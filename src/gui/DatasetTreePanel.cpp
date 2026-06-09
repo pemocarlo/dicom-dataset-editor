@@ -7,6 +7,8 @@
 
 namespace {
 
+constexpr int ValueColumn = 5;
+
 std::string lower(std::string value)
 {
     std::ranges::transform(value, value.begin(), [](unsigned char ch) {
@@ -56,7 +58,7 @@ DatasetTreePanel::DatasetTreePanel(wxWindow* parent)
     list_->AppendTextColumn("VR", wxDATAVIEW_CELL_INERT, 55, wxALIGN_LEFT, wxDATAVIEW_COL_RESIZABLE);
     list_->AppendTextColumn("VM", wxDATAVIEW_CELL_INERT, 55, wxALIGN_LEFT, wxDATAVIEW_COL_RESIZABLE);
     list_->AppendTextColumn("Path", wxDATAVIEW_CELL_INERT, 260, wxALIGN_LEFT, wxDATAVIEW_COL_RESIZABLE);
-    list_->AppendTextColumn("Value", wxDATAVIEW_CELL_INERT, 420, wxALIGN_LEFT, wxDATAVIEW_COL_RESIZABLE);
+    list_->AppendTextColumn("Value", wxDATAVIEW_CELL_EDITABLE, 420, wxALIGN_LEFT, wxDATAVIEW_COL_RESIZABLE);
     list_->AppendTextColumn("Kind", wxDATAVIEW_CELL_INERT, 90, wxALIGN_LEFT, wxDATAVIEW_COL_RESIZABLE);
 
     auto* sizer = new wxBoxSizer(wxVERTICAL);
@@ -66,6 +68,7 @@ DatasetTreePanel::DatasetTreePanel(wxWindow* parent)
 
     filter_->Bind(wxEVT_TEXT, &DatasetTreePanel::OnFilterChanged, this);
     list_->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, &DatasetTreePanel::OnSelectionChanged, this);
+    list_->Bind(wxEVT_DATAVIEW_ITEM_VALUE_CHANGED, &DatasetTreePanel::OnValueChanged, this);
 }
 
 void DatasetTreePanel::SetNodes(std::vector<dicom_editor::DicomNode> nodes)
@@ -88,6 +91,11 @@ void DatasetTreePanel::SetSelectionChangedHandler(std::function<void()> handler)
     selectionChanged_ = std::move(handler);
 }
 
+void DatasetTreePanel::SetValueChangedHandler(std::function<void(dicom_editor::DicomPath, std::string)> handler)
+{
+    valueChanged_ = std::move(handler);
+}
+
 void DatasetTreePanel::Rebuild()
 {
     list_->DeleteAllItems();
@@ -107,7 +115,7 @@ void DatasetTreePanel::Rebuild()
         row.push_back(wxVariant(wxString::FromUTF8(node.vr)));
         row.push_back(wxVariant(wxString::FromUTF8(node.vm)));
         row.push_back(wxVariant(wxString::FromUTF8(node.path.toString())));
-        row.push_back(wxVariant(wxString::FromUTF8(node.valuePreview)));
+        row.push_back(wxVariant(wxString::FromUTF8(node.value)));
         row.push_back(wxVariant(wxString::FromUTF8(kindLabel(node.kind))));
         list_->AppendItem(row);
         visibleToNode_.push_back(index);
@@ -123,5 +131,20 @@ void DatasetTreePanel::OnSelectionChanged(wxDataViewEvent&)
 {
     if (selectionChanged_) {
         selectionChanged_();
+    }
+}
+
+void DatasetTreePanel::OnValueChanged(wxDataViewEvent& event)
+{
+    const int row = list_->ItemToRow(event.GetItem());
+    if (event.GetColumn() != ValueColumn || row < 0 || static_cast<std::size_t>(row) >= visibleToNode_.size()) {
+        return;
+    }
+
+    const auto& node = allNodes_[visibleToNode_[static_cast<std::size_t>(row)]];
+    if (node.editable && valueChanged_) {
+        valueChanged_(node.path, list_->GetTextValue(static_cast<unsigned int>(row), ValueColumn).ToStdString());
+    } else {
+        Rebuild();
     }
 }

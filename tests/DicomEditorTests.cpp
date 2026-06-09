@@ -127,6 +127,22 @@ void recursiveNodeListing()
     assert(sawNestedValue);
 }
 
+void nodeKeepsFullValue()
+{
+    DicomDocument document;
+    const std::string longValue(200, 'x');
+    document.dataset().putAndInsertString(DCM_PatientComments, longValue.c_str());
+
+    for (const auto& node : document.nodes()) {
+        if (node.keyword == "PatientComments") {
+            assert(node.value == longValue);
+            assert(node.valuePreview.size() == 160);
+            return;
+        }
+    }
+    assert(false);
+}
+
 } // namespace
 
 int main()
@@ -136,6 +152,7 @@ int main()
     nestedSequenceEdit();
     saveReloadPersistence();
     recursiveNodeListing();
+    nodeKeepsFullValue();
 
     std::cout << "All DICOM editor tests passed\n";
     return 0;

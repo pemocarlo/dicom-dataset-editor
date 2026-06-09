@@ -15,6 +15,8 @@ private:
     void RefreshDataset();
     bool ConfirmDiscardChanges();
     bool SaveCurrent();
+    void EditSelectedValue();
+    void EditValue(dicom_editor::DicomPath path, std::string value);
     void ShowError(const std::string& message);
     void UpdateActions();
 

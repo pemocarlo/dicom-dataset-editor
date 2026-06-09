@@ -32,6 +32,9 @@ MainFrame::MainFrame()
 
     datasetPanel_ = new DatasetTreePanel(this);
     datasetPanel_->SetSelectionChangedHandler([this] { UpdateActions(); });
+    datasetPanel_->SetValueChangedHandler([this](dicom_editor::DicomPath path, std::string value) {
+        EditValue(std::move(path), std::move(value));
+    });
     auto* sizer = new wxBoxSizer(wxVERTICAL);
     sizer->Add(datasetPanel_, 1, wxEXPAND);
     SetSizer(sizer);
@@ -173,21 +176,32 @@ void MainFrame::OnSaveAs(wxCommandEvent&)
 
 void MainFrame::OnEdit(wxCommandEvent&)
 {
+    EditSelectedValue();
+}
+
+void MainFrame::EditSelectedValue()
+{
     const auto* selected = datasetPanel_->SelectedNode();
     if (selected == nullptr || !selected->editable) {
         return;
     }
 
-    auto result = AttributeEditDialog::Edit(this, "Edit " + wxString::FromUTF8(selected->keyword), wxString::FromUTF8(selected->valuePreview));
+    auto result = AttributeEditDialog::Edit(this, "Edit " + wxString::FromUTF8(selected->keyword), wxString::FromUTF8(selected->value));
     if (!result) {
         return;
     }
 
+    EditValue(selected->path, result->value);
+}
+
+void MainFrame::EditValue(dicom_editor::DicomPath path, std::string value)
+{
     try {
-        editor_.editValue(document_, {.path = selected->path, .value = result->value});
+        editor_.editValue(document_, {.path = std::move(path), .value = std::move(value)});
         RefreshDataset();
     } catch (const std::exception& error) {
         ShowError(error.what());
+        RefreshDataset();
     }
 }
 

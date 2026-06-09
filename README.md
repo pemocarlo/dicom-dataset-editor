@@ -63,6 +63,7 @@ On Linux and macOS, the installed executable uses a relative runtime path from `
 - Open DICOM file.
 - Display recursive dataset rows, including sequence items.
 - Show tag, keyword, VR, VM, path, and value preview.
+- Edit values inline by double-clicking a Value cell.
 - Edit non-sequence attributes with DCMTK validation.
 - Navigate and edit attributes inside sequence items.
 - Add and delete normal attributes.
