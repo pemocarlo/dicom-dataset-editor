@@ -1,16 +1,28 @@
 #include "dicom_editor/DicomDocument.hpp"
 
 #include "dicom_editor/DicomError.hpp"
+#include "dicom_editor/DicomPath.hpp"
 #include "dicom_editor/RuntimePaths.hpp"
 
-#include <dcmtk/dcmdata/dcdeftag.h>
+#include <dcmtk/dcmdata/dcdatset.h>
+#include <dcmtk/dcmdata/dcelem.h>
+#include <dcmtk/dcmdata/dcfilefo.h>
+#include <dcmtk/dcmdata/dcitem.h>
 #include <dcmtk/dcmdata/dcsequen.h>
+#include <dcmtk/dcmdata/dctag.h>
+#include <dcmtk/dcmdata/dctagkey.h>
 #include <dcmtk/dcmdata/dcvr.h>
+#include <dcmtk/dcmdata/dcxfer.h>
+#include <dcmtk/ofstd/ofcond.h>
+#include <dcmtk/ofstd/offile.h>
+#include <dcmtk/ofstd/ofstring.h>
 
-#include <algorithm>
 #include <cstdlib>
 #include <iomanip>
+#include <optional>
 #include <sstream>
+#include <string>
+#include <utility>
 
 namespace dicom_editor {
 
@@ -81,7 +93,7 @@ std::string valueFor(DcmElement &element) {
         return "<binary>";
     }
 
-    return value.c_str();
+    return value;
 }
 
 std::string valuePreviewFor(const std::string &value) {
@@ -224,12 +236,13 @@ const DcmItem &DicomDocument::itemAt(const DicomPath &path) const {
 }
 
 DcmElement &DicomDocument::elementAt(const DicomPath &path) {
-    if (!path.pointsToElement()) {
+    const auto &tag = path.elementTag();
+    if (!tag) {
         throw DicomError("Path does not point to an element: " + path.toString());
     }
     DcmItem &parent = resolveItem(dataset(), path);
     DcmElement *element = nullptr;
-    requireGood(parent.findAndGetElement(*path.elementTag(), element), "Find element " + path.toString());
+    requireGood(parent.findAndGetElement(*tag, element), "Find element " + path.toString());
     if (element == nullptr) {
         throw DicomError("Element not found: " + path.toString());
     }

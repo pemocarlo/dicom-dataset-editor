@@ -1,16 +1,21 @@
 Checks: >
   -*,
   clang-analyzer-*,
-  bugprone-branch-clone,
-  bugprone-dangling-handle,
-  bugprone-infinite-loop,
-  bugprone-misplaced-widening-cast,
-  bugprone-narrowing-conversions,
-  bugprone-sizeof-expression,
-  bugprone-string-constructor,
-  bugprone-use-after-move,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-exception-escape,
+  -bugprone-suspicious-call-argument,
+  -bugprone-unsafe-functions,
   modernize-use-nullptr,
   performance-*,
-  readability-container-size-empty
+  portability-*,
+  -portability-avoid-pragma-once,
+  readability-container-size-empty,
+  readability-duplicate-include,
+  readability-misleading-indentation,
+  readability-redundant-*,
+  readability-static-accessed-through-instance
 WarningsAsErrors: '*'
 HeaderFilterRegex: '^(?!.*\.conan2/).*(include|src|tests)/.*'
+ExtraArgsBefore:
+  - '-Wno-unknown-warning-option'

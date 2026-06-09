@@ -13,7 +13,7 @@ This project is a C++23 wxWidgets GUI for opening, inspecting, editing, and savi
 - `dcmtk/3.7.0`
 - Conan `CMakeToolchain`
 - Experimental Conan `CMakeConfigDeps`
-- `clang-format` and `clang-tidy` for developer checks
+- `clang-format`, `clang-tidy`, and include-what-you-use for developer checks
 
 ## Architecture
 
@@ -43,13 +43,13 @@ Always build this project with `-pr:h=linux-gcc-release -pr:b=linux-gcc-release`
 
 ## Developer Mode
 
-Developer mode enables tests, formatting and linting targets, and a compilation database for editor tooling:
+Developer mode enables tests, strict compiler warnings, formatting and linting targets, and a compilation database for editor tooling:
 
 ```bash
 cmake --workflow --preset dev-check
 ```
 
-The workflow configures and builds the developer tree, checks formatting, runs `clang-tidy`, and runs tests. Individual steps remain available:
+The workflow configures and builds the developer tree with strict warnings, checks formatting, runs `clang-tidy`, and runs tests. Individual steps remain available:
 
 ```bash
 cmake --preset dev
@@ -65,11 +65,47 @@ Apply `clang-format` changes with:
 cmake --build --preset format
 ```
 
+The developer preset enables `DICOM_EDITOR_ENABLE_STRICT_WARNINGS`. GCC builds use a broad, practical warning set including `-Wall`, `-Wextra`, `-Wpedantic`, conversion, shadowing, format, virtual-dispatch, switch, and null-dereference diagnostics. `-Werror` makes every enabled compiler warning fail the build. The project does not blindly enable every GCC warning flag: GCC has no `-Weverything`, and many optional warnings are language-specific, mutually incompatible, intentionally noisy, or diagnose external APIs rather than project defects.
+
+`clang-tidy` also treats every enabled diagnostic as an error. Its checks are deliberately selected rather than enabling `*`:
+
+- Platform and vendor suites such as Android, Fuchsia, LLVM, and Google enforce unrelated environments or style guides.
+- Broad policy suites such as `cppcoreguidelines-*` and `hicpp-*` contain overlapping checks and rules that conflict with wxWidgets/DCMTK APIs.
+- Subjective metrics and style checks such as identifier length, magic numbers, and function size create noise without proving defects.
+- `bugprone-easily-swappable-parameters` flags many intentional same-type GUI parameters.
+- `bugprone-exception-escape` cannot model wxWidgets callback and application exception boundaries reliably.
+- `bugprone-suspicious-call-argument` relies on parameter-name similarity and produces heuristic false positives.
+- `bugprone-unsafe-functions` applies a broad API policy unsuitable for portable third-party GUI and DICOM APIs.
+- `portability-avoid-pragma-once` conflicts with this project's accepted header style.
+
+Enabled clang-tidy groups focus on analyzer defects, bug-prone constructs, performance, portability, duplicate/redundant code, and selected modernization. Keep exclusions explicit in `.clang-tidy`; add a check only when its findings can be kept warning-free.
+
+Include-what-you-use uses CMake's native `CXX_INCLUDE_WHAT_YOU_USE` integration in a dedicated clean build:
+
+```bash
+cmake --preset iwyu
+cmake --build --preset iwyu
+```
+
+IWYU is experimental and tightly coupled to its Clang version. Install an IWYU release matching installed Clang and ensure `include-what-you-use` is in `PATH`. A system-wide installation is not required; for a local installation outside `PATH`, configure with:
+
+```bash
+cmake --preset iwyu -DDICOM_EDITOR_IWYU_EXECUTABLE="$HOME/.local/bin/include-what-you-use"
+```
+
+The dedicated build is clean because IWYU runs only when sources compile. Findings fail the build through `--error=1`. IWYU alone ignores unknown warning names because it parses the GCC command line with Clang; GCC still enforces every configured warning. `iwyu.imp` maps wxWidgets platform-private implementation headers back to portable public headers, preventing Linux-only `wx/gtk/*` suggestions.
+
+To run strict compilation, formatting, clang-tidy, tests, and IWYU together:
+
+```bash
+cmake --workflow --preset all-checks
+```
+
 The `dev` preset inherits Conan's generated release preset but uses a separate `build/Dev` directory. Run the documented `conan install` command with both `linux-gcc-release` profiles first so `build/Release/generators/CMakePresets.json` and the Conan toolchain exist.
 
 Developer mode sets `DICOM_EDITOR_ENABLE_LSP=ON`. This enables `CMAKE_EXPORT_COMPILE_COMMANDS` and creates the source-root `compile_commands.json` symlink used automatically by `clangd`, including Neovim LSP clients. To enable only the compilation database in another configuration, pass `-DDICOM_EDITOR_ENABLE_LSP=ON`.
 
-Developer tooling is opt-in. Normal release configuration does not require `clang-format` or `clang-tidy`.
+Developer tooling is opt-in. Normal release configuration does not require `clang-format`, `clang-tidy`, or IWYU, and does not enable warnings as errors.
 
 ## Install
 

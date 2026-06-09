@@ -1,0 +1,12 @@
+[
+  { "include": ["<wx/gtk/app.h>", "private", "<wx/app.h>", "public"] },
+  { "include": ["<wx/unix/app.h>", "private", "<wx/app.h>", "public"] },
+  { "include": ["<wx/gtk/dialog.h>", "private", "<wx/dialog.h>", "public"] },
+  { "include": ["<wx/gtk/frame.h>", "private", "<wx/frame.h>", "public"] },
+  { "include": ["<wx/gtk/menu.h>", "private", "<wx/menu.h>", "public"] },
+  { "include": ["<wx/gtk/menuitem.h>", "private", "<wx/menu.h>", "public"] },
+  { "include": ["<wx/gtk/panel.h>", "private", "<wx/panel.h>", "public"] },
+  { "include": ["<wx/gtk/srchctrl.h>", "private", "<wx/srchctrl.h>", "public"] },
+  { "include": ["<wx/gtk/stattext.h>", "private", "<wx/stattext.h>", "public"] },
+  { "include": ["<wx/gtk/textctrl.h>", "private", "<wx/textctrl.h>", "public"] }
+]

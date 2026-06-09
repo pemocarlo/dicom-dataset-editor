@@ -1,6 +1,8 @@
 #include "MainFrame.hpp"
 
+#ifdef DICOM_EDITOR_INSTALL_DATADIR
 #include "dicom_editor/RuntimePaths.hpp"
+#endif
 
 #include <wx/app.h>
 
@@ -17,11 +19,13 @@ void setEnvIfUnsetOrInvalid(const char *name, const std::filesystem::path &value
     }
 }
 
+#if defined(DICOM_EDITOR_INSTALL_DATADIR) && defined(__linux__)
 void setEnvIfUnset(const char *name, const char *value) {
     if (std::getenv(name) == nullptr) {
         setenv(name, value, 1);
     }
 }
+#endif
 
 struct RuntimeEnvironment {
     RuntimeEnvironment() {
@@ -41,13 +45,12 @@ struct RuntimeEnvironment {
     }
 };
 
-RuntimeEnvironment runtimeEnvironment;
-
 } // namespace
 
 class DicomDatasetEditorApp final : public wxApp {
   public:
     bool OnInit() override {
+        RuntimeEnvironment runtimeEnvironment;
         auto *frame = new MainFrame();
         frame->Show(true);
         return true;

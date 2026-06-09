@@ -19,7 +19,18 @@
             "cacheVariables": {
                 "BUILD_TESTING": true,
                 "DICOM_EDITOR_DEVELOPER_MODE": true,
-                "DICOM_EDITOR_ENABLE_LSP": true
+                "DICOM_EDITOR_ENABLE_LSP": true,
+                "DICOM_EDITOR_ENABLE_STRICT_WARNINGS": true
+            }
+        },
+        {
+            "name": "iwyu",
+            "displayName": "Include-what-you-use",
+            "description": "Developer build with native CMake include-what-you-use integration",
+            "inherits": "dev",
+            "binaryDir": "${sourceDir}/build/IWYU",
+            "cacheVariables": {
+                "DICOM_EDITOR_ENABLE_IWYU": true
             }
         }
     ],
@@ -48,12 +59,38 @@
             "targets": [
                 "lint"
             ]
+        },
+        {
+            "name": "iwyu",
+            "configurePreset": "iwyu",
+            "cleanFirst": true
+        },
+        {
+            "name": "check-format-iwyu",
+            "configurePreset": "iwyu",
+            "targets": [
+                "check-format"
+            ]
+        },
+        {
+            "name": "lint-iwyu",
+            "configurePreset": "iwyu",
+            "targets": [
+                "lint"
+            ]
         }
     ],
     "testPresets": [
         {
             "name": "dev",
             "configurePreset": "dev",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "iwyu",
+            "configurePreset": "iwyu",
             "output": {
                 "outputOnFailure": true
             }
@@ -84,6 +121,33 @@
                 {
                     "type": "test",
                     "name": "dev"
+                }
+            ]
+        },
+        {
+            "name": "all-checks",
+            "displayName": "Developer verification with IWYU",
+            "description": "Run developer verification and a clean include-what-you-use build",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "iwyu"
+                },
+                {
+                    "type": "build",
+                    "name": "iwyu"
+                },
+                {
+                    "type": "build",
+                    "name": "check-format-iwyu"
+                },
+                {
+                    "type": "build",
+                    "name": "lint-iwyu"
+                },
+                {
+                    "type": "test",
+                    "name": "iwyu"
                 }
             ]
         }

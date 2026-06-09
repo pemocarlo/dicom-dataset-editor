@@ -1,7 +1,10 @@
 #include "dicom_editor/DicomPath.hpp"
 
+#include <dcmtk/dcmdata/dctagkey.h>
+
 #include <iomanip>
 #include <sstream>
+#include <utility>
 
 namespace dicom_editor {
 

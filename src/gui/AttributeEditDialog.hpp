@@ -3,10 +3,13 @@
 #include <dcmtk/dcmdata/dctagkey.h>
 
 #include <wx/dialog.h>
-#include <wx/textctrl.h>
+#include <wx/string.h>
 
 #include <optional>
 #include <string>
+
+class wxTextCtrl;
+class wxWindow;
 
 struct AttributeDialogResult {
     std::optional<DcmTagKey> tag;

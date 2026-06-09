@@ -26,7 +26,11 @@ add_custom_target(check-format
 )
 
 add_custom_target(lint
-    COMMAND ${DICOM_EDITOR_CLANG_TIDY} --quiet -p=${CMAKE_BINARY_DIR} ${DICOM_EDITOR_LINT_FILES}
+    COMMAND ${DICOM_EDITOR_CLANG_TIDY}
+        --quiet
+        --warnings-as-errors=*
+        -p=${CMAKE_BINARY_DIR}
+        ${DICOM_EDITOR_LINT_FILES}
     COMMENT "Linting C++ sources"
     VERBATIM
 )

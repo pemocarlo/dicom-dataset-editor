@@ -2,14 +2,19 @@
 
 #include "dicom_editor/DicomNode.hpp"
 
-#include <dcmtk/dcmdata/dctk.h>
+#include <dcmtk/dcmdata/dcfilefo.h>
 
 #include <filesystem>
 #include <memory>
-#include <string>
 #include <vector>
 
+class DcmDataset;
+class DcmElement;
+class DcmItem;
+
 namespace dicom_editor {
+
+class DicomPath;
 
 class DicomDocument {
   public:

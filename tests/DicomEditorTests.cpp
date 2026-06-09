@@ -1,14 +1,23 @@
 #include "dicom_editor/DicomDocument.hpp"
 #include "dicom_editor/DicomEditorService.hpp"
+#include "dicom_editor/DicomNode.hpp"
+#include "dicom_editor/DicomPath.hpp"
 
+#include <dcmtk/dcmdata/dcdatset.h>
 #include <dcmtk/dcmdata/dcdeftag.h>
+#include <dcmtk/dcmdata/dcelem.h>
+#include <dcmtk/dcmdata/dcitem.h>
 #include <dcmtk/dcmdata/dcsequen.h>
-#include <dcmtk/dcmdata/dctk.h>
+#include <dcmtk/dcmdata/dctagkey.h>
+#include <dcmtk/dcmdata/dcuid.h>
+#include <dcmtk/ofstd/ofcond.h>
+#include <dcmtk/ofstd/ofstring.h>
 
-#include <cassert>
 #include <filesystem>
 #include <iostream>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 using dicom_editor::AddAttributeRequest;
 using dicom_editor::DicomDocument;
@@ -19,11 +28,17 @@ using dicom_editor::SequenceItemRef;
 
 namespace {
 
+void require(bool condition) {
+    if (!condition) {
+        throw std::runtime_error("test requirement failed");
+    }
+}
+
 std::string stringValue(DicomDocument &document, const DicomPath &path) {
     OFString value;
     const auto condition = document.elementAt(path).getOFStringArray(value);
-    assert(condition.good());
-    return value.c_str();
+    require(condition.good());
+    return value;
 }
 
 void seedDataset(DicomDocument &document) {
@@ -52,8 +67,8 @@ void scalarEdit() {
     const DicomPath patientName = DicomPath::element({}, DCM_PatientName);
     editor.editValue(document, {.path = patientName, .value = "After^Patient"});
 
-    assert(document.dirty());
-    assert(stringValue(document, patientName) == "After^Patient");
+    require(document.dirty());
+    require(stringValue(document, patientName) == "After^Patient");
 }
 
 void addDeleteElement() {
@@ -64,11 +79,11 @@ void addDeleteElement() {
     const auto tag = DCM_PatientID;
     const DicomPath patientId = DicomPath::element({}, tag);
     editor.addAttribute(document, AddAttributeRequest{.parentItemPath = DicomPath::dataset(), .tag = tag, .value = "PID-123"});
-    assert(stringValue(document, patientId) == "PID-123");
+    require(stringValue(document, patientId) == "PID-123");
 
     editor.deleteAttribute(document, patientId);
     DcmElement *deleted = nullptr;
-    assert(document.dataset().findAndGetElement(tag, deleted).bad());
+    require(document.dataset().findAndGetElement(tag, deleted).bad());
 }
 
 void nestedSequenceEdit() {
@@ -80,7 +95,7 @@ void nestedSequenceEdit() {
     const DicomPath referencedSop = DicomPath::element(parents, DCM_ReferencedSOPInstanceUID);
     editor.editValue(document, {.path = referencedSop, .value = "1.2.826.0.1.3680043.10.543.99"});
 
-    assert(stringValue(document, referencedSop) == "1.2.826.0.1.3680043.10.543.99");
+    require(stringValue(document, referencedSop) == "1.2.826.0.1.3680043.10.543.99");
 }
 
 void saveReloadPersistence() {
@@ -96,7 +111,7 @@ void saveReloadPersistence() {
 
     DicomDocument reloaded;
     reloaded.load(output);
-    assert(stringValue(reloaded, patientName) == "Persisted^Patient");
+    require(stringValue(reloaded, patientName) == "Persisted^Patient");
 
     std::filesystem::remove(output);
 }
@@ -115,9 +130,9 @@ void recursiveNodeListing() {
         sawNestedValue = sawNestedValue || node.keyword == "ReferencedSOPInstanceUID";
     }
 
-    assert(sawPatientName);
-    assert(sawSequence);
-    assert(sawNestedValue);
+    require(sawPatientName);
+    require(sawSequence);
+    require(sawNestedValue);
 }
 
 void nodeKeepsFullValue() {
@@ -127,12 +142,12 @@ void nodeKeepsFullValue() {
 
     for (const auto &node : document.nodes()) {
         if (node.keyword == "PatientComments") {
-            assert(node.value == longValue);
-            assert(node.valuePreview.size() == 160);
+            require(node.value == longValue);
+            require(node.valuePreview.size() == 160);
             return;
         }
     }
-    assert(false);
+    require(false);
 }
 
 } // namespace

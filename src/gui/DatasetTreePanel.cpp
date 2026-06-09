@@ -1,9 +1,21 @@
 #include "DatasetTreePanel.hpp"
 
+#include "dicom_editor/DicomPath.hpp"
+
+#include <wx/dataview.h>
+#include <wx/defs.h>
+#include <wx/event.h>
+#include <wx/gdicmn.h>
 #include <wx/sizer.h>
+#include <wx/srchctrl.h>
+#include <wx/string.h>
+#include <wx/textctrl.h>
+#include <wx/variant.h>
+#include <wx/vector.h>
 
 #include <algorithm>
 #include <cctype>
+#include <utility>
 
 namespace {
 
@@ -33,7 +45,7 @@ std::string kindLabel(dicom_editor::DicomNodeKind kind) {
 }
 
 wxString indented(const dicom_editor::DicomNode &node) {
-    std::string text(node.depth * 2, ' ');
+    std::string text(static_cast<std::size_t>(node.depth) * 2, ' ');
     text += node.keyword.empty() ? node.tag : node.keyword;
     return wxString::FromUTF8(text);
 }

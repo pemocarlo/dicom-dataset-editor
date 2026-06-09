@@ -1,12 +1,27 @@
 #include "MainFrame.hpp"
 
 #include "AttributeEditDialog.hpp"
+#include "DatasetTreePanel.hpp"
+#include "dicom_editor/DicomNode.hpp"
+#include "dicom_editor/DicomPath.hpp"
 
+#include <dcmtk/dcmdata/dctagkey.h>
+
+#include <wx/defs.h>
+#include <wx/event.h>
 #include <wx/filedlg.h>
+#include <wx/gdicmn.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
 #include <wx/sizer.h>
-#include <wx/statusbr.h>
+#include <wx/string.h>
+
+#include <exception>
+#include <filesystem>
+#include <functional>
+#include <optional>
+#include <utility>
+#include <vector>
 
 namespace {
 
