@@ -1,5 +1,7 @@
 #include "MainFrame.hpp"
 
+#include "dicom_editor/RuntimePaths.hpp"
+
 #include <wx/app.h>
 
 #include <cstdlib>
@@ -16,9 +18,23 @@ void setEnvIfUnsetOrInvalid(const char* name, const std::filesystem::path& value
     }
 }
 
+void setEnvIfUnset(const char* name, const char* value)
+{
+    if (std::getenv(name) == nullptr) {
+        setenv(name, value, 1);
+    }
+}
+
 struct RuntimeEnvironment {
     RuntimeEnvironment()
     {
+#ifdef DICOM_EDITOR_INSTALL_DATADIR
+        const auto installedFontconfig = dicom_editor::installedDataPath("fontconfig/fonts.conf");
+        setEnvIfUnsetOrInvalid("FONTCONFIG_FILE", installedFontconfig);
+#if defined(__linux__)
+        setEnvIfUnset("GTK_IM_MODULE", "gtk-im-context-simple");
+#endif
+#endif
 #ifdef DICOM_EDITOR_FONTCONFIG_PATH
         setEnvIfUnsetOrInvalid("FONTCONFIG_PATH", DICOM_EDITOR_FONTCONFIG_PATH);
 #endif

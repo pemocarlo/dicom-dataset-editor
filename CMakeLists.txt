@@ -2,9 +2,16 @@ cmake_minimum_required(VERSION 4.0)
 
 project(DicomDatasetEditor VERSION 0.1.0 LANGUAGES CXX)
 
+include(GNUInstallDirs)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+option(DICOM_EDITOR_RELOCATABLE_INSTALL
+    "Bundle non-system shared libraries and use relative runtime paths"
+    OFF
+)
 
 find_package(DCMTK CONFIG REQUIRED)
 if(UNIX AND NOT APPLE)
@@ -57,6 +64,73 @@ else()
 endif()
 
 target_link_libraries(dicom-dataset-editor PRIVATE dicom_editor_core ${DICOM_EDITOR_WX_TARGET})
+
+if(DICOM_EDITOR_RELOCATABLE_INSTALL)
+    set(DICOM_EDITOR_INSTALL_DATADIR "../${CMAKE_INSTALL_DATADIR}/dicom-dataset-editor")
+    target_compile_definitions(dicom_editor_core
+        PRIVATE DICOM_EDITOR_INSTALL_DATADIR="${DICOM_EDITOR_INSTALL_DATADIR}"
+    )
+    target_compile_definitions(dicom-dataset-editor
+        PRIVATE DICOM_EDITOR_INSTALL_DATADIR="${DICOM_EDITOR_INSTALL_DATADIR}"
+    )
+
+    if(APPLE)
+        set_property(TARGET dicom-dataset-editor PROPERTY INSTALL_RPATH
+            "@loader_path/../${CMAKE_INSTALL_LIBDIR}"
+        )
+    elseif(UNIX)
+        set_property(TARGET dicom-dataset-editor PROPERTY INSTALL_RPATH
+            "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+        )
+    endif()
+
+    set_property(TARGET dicom-dataset-editor PROPERTY BUILD_RPATH_USE_ORIGIN TRUE)
+
+    install(TARGETS dicom-dataset-editor
+        RUNTIME_DEPENDENCY_SET dicom_editor_runtime_dependencies
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        BUNDLE DESTINATION .
+    )
+
+    if(APPLE)
+        install(RUNTIME_DEPENDENCY_SET dicom_editor_runtime_dependencies
+            POST_EXCLUDE_REGEXES
+                "^/System/Library/"
+                "^/usr/lib/"
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            FRAMEWORK DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        )
+    elseif(UNIX)
+        install(RUNTIME_DEPENDENCY_SET dicom_editor_runtime_dependencies
+            POST_EXCLUDE_REGEXES
+                "^/lib/"
+                "^/lib64/"
+                "^/usr/lib/"
+                "^/usr/lib64/"
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        )
+    else()
+        install(RUNTIME_DEPENDENCY_SET dicom_editor_runtime_dependencies
+            PRE_EXCLUDE_REGEXES
+                "^api-ms-"
+                "^ext-ms-"
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        )
+    endif()
+
+    install(FILES
+        "${dcmtk_PACKAGE_FOLDER_RELEASE}/bin/share/dcmtk-3.7.0/dicom.dic"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/dicom-dataset-editor/dcmtk"
+    )
+    install(FILES resources/fonts.conf
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/dicom-dataset-editor/fontconfig"
+    )
+else()
+    install(TARGETS dicom-dataset-editor
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        BUNDLE DESTINATION .
+    )
+endif()
 
 include(CTest)
 if(BUILD_TESTING)
