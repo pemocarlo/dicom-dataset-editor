@@ -9,18 +9,17 @@
 #include <mach-o/dyld.h>
 #include <vector>
 #elif defined(_WIN32)
-#include <windows.h>
 #include <vector>
+#include <windows.h>
 #endif
 
 namespace dicom_editor {
 
-inline std::filesystem::path executableDirectory()
-{
+inline std::filesystem::path executableDirectory() {
 #if defined(__linux__)
     std::error_code error;
     const auto executable = std::filesystem::read_symlink("/proc/self/exe", error);
-    return error ? std::filesystem::path {} : executable.parent_path();
+    return error ? std::filesystem::path{} : executable.parent_path();
 #elif defined(__APPLE__)
     std::uint32_t size = 0;
     _NSGetExecutablePath(nullptr, &size);
@@ -30,7 +29,7 @@ inline std::filesystem::path executableDirectory()
     }
     std::error_code error;
     const auto executable = std::filesystem::weakly_canonical(buffer.data(), error);
-    return error ? std::filesystem::path {} : executable.parent_path();
+    return error ? std::filesystem::path{} : executable.parent_path();
 #elif defined(_WIN32)
     std::vector<wchar_t> buffer(32768);
     const auto size = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
@@ -43,8 +42,7 @@ inline std::filesystem::path executableDirectory()
 #endif
 }
 
-inline std::filesystem::path installedDataPath(const std::filesystem::path& relativePath)
-{
+inline std::filesystem::path installedDataPath(const std::filesystem::path &relativePath) {
 #ifdef DICOM_EDITOR_INSTALL_DATADIR
     const auto executableDir = executableDirectory();
     if (!executableDir.empty()) {

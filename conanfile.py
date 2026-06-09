@@ -1,5 +1,5 @@
 from conan import ConanFile
-from conan.tools.cmake import CMakeConfigDeps, cmake_layout
+from conan.tools.cmake import CMakeConfigDeps, CMakeToolchain, cmake_layout
 
 
 class DicomDatasetEditorRecipe(ConanFile):
@@ -14,11 +14,13 @@ class DicomDatasetEditorRecipe(ConanFile):
         "dcmtk/3.7.0",
     )
 
-    generators = "CMakeToolchain"
-
     def layout(self):
         cmake_layout(self, build_folder="build")
 
     def generate(self):
+        toolchain = CMakeToolchain(self)
+        toolchain.user_presets_path = False
+        toolchain.generate()
+
         deps = CMakeConfigDeps(self)
         deps.generate()

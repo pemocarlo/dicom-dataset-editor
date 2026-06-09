@@ -10,24 +10,21 @@
 
 namespace {
 
-void setEnvIfUnsetOrInvalid(const char* name, const std::filesystem::path& value)
-{
-    const char* current = std::getenv(name);
+void setEnvIfUnsetOrInvalid(const char *name, const std::filesystem::path &value) {
+    const char *current = std::getenv(name);
     if ((current == nullptr || !std::filesystem::exists(current)) && std::filesystem::exists(value)) {
         setenv(name, value.string().c_str(), 1);
     }
 }
 
-void setEnvIfUnset(const char* name, const char* value)
-{
+void setEnvIfUnset(const char *name, const char *value) {
     if (std::getenv(name) == nullptr) {
         setenv(name, value, 1);
     }
 }
 
 struct RuntimeEnvironment {
-    RuntimeEnvironment()
-    {
+    RuntimeEnvironment() {
 #ifdef DICOM_EDITOR_INSTALL_DATADIR
         const auto installedFontconfig = dicom_editor::installedDataPath("fontconfig/fonts.conf");
         setEnvIfUnsetOrInvalid("FONTCONFIG_FILE", installedFontconfig);
@@ -49,10 +46,9 @@ RuntimeEnvironment runtimeEnvironment;
 } // namespace
 
 class DicomDatasetEditorApp final : public wxApp {
-public:
-    bool OnInit() override
-    {
-        auto* frame = new MainFrame();
+  public:
+    bool OnInit() override {
+        auto *frame = new MainFrame();
         frame->Show(true);
         return true;
     }

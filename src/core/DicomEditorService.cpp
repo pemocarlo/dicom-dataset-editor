@@ -8,15 +8,13 @@ namespace dicom_editor {
 
 namespace {
 
-void requireGood(const OFCondition& condition, const std::string& action)
-{
+void requireGood(const OFCondition &condition, const std::string &action) {
     if (condition.bad()) {
         throw DicomError(action + ": " + condition.text());
     }
 }
 
-void requireEditable(const DcmElement& element)
-{
+void requireEditable(const DcmElement &element) {
     if (element.ident() == EVR_SQ) {
         throw DicomError("Sequences are edited through their items and attributes");
     }
@@ -24,23 +22,20 @@ void requireEditable(const DcmElement& element)
 
 } // namespace
 
-void DicomEditorService::editValue(DicomDocument& document, const EditRequest& request) const
-{
-    DcmElement& element = document.elementAt(request.path);
+void DicomEditorService::editValue(DicomDocument &document, const EditRequest &request) const {
+    DcmElement &element = document.elementAt(request.path);
     requireEditable(element);
     requireGood(element.putString(request.value.c_str()), "Edit element " + request.path.toString());
     document.markDirty();
 }
 
-void DicomEditorService::addAttribute(DicomDocument& document, const AddAttributeRequest& request) const
-{
-    DcmItem& parent = document.itemAt(request.parentItemPath);
+void DicomEditorService::addAttribute(DicomDocument &document, const AddAttributeRequest &request) const {
+    DcmItem &parent = document.itemAt(request.parentItemPath);
     requireGood(parent.putAndInsertString(request.tag, request.value.c_str(), true), "Add attribute");
     document.markDirty();
 }
 
-void DicomEditorService::deleteAttribute(DicomDocument& document, const DicomPath& path) const
-{
+void DicomEditorService::deleteAttribute(DicomDocument &document, const DicomPath &path) const {
     if (!path.pointsToElement()) {
         throw DicomError("Only attributes can be deleted");
     }
@@ -49,7 +44,7 @@ void DicomEditorService::deleteAttribute(DicomDocument& document, const DicomPat
     }
 
     DicomPath parentPath = DicomPath::item(path.parents());
-    DcmItem& parent = document.itemAt(parentPath);
+    DcmItem &parent = document.itemAt(parentPath);
     requireGood(parent.findAndDeleteElement(*path.elementTag(), true, true), "Delete attribute " + path.toString());
     document.markDirty();
 }

@@ -1,0 +1,91 @@
+{
+    "version": 10,
+    "cmakeMinimumRequired": {
+        "major": 4,
+        "minor": 0,
+        "patch": 0
+    },
+    "include": [
+        "build/Release/generators/CMakePresets.json"
+    ],
+    "configurePresets": [
+        {
+            "name": "dev",
+            "displayName": "Developer mode",
+            "description": "Release build with tests, linting, formatting, and LSP compile commands",
+            "inherits": "conan-release",
+            "binaryDir": "${sourceDir}/build/Dev",
+            "toolchainFile": "${sourceDir}/build/Release/generators/conan_toolchain.cmake",
+            "cacheVariables": {
+                "BUILD_TESTING": true,
+                "DICOM_EDITOR_DEVELOPER_MODE": true,
+                "DICOM_EDITOR_ENABLE_LSP": true
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "dev",
+            "configurePreset": "dev"
+        },
+        {
+            "name": "format",
+            "configurePreset": "dev",
+            "targets": [
+                "format"
+            ]
+        },
+        {
+            "name": "check-format",
+            "configurePreset": "dev",
+            "targets": [
+                "check-format"
+            ]
+        },
+        {
+            "name": "lint",
+            "configurePreset": "dev",
+            "targets": [
+                "lint"
+            ]
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "dev",
+            "configurePreset": "dev",
+            "output": {
+                "outputOnFailure": true
+            }
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "dev-check",
+            "displayName": "Developer verification",
+            "description": "Configure, build, check formatting, lint, and test",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "dev"
+                },
+                {
+                    "type": "build",
+                    "name": "dev"
+                },
+                {
+                    "type": "build",
+                    "name": "check-format"
+                },
+                {
+                    "type": "build",
+                    "name": "lint"
+                },
+                {
+                    "type": "test",
+                    "name": "dev"
+                }
+            ]
+        }
+    ]
+}
