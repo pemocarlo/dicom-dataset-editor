@@ -1,0 +1,18 @@
+{
+    "files.eol": "\n",
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "cmake.useCMakePresets": "always",
+    "cmake.configurePreset": "dev",
+    "cmake.buildPreset": "dev",
+    "cmake.testPreset": "dev",
+    "cmake.ctestArgs": [
+        "--output-on-failure"
+    ],
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json",
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}"
+    ]
+}
