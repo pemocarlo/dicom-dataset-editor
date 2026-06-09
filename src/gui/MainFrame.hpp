@@ -1,10 +1,19 @@
 #pragma once
 
-#include "DatasetTreePanel.hpp"
 #include "dicom_editor/DicomDocument.hpp"
 #include "dicom_editor/DicomEditorService.hpp"
 
 #include <wx/frame.h>
+
+#include <string>
+
+class DatasetTreePanel;
+class wxCommandEvent;
+class wxMenuItem;
+
+namespace dicom_editor {
+class DicomPath;
+}
 
 class MainFrame final : public wxFrame {
   public:

@@ -14,9 +14,18 @@ option(DICOM_EDITOR_RELOCATABLE_INSTALL
 )
 option(DICOM_EDITOR_DEVELOPER_MODE "Enable developer tooling targets" OFF)
 option(DICOM_EDITOR_ENABLE_LSP "Export compile commands and expose them at the source root" OFF)
+option(DICOM_EDITOR_ENABLE_STRICT_WARNINGS "Enable strict compiler warnings and treat them as errors" OFF)
+option(DICOM_EDITOR_ENABLE_IWYU "Run include-what-you-use while compiling" OFF)
 
 if(DICOM_EDITOR_ENABLE_LSP)
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
+
+if(DICOM_EDITOR_ENABLE_IWYU)
+    find_program(DICOM_EDITOR_IWYU_EXECUTABLE include-what-you-use REQUIRED)
+    set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE
+        "${DICOM_EDITOR_IWYU_EXECUTABLE};-Wno-unknown-warning-option;-Xiwyu;--error=1;-Xiwyu;--mapping_file=${PROJECT_SOURCE_DIR}/iwyu.imp"
+    )
 endif()
 
 find_package(DCMTK CONFIG REQUIRED)
@@ -143,6 +152,14 @@ if(BUILD_TESTING)
     add_executable(dicom_editor_tests tests/DicomEditorTests.cpp)
     target_link_libraries(dicom_editor_tests PRIVATE dicom_editor_core)
     add_test(NAME dicom_editor_tests COMMAND dicom_editor_tests)
+endif()
+
+if(DICOM_EDITOR_ENABLE_STRICT_WARNINGS)
+    include(cmake/CompilerWarnings.cmake)
+    dicom_editor_enable_strict_warnings(dicom_editor_core dicom-dataset-editor)
+    if(BUILD_TESTING)
+        dicom_editor_enable_strict_warnings(dicom_editor_tests)
+    endif()
 endif()
 
 if(DICOM_EDITOR_DEVELOPER_MODE)

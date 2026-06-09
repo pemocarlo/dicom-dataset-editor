@@ -1,8 +1,17 @@
 #include "dicom_editor/DicomEditorService.hpp"
 
+#include "dicom_editor/DicomDocument.hpp"
 #include "dicom_editor/DicomError.hpp"
 
-#include <dcmtk/dcmdata/dcsequen.h>
+#include <dcmtk/dcmdata/dcelem.h>
+#include <dcmtk/dcmdata/dcitem.h>
+#include <dcmtk/dcmdata/dctag.h>
+#include <dcmtk/dcmdata/dctagkey.h>
+#include <dcmtk/dcmdata/dcvr.h>
+#include <dcmtk/ofstd/ofcond.h>
+
+#include <optional>
+#include <vector>
 
 namespace dicom_editor {
 
@@ -36,7 +45,8 @@ void DicomEditorService::addAttribute(DicomDocument &document, const AddAttribut
 }
 
 void DicomEditorService::deleteAttribute(DicomDocument &document, const DicomPath &path) const {
-    if (!path.pointsToElement()) {
+    const auto &tag = path.elementTag();
+    if (!tag) {
         throw DicomError("Only attributes can be deleted");
     }
     if (document.elementAt(path).ident() == EVR_SQ) {
@@ -45,7 +55,7 @@ void DicomEditorService::deleteAttribute(DicomDocument &document, const DicomPat
 
     DicomPath parentPath = DicomPath::item(path.parents());
     DcmItem &parent = document.itemAt(parentPath);
-    requireGood(parent.findAndDeleteElement(*path.elementTag(), true, true), "Delete attribute " + path.toString());
+    requireGood(parent.findAndDeleteElement(*tag, true, true), "Delete attribute " + path.toString());
     document.markDirty();
 }
 
