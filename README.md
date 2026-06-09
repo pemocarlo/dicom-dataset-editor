@@ -38,6 +38,26 @@ ctest --preset conan-release
 
 `conan config install-pkg .` reads `conanconfig.yml` and installs the `dicom-dataset-editor-conf/0.1.0` configuration package. `--lockfile=""` avoids using a stale project lockfile before the config package is installed, and `--lockfile-out conan.lock` records the installed config package in `config_requires`. Export `../conan-conf` locally before installing the config package unless that package has already been uploaded to a configured Conan remote.
 
+## Install
+
+Installing is always explicit. To create a relocatable, per-user installation without writing system-wide files:
+
+```bash
+cmake --preset conan-release -DDICOM_EDITOR_RELOCATABLE_INSTALL=ON
+cmake --build --preset conan-release
+cmake --install build/Release --prefix "$HOME/.local"
+```
+
+This installs:
+
+- `~/.local/bin/dicom-dataset-editor`
+- Bundled non-system shared libraries under `~/.local/lib`
+- Runtime data under `~/.local/share/dicom-dataset-editor`
+
+On Linux and macOS, the installed executable uses a relative runtime path from `bin` to `lib`. Runtime data is also located relative to the executable, so the complete prefix can be moved. System libraries remain system-provided and are not copied. On Linux, the relocatable build uses GTK's built-in simple input context because matching system GTK input modules cannot safely load into the bundled GTK libraries. On Windows, required non-system DLLs are installed beside the executable in `bin`.
+
+`DICOM_EDITOR_RELOCATABLE_INSTALL` defaults to `OFF`. Without it, `cmake --install` installs only the executable. Use `--prefix` with any writable destination, or set `CMAKE_INSTALL_PREFIX` while configuring. Prefer `--prefix` for one-off installs because it does not change the configured build tree.
+
 ## Implemented Features
 
 - Open DICOM file.
