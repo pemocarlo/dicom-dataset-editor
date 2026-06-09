@@ -4,7 +4,7 @@ project(DicomDatasetEditor VERSION 0.1.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -12,6 +12,12 @@ option(DICOM_EDITOR_RELOCATABLE_INSTALL
     "Bundle non-system shared libraries and use relative runtime paths"
     OFF
 )
+option(DICOM_EDITOR_DEVELOPER_MODE "Enable developer tooling targets" OFF)
+option(DICOM_EDITOR_ENABLE_LSP "Export compile commands and expose them at the source root" OFF)
+
+if(DICOM_EDITOR_ENABLE_LSP)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
 
 find_package(DCMTK CONFIG REQUIRED)
 if(UNIX AND NOT APPLE)
@@ -137,4 +143,8 @@ if(BUILD_TESTING)
     add_executable(dicom_editor_tests tests/DicomEditorTests.cpp)
     target_link_libraries(dicom_editor_tests PRIVATE dicom_editor_core)
     add_test(NAME dicom_editor_tests COMMAND dicom_editor_tests)
+endif()
+
+if(DICOM_EDITOR_DEVELOPER_MODE)
+    include(cmake/DeveloperMode.cmake)
 endif()

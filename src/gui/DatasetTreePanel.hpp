@@ -10,22 +10,22 @@
 #include <vector>
 
 class DatasetTreePanel final : public wxPanel {
-public:
-    explicit DatasetTreePanel(wxWindow* parent);
+  public:
+    explicit DatasetTreePanel(wxWindow *parent);
 
     void SetNodes(std::vector<dicom_editor::DicomNode> nodes);
-    [[nodiscard]] const dicom_editor::DicomNode* SelectedNode() const;
+    [[nodiscard]] const dicom_editor::DicomNode *SelectedNode() const;
     void SetSelectionChangedHandler(std::function<void()> handler);
     void SetValueChangedHandler(std::function<void(dicom_editor::DicomPath, std::string)> handler);
 
-private:
+  private:
     void Rebuild();
-    void OnFilterChanged(wxCommandEvent& event);
-    void OnSelectionChanged(wxDataViewEvent& event);
-    void OnValueChanged(wxDataViewEvent& event);
+    void OnFilterChanged(wxCommandEvent &event);
+    void OnSelectionChanged(wxDataViewEvent &event);
+    void OnValueChanged(wxDataViewEvent &event);
 
-    wxSearchCtrl* filter_{};
-    wxDataViewListCtrl* list_{};
+    wxSearchCtrl *filter_{};
+    wxDataViewListCtrl *list_{};
     std::vector<dicom_editor::DicomNode> allNodes_;
     std::vector<std::size_t> visibleToNode_;
     std::function<void()> selectionChanged_;

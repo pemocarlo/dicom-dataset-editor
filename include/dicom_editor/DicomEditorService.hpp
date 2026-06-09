@@ -20,10 +20,10 @@ struct AddAttributeRequest {
 };
 
 class DicomEditorService {
-public:
-    void editValue(DicomDocument& document, const EditRequest& request) const;
-    void addAttribute(DicomDocument& document, const AddAttributeRequest& request) const;
-    void deleteAttribute(DicomDocument& document, const DicomPath& path) const;
+  public:
+    void editValue(DicomDocument &document, const EditRequest &request) const;
+    void addAttribute(DicomDocument &document, const AddAttributeRequest &request) const;
+    void deleteAttribute(DicomDocument &document, const DicomPath &path) const;
 };
 
 } // namespace dicom_editor
