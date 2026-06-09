@@ -73,7 +73,7 @@ std::string vmFor(DcmElement& element)
     return out.str();
 }
 
-std::string valuePreviewFor(DcmElement& element)
+std::string valueFor(DcmElement& element)
 {
     if (element.ident() == EVR_SQ) {
         const auto& sequence = static_cast<DcmSequenceOfItems&>(element);
@@ -90,7 +90,12 @@ std::string valuePreviewFor(DcmElement& element)
         return "<binary>";
     }
 
-    std::string preview(value.c_str());
+    return value.c_str();
+}
+
+std::string valuePreviewFor(const std::string& value)
+{
+    std::string preview(value);
     constexpr std::size_t maxPreviewLength = 160;
     if (preview.size() > maxPreviewLength) {
         preview.resize(maxPreviewLength - 3);
@@ -126,7 +131,8 @@ void collectNodesFromItem(DcmItem& item,
         node.keyword = keywordFor(tag);
         node.vr = vrFor(*element);
         node.vm = vmFor(*element);
-        node.valuePreview = valuePreviewFor(*element);
+        node.value = valueFor(*element);
+        node.valuePreview = valuePreviewFor(node.value);
         node.depth = depth;
         node.editable = isEditable(*element);
         nodes.push_back(std::move(node));
@@ -147,7 +153,8 @@ void collectNodesFromItem(DcmItem& item,
             itemNode.keyword = "Item";
             itemNode.vr = "";
             itemNode.vm = "";
-            itemNode.valuePreview = "#" + std::to_string(itemIndex);
+            itemNode.value = "#" + std::to_string(itemIndex);
+            itemNode.valuePreview = itemNode.value;
             itemNode.depth = depth + 1;
             itemNode.editable = false;
             nodes.push_back(std::move(itemNode));
@@ -276,7 +283,8 @@ std::vector<DicomNode> DicomDocument::nodes() const
     root.kind = DicomNodeKind::Dataset;
     root.path = DicomPath::dataset();
     root.keyword = "Dataset";
-    root.valuePreview = filePath_.empty() ? "<new>" : filePath_.string();
+    root.value = filePath_.empty() ? "<new>" : filePath_.string();
+    root.valuePreview = root.value;
     root.editable = false;
     result.push_back(std::move(root));
     collectNodesFromItem(const_cast<DcmDataset&>(dataset()), {}, 1, result);

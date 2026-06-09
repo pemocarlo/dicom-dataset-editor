@@ -20,6 +20,7 @@ struct DicomNode {
     std::string keyword;
     std::string vr;
     std::string vm;
+    std::string value;
     std::string valuePreview;
     unsigned int depth{};
     bool editable{};
