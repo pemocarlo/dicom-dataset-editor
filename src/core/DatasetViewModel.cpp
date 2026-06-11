@@ -22,8 +22,8 @@ bool containsCaseInsensitive(const std::string &haystack, const std::string &nee
 
 } // namespace
 
-void DatasetViewModel::setNodes(std::vector<DicomNode> nodes) {
-    nodes_ = std::move(nodes);
+void DatasetViewModel::setNodes(std::vector<DicomNode> newNodes) {
+    nodes_ = std::move(newNodes);
     rebuild();
 }
 

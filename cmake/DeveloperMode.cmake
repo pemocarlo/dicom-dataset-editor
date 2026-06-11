@@ -1,5 +1,6 @@
 find_program(DICOM_EDITOR_CLANG_FORMAT clang-format REQUIRED)
 find_program(DICOM_EDITOR_CLANG_TIDY clang-tidy REQUIRED)
+find_program(DICOM_EDITOR_CPPCHECK cppcheck REQUIRED)
 
 file(GLOB_RECURSE DICOM_EDITOR_FORMAT_FILES CONFIGURE_DEPENDS
     "${PROJECT_SOURCE_DIR}/include/*.hpp"
@@ -36,6 +37,17 @@ add_custom_target(lint
         -p=${CMAKE_BINARY_DIR}
         ${DICOM_EDITOR_LINT_FILES}
     COMMENT "Linting C++ sources"
+    VERBATIM
+)
+
+add_custom_target(cppcheck
+    COMMAND ${DICOM_EDITOR_CPPCHECK}
+        --project=${CMAKE_BINARY_DIR}/compile_commands.json
+        --enable=warning,style,performance,portability
+        --error-exitcode=1
+        --inline-suppr
+        --quiet
+    COMMENT "Running cppcheck"
     VERBATIM
 )
 

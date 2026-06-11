@@ -61,6 +61,13 @@
             ]
         },
         {
+            "name": "cppcheck",
+            "configurePreset": "dev",
+            "targets": [
+                "cppcheck"
+            ]
+        },
+        {
             "name": "iwyu",
             "configurePreset": "iwyu",
             "cleanFirst": true
@@ -77,6 +84,13 @@
             "configurePreset": "iwyu",
             "targets": [
                 "lint"
+            ]
+        },
+        {
+            "name": "cppcheck-iwyu",
+            "configurePreset": "iwyu",
+            "targets": [
+                "cppcheck"
             ]
         }
     ],
@@ -119,6 +133,10 @@
                     "name": "lint"
                 },
                 {
+                    "type": "build",
+                    "name": "cppcheck"
+                },
+                {
                     "type": "test",
                     "name": "dev"
                 }
@@ -144,6 +162,10 @@
                 {
                     "type": "build",
                     "name": "lint-iwyu"
+                },
+                {
+                    "type": "build",
+                    "name": "cppcheck-iwyu"
                 },
                 {
                     "type": "test",
