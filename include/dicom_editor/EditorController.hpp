@@ -27,9 +27,9 @@ struct ActionState {
     bool deleteEnabled{};
 };
 
-class EditorControllerHost {
+class EditorView {
   public:
-    virtual ~EditorControllerHost() = default;
+    virtual ~EditorView() = default;
 
     [[nodiscard]] virtual std::optional<std::filesystem::path> chooseOpenFile() = 0;
     [[nodiscard]] virtual std::optional<std::filesystem::path> chooseSaveFile() = 0;
@@ -44,25 +44,25 @@ class EditorControllerHost {
 
 class EditorController {
   public:
-    explicit EditorController(EditorControllerHost &host);
+    explicit EditorController(EditorView &view);
 
-    void refresh();
-    void open();
-    bool save();
-    bool saveAs();
+    void refreshView();
+    void openDocument();
+    bool saveDocument();
+    bool saveDocumentAs();
     void editSelected(const DicomNode *selected);
-    void editValue(const DicomPath &path, const std::string &value);
-    void add(const DicomNode *selected);
-    void remove(const DicomNode *selected);
+    void addAttribute(const DicomNode *selected);
+    void deleteAttribute(const DicomNode *selected);
     [[nodiscard]] bool confirmClose();
     [[nodiscard]] ActionState actionState(const DicomNode *selected) const;
 
   private:
     [[nodiscard]] bool confirmDiscardChanges();
     bool saveTo(const std::optional<std::filesystem::path> &path);
+    void editValue(const DicomPath &path, const std::string &value);
     void reportError(const std::exception &error, bool refreshAfter);
 
-    EditorControllerHost &host_;
+    EditorView &view_;
     DicomDocument document_;
     DicomEditorService editor_;
 };
