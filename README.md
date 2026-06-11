@@ -1,6 +1,6 @@
 # DICOM Dataset Editor
 
-C++23 wxWidgets GUI for opening, inspecting, editing, and saving DICOM datasets through DCMTK.
+C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets through DCMTK.
 
 ## Start Here
 
