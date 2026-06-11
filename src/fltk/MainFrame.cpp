@@ -2,10 +2,9 @@
 
 #include "AttributeEditDialog.hpp"
 #include "DatasetTreePanel.hpp"
+#include "dicom_editor/AttributeInput.hpp"
 #include "dicom_editor/DicomNode.hpp"
-#include "dicom_editor/DicomPath.hpp"
-
-#include <dcmtk/dcmdata/dctagkey.h>
+#include "dicom_editor/EditorController.hpp"
 
 #include <FL/Enumerations.H>
 #include <FL/Fl.H>
@@ -17,12 +16,16 @@
 #include <FL/fl_ask.H>
 
 #include <cstdint>
-#include <exception>
 #include <filesystem>
 #include <functional>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
+
+namespace dicom_editor {
+class DicomPath;
+}
 
 namespace {
 
@@ -47,17 +50,12 @@ MenuAction editAction = MenuAction::Edit;
 MenuAction addAction = MenuAction::Add;
 MenuAction deleteAction = MenuAction::Delete;
 
-std::string documentTitle(const dicom_editor::DicomDocument &document) {
-    const std::string name = document.hasFilePath() ? document.filePath().filename().string() : "Untitled";
-    return "DICOM Dataset Editor - " + name + (document.dirty() ? "*" : "");
-}
-
-std::filesystem::path chooseFile(Fl_Native_File_Chooser::Type type, const char *title) {
+std::optional<std::filesystem::path> chooseFile(Fl_Native_File_Chooser::Type type, const char *title) {
     Fl_Native_File_Chooser chooser(type);
     chooser.title(title);
     chooser.filter("DICOM files\t*.dcm\nAll files\t*");
     if (chooser.show() != 0) {
-        return {};
+        return std::nullopt;
     }
     return chooser.filename();
 }
@@ -73,7 +71,7 @@ void setMenuActive(Fl_Menu_Bar &menu, const char *path, bool active) {
 
 } // namespace
 
-MainFrame::MainFrame() : Fl_Double_Window(1180, 760, "DICOM Dataset Editor") {
+MainFrame::MainFrame() : Fl_Double_Window(1180, 760, "DICOM Dataset Editor"), controller_(*this) {
     menu_ = new Fl_Menu_Bar(0, 0, w(), MenuHeight);
     menu_->add("&File/&Open...", FL_CTRL + 'o', menuCallback, &openAction);
     menu_->add("&File/&Save", FL_CTRL + 's', menuCallback, &saveAction);
@@ -84,15 +82,9 @@ MainFrame::MainFrame() : Fl_Double_Window(1180, 760, "DICOM Dataset Editor") {
     menu_->add("&Edit/&Delete Attribute", FL_Delete, menuCallback, &deleteAction);
 
     datasetPanel_ = new DatasetTreePanel(0, MenuHeight, w(), h() - MenuHeight - StatusHeight);
-    datasetPanel_->SetSelectionChangedHandler([this] { UpdateActions(); });
-    datasetPanel_->SetValueChangedHandler([this](const dicom_editor::DicomPath &path, const std::string &value) {
-        const auto *selected = datasetPanel_->SelectedNode();
-        const std::string title = selected == nullptr ? "Edit Value" : "Edit " + selected->keyword;
-        const auto result = AttributeEditDialog::Edit(title, value);
-        if (result) {
-            EditValue(path, result->value);
-        }
-    });
+    datasetPanel_->SetSelectionChangedHandler([this] { updateActions(); });
+    datasetPanel_->SetValueChangedHandler(
+        [this](const dicom_editor::DicomPath &, const std::string &) { controller_.editSelected(datasetPanel_->SelectedNode()); });
 
     status_ = new Fl_Box(6, h() - StatusHeight, w() - 12, StatusHeight);
     status_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
@@ -100,7 +92,7 @@ MainFrame::MainFrame() : Fl_Double_Window(1180, 760, "DICOM Dataset Editor") {
     callback(closeCallback, this);
     end();
 
-    RefreshDataset();
+    controller_.refresh();
     datasetPanel_->FocusRows();
 }
 
@@ -112,116 +104,54 @@ int MainFrame::handle(int event) {
     return Fl_Double_Window::handle(event);
 }
 
-void MainFrame::RefreshDataset() {
-    datasetPanel_->SetNodes(document_.nodes());
-    copy_label(documentTitle(document_).c_str());
-    status_->copy_label(document_.hasFilePath() ? document_.filePath().string().c_str() : "New dataset");
-    UpdateActions();
+std::optional<std::filesystem::path> MainFrame::chooseOpenFile() {
+    return chooseFile(Fl_Native_File_Chooser::BROWSE_FILE, "Open DICOM File");
 }
 
-bool MainFrame::ConfirmDiscardChanges() {
-    if (!document_.dirty()) {
-        return true;
-    }
+std::optional<std::filesystem::path> MainFrame::chooseSaveFile() {
+    return chooseFile(Fl_Native_File_Chooser::BROWSE_SAVE_FILE, "Save DICOM File");
+}
+
+dicom_editor::SaveChangesChoice MainFrame::confirmSaveChanges() {
     const int answer = fl_choice("Save changes before continuing?", "Cancel", "Don't Save", "Save");
-    return answer == 1 || (answer == 2 && SaveCurrent());
-}
-
-bool MainFrame::SaveCurrent() {
-    try {
-        if (!document_.hasFilePath()) {
-            return SaveAs();
-        }
-        document_.save();
-        dicom_editor::DicomDocument verified;
-        verified.load(document_.filePath());
-        RefreshDataset();
-        status_->copy_label(("Saved and reloaded successfully: " + document_.filePath().string()).c_str());
-        return true;
-    } catch (const std::exception &error) {
-        ShowError(error.what());
-        return false;
+    switch (answer) {
+    case 1:
+        return dicom_editor::SaveChangesChoice::Discard;
+    case 2:
+        return dicom_editor::SaveChangesChoice::Save;
+    default:
+        return dicom_editor::SaveChangesChoice::Cancel;
     }
 }
 
-bool MainFrame::SaveAs() {
-    const auto path = chooseFile(Fl_Native_File_Chooser::BROWSE_SAVE_FILE, "Save DICOM File");
-    if (path.empty()) {
-        return false;
-    }
+bool MainFrame::confirmDelete() { return fl_choice("Delete selected attribute?", "Cancel", "Delete", nullptr) == 1; }
 
-    try {
-        document_.saveAs(path);
-        dicom_editor::DicomDocument verified;
-        verified.load(document_.filePath());
-        RefreshDataset();
-        status_->copy_label(("Saved and reloaded successfully: " + document_.filePath().string()).c_str());
-        return true;
-    } catch (const std::exception &error) {
-        ShowError(error.what());
-        return false;
-    }
+std::optional<dicom_editor::AttributeInput> MainFrame::editAttribute(const std::string &title, const std::string &value) {
+    return AttributeEditDialog::Edit(title, value);
 }
 
-void MainFrame::EditSelectedValue() { datasetPanel_->EditSelectedValue(); }
+std::optional<dicom_editor::AttributeInput> MainFrame::addAttribute() { return AttributeEditDialog::Add(); }
 
-void MainFrame::EditValue(const dicom_editor::DicomPath &path, const std::string &value) {
-    try {
-        editor_.editValue(document_, {.path = path, .value = value});
-        RefreshDataset();
-    } catch (const std::exception &error) {
-        ShowError(error.what());
-        RefreshDataset();
-    }
+void MainFrame::showError(const std::string &message) { fl_alert("%s", message.c_str()); }
+
+void MainFrame::presentDocument(std::vector<dicom_editor::DicomNode> nodes, const std::string &title, const std::string &status) {
+    datasetPanel_->SetNodes(std::move(nodes));
+    copy_label(title.c_str());
+    setStatus(status);
+    updateActions();
 }
 
-void MainFrame::AddAttribute() {
-    const auto *selected = datasetPanel_->SelectedNode();
-    dicom_editor::DicomPath parent = dicom_editor::DicomPath::dataset();
-    if (selected != nullptr) {
-        parent =
-            selected->kind == dicom_editor::DicomNodeKind::Item ? selected->path : dicom_editor::DicomPath::item(selected->path.parents());
-    }
+void MainFrame::setStatus(const std::string &status) { status_->copy_label(status.c_str()); }
 
-    const auto result = AttributeEditDialog::Add();
-    if (!result || !result->tag) {
-        return;
-    }
-
-    try {
-        editor_.addAttribute(document_, {.parentItemPath = parent, .tag = *result->tag, .value = result->value});
-        RefreshDataset();
-    } catch (const std::exception &error) {
-        ShowError(error.what());
-    }
+void MainFrame::updateActions() {
+    const auto actions = controller_.actionState(datasetPanel_->SelectedNode());
+    setMenuActive(*menu_, "&Edit/&Edit Value...", actions.editEnabled);
+    setMenuActive(*menu_, "&Edit/&Delete Attribute", actions.deleteEnabled);
+    setMenuActive(*menu_, "&File/&Save", actions.saveEnabled);
 }
 
-void MainFrame::DeleteAttribute() {
-    const auto *selected = datasetPanel_->SelectedNode();
-    if (selected == nullptr || !selected->editable || fl_choice("Delete selected attribute?", "Cancel", "Delete", nullptr) != 1) {
-        return;
-    }
-
-    try {
-        editor_.deleteAttribute(document_, selected->path);
-        RefreshDataset();
-    } catch (const std::exception &error) {
-        ShowError(error.what());
-    }
-}
-
-void MainFrame::ShowError(const std::string &message) { fl_alert("%s", message.c_str()); }
-
-void MainFrame::UpdateActions() {
-    const auto *selected = datasetPanel_->SelectedNode();
-    const bool editable = selected != nullptr && selected->editable;
-    setMenuActive(*menu_, "&Edit/&Edit Value...", editable);
-    setMenuActive(*menu_, "&Edit/&Delete Attribute", editable);
-    setMenuActive(*menu_, "&File/&Save", document_.dirty() || !document_.hasFilePath());
-}
-
-void MainFrame::Exit() {
-    if (ConfirmDiscardChanges()) {
+void MainFrame::exit() {
+    if (controller_.confirmClose()) {
         hide();
     }
 }
@@ -231,40 +161,28 @@ void MainFrame::menuCallback(Fl_Widget *widget, void *data) {
     const auto action = *static_cast<MenuAction *>(data);
 
     switch (action) {
-    case MenuAction::Open: {
-        if (!frame->ConfirmDiscardChanges()) {
-            return;
-        }
-        const auto file = chooseFile(Fl_Native_File_Chooser::BROWSE_FILE, "Open DICOM File");
-        if (!file.empty()) {
-            try {
-                frame->document_.load(file);
-                frame->RefreshDataset();
-            } catch (const std::exception &error) {
-                frame->ShowError(error.what());
-            }
-        }
+    case MenuAction::Open:
+        frame->controller_.open();
         break;
-    }
     case MenuAction::Save:
-        frame->SaveCurrent();
+        frame->controller_.save();
         break;
     case MenuAction::SaveAs:
-        frame->SaveAs();
+        frame->controller_.saveAs();
         break;
     case MenuAction::Exit:
-        frame->Exit();
+        frame->exit();
         break;
     case MenuAction::Edit:
-        frame->EditSelectedValue();
+        frame->controller_.editSelected(frame->datasetPanel_->SelectedNode());
         break;
     case MenuAction::Add:
-        frame->AddAttribute();
+        frame->controller_.add(frame->datasetPanel_->SelectedNode());
         break;
     case MenuAction::Delete:
-        frame->DeleteAttribute();
+        frame->controller_.remove(frame->datasetPanel_->SelectedNode());
         break;
     }
 }
 
-void MainFrame::closeCallback(Fl_Widget *, void *data) { static_cast<MainFrame *>(data)->Exit(); }
+void MainFrame::closeCallback(Fl_Widget *, void *data) { static_cast<MainFrame *>(data)->exit(); }

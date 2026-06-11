@@ -1,5 +1,6 @@
 #include "DatasetTreePanel.hpp"
 
+#include "dicom_editor/DatasetViewModel.hpp"
 #include "dicom_editor/DicomPath.hpp"
 
 #include <wx/dataview.h>
@@ -13,42 +14,11 @@
 #include <wx/variant.h>
 #include <wx/vector.h>
 
-#include <algorithm>
-#include <cctype>
 #include <utility>
 
 namespace {
 
 constexpr int ValueColumn = 5;
-
-std::string lower(std::string value) {
-    std::ranges::transform(value, value.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-    return value;
-}
-
-bool containsCaseInsensitive(const std::string &haystack, const std::string &needle) {
-    return lower(haystack).find(lower(needle)) != std::string::npos;
-}
-
-std::string kindLabel(dicom_editor::DicomNodeKind kind) {
-    switch (kind) {
-    case dicom_editor::DicomNodeKind::Dataset:
-        return "Dataset";
-    case dicom_editor::DicomNodeKind::Element:
-        return "Element";
-    case dicom_editor::DicomNodeKind::Sequence:
-        return "Sequence";
-    case dicom_editor::DicomNodeKind::Item:
-        return "Item";
-    }
-    return "";
-}
-
-wxString indented(const dicom_editor::DicomNode &node) {
-    std::string text(static_cast<std::size_t>(node.depth) * 2, ' ');
-    text += node.keyword.empty() ? node.tag : node.keyword;
-    return wxString::FromUTF8(text);
-}
 
 } // namespace
 
@@ -76,16 +46,13 @@ DatasetTreePanel::DatasetTreePanel(wxWindow *parent) : wxPanel(parent) {
 }
 
 void DatasetTreePanel::SetNodes(std::vector<dicom_editor::DicomNode> nodes) {
-    allNodes_ = std::move(nodes);
+    model_.setNodes(std::move(nodes));
     Rebuild();
 }
 
 const dicom_editor::DicomNode *DatasetTreePanel::SelectedNode() const {
     const int row = list_->GetSelectedRow();
-    if (row < 0 || static_cast<std::size_t>(row) >= visibleToNode_.size()) {
-        return nullptr;
-    }
-    return &allNodes_[visibleToNode_[static_cast<std::size_t>(row)]];
+    return row < 0 ? nullptr : model_.nodeAt(static_cast<std::size_t>(row));
 }
 
 void DatasetTreePanel::SetSelectionChangedHandler(std::function<void()> handler) { selectionChanged_ = std::move(handler); }
@@ -96,26 +63,19 @@ void DatasetTreePanel::SetValueChangedHandler(std::function<void(dicom_editor::D
 
 void DatasetTreePanel::Rebuild() {
     list_->DeleteAllItems();
-    visibleToNode_.clear();
+    model_.setFilter(filter_->GetValue().ToStdString());
 
-    const std::string query = filter_->GetValue().ToStdString();
-    for (std::size_t index = 0; index < allNodes_.size(); ++index) {
-        const auto &node = allNodes_[index];
-        const std::string searchable = node.tag + " " + node.keyword + " " + node.vr + " " + node.valuePreview + " " + node.path.toString();
-        if (!query.empty() && !containsCaseInsensitive(searchable, query)) {
-            continue;
-        }
-
+    for (const std::size_t index : model_.visibleIndices()) {
+        const auto &node = model_.nodes()[index];
         wxVector<wxVariant> row;
-        row.push_back(wxVariant(indented(node)));
+        row.push_back(wxVariant(wxString::FromUTF8(dicom_editor::DatasetViewModel::attributeLabel(node))));
         row.push_back(wxVariant(wxString::FromUTF8(node.tag)));
         row.push_back(wxVariant(wxString::FromUTF8(node.vr)));
         row.push_back(wxVariant(wxString::FromUTF8(node.vm)));
         row.push_back(wxVariant(wxString::FromUTF8(node.path.toString())));
         row.push_back(wxVariant(wxString::FromUTF8(node.value)));
-        row.push_back(wxVariant(wxString::FromUTF8(kindLabel(node.kind))));
+        row.push_back(wxVariant(wxString::FromUTF8(dicom_editor::DatasetViewModel::kindLabel(node.kind))));
         list_->AppendItem(row);
-        visibleToNode_.push_back(index);
     }
 }
 
@@ -129,13 +89,13 @@ void DatasetTreePanel::OnSelectionChanged(wxDataViewEvent &) {
 
 void DatasetTreePanel::OnValueChanged(wxDataViewEvent &event) {
     const int row = list_->ItemToRow(event.GetItem());
-    if (event.GetColumn() != ValueColumn || row < 0 || static_cast<std::size_t>(row) >= visibleToNode_.size()) {
+    if (event.GetColumn() != ValueColumn || row < 0) {
         return;
     }
 
-    const auto &node = allNodes_[visibleToNode_[static_cast<std::size_t>(row)]];
-    if (node.editable && valueChanged_) {
-        valueChanged_(node.path, list_->GetTextValue(static_cast<unsigned int>(row), ValueColumn).ToStdString());
+    const auto *node = model_.nodeAt(static_cast<std::size_t>(row));
+    if (node != nullptr && node->editable && valueChanged_) {
+        valueChanged_(node->path, list_->GetTextValue(static_cast<unsigned int>(row), ValueColumn).ToStdString());
     } else {
         Rebuild();
     }
