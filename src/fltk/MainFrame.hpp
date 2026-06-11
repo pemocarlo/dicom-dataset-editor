@@ -19,6 +19,7 @@ class DicomPath;
 class MainFrame final : public Fl_Double_Window {
   public:
     MainFrame();
+    int handle(int event) override;
 
   private:
     void RefreshDataset();

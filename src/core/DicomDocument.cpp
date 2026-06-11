@@ -5,7 +5,6 @@
 #include "dicom_editor/RuntimePaths.hpp"
 
 #include <dcmtk/dcmdata/dcdatset.h>
-#include <dcmtk/dcmdata/dcdeftag.h>
 #include <dcmtk/dcmdata/dcelem.h>
 #include <dcmtk/dcmdata/dcfilefo.h>
 #include <dcmtk/dcmdata/dcitem.h>
@@ -23,11 +22,16 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace dicom_editor {
 
 namespace {
+
+constexpr std::string_view PixelDataPlaceholder = "[Pixel Data not displayed]";
+
+bool isPixelData(const DcmTagKey &key) { return key.getGroup() == 0x7fe0 && key.getElement() == 0x0010; }
 
 std::string conditionMessage(const OFCondition &condition) {
     return condition.text() == nullptr ? "unknown DCMTK error" : condition.text();
@@ -79,10 +83,6 @@ std::string vmFor(DcmElement &element) {
 }
 
 std::string valueFor(DcmElement &element) {
-    if (element.getTag() == DCM_PixelData) {
-        return "<not displayed>";
-    }
-
     if (element.ident() == EVR_SQ) {
         const auto &sequence = static_cast<DcmSequenceOfItems &>(element);
         std::ostringstream out;
@@ -111,7 +111,7 @@ std::string valuePreviewFor(const std::string &value) {
     return preview;
 }
 
-bool isEditable(const DcmElement &element) { return element.ident() != EVR_SQ && element.getTag() != DCM_PixelData; }
+bool isEditable(const DcmElement &element) { return element.ident() != EVR_SQ && !isPixelData(element.getTag().getXTag()); }
 
 void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &parents, unsigned int depth, std::vector<DicomNode> &nodes) {
     for (unsigned long index = 0; index < item.card(); ++index) {
@@ -123,6 +123,7 @@ void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &par
         DcmTag tag(element->getTag());
         const DcmTagKey key = tag.getXTag();
         const bool sequence = element->ident() == EVR_SQ;
+        const bool pixelData = isPixelData(key);
 
         DicomNode node;
         node.kind = sequence ? DicomNodeKind::Sequence : DicomNodeKind::Element;
@@ -131,8 +132,8 @@ void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &par
         node.keyword = keywordFor(tag);
         node.vr = vrFor(*element);
         node.vm = vmFor(*element);
-        node.value = valueFor(*element);
-        node.valuePreview = key == DCM_PixelData ? "" : valuePreviewFor(node.value);
+        node.value = pixelData ? PixelDataPlaceholder : valueFor(*element);
+        node.valuePreview = pixelData ? "" : valuePreviewFor(node.value);
         node.depth = depth;
         node.editable = isEditable(*element);
         nodes.push_back(std::move(node));

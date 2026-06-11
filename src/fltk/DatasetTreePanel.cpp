@@ -54,10 +54,40 @@ std::string attributeLabel(const dicom_editor::DicomNode &node) {
 
 } // namespace
 
+class DatasetFilterInput final : public Fl_Input {
+  public:
+    DatasetFilterInput(int x, int y, int width, int height, const char *label, DatasetTreePanel &owner)
+        : Fl_Input(x, y, width, height, label), owner_(owner) {}
+
+    int handle(int event) override {
+        if (event == FL_KEYDOWN) {
+            const int key = Fl::event_key();
+            if (key == FL_Escape) {
+                owner_.FocusRows();
+                return 1;
+            }
+            if (key == FL_Up) {
+                owner_.FocusRows(-1);
+                return 1;
+            }
+            if (key == FL_Down) {
+                owner_.FocusRows(1);
+                return 1;
+            }
+        }
+        return Fl_Input::handle(event);
+    }
+
+  private:
+    DatasetTreePanel &owner_;
+};
+
 class DatasetTable final : public Fl_Table_Row {
   public:
     DatasetTable(int x, int y, int width, int height, DatasetTreePanel &owner) : Fl_Table_Row(x, y, width, height), owner_(owner) {
         cols(ColumnCount);
+        type(SELECT_SINGLE);
+        selection_color(fl_rgb_color(210, 230, 250));
         col_header(true);
         col_resize(true);
         row_header(false);
@@ -85,9 +115,39 @@ class DatasetTable final : public Fl_Table_Row {
         return -1;
     }
 
+    void moveSelection(int offset) {
+        if (rows() == 0) {
+            return;
+        }
+
+        const int current = selectedRow();
+        const int target = std::clamp(current < 0 ? 0 : current + offset, 0, rows() - 1);
+        select_all_rows(0);
+        select_row(target);
+        move_cursor(target, 0);
+        redraw();
+        owner_.SelectionChanged();
+    }
+
     int handle(int event) override {
+        if (event == FL_KEYDOWN) {
+            const int key = Fl::event_key();
+            if (key == FL_Up || key == 'k') {
+                moveSelection(-1);
+                return 1;
+            }
+            if (key == FL_Down || key == 'j') {
+                moveSelection(1);
+                return 1;
+            }
+            if (key == FL_Enter) {
+                owner_.EditSelectedValue();
+                return 1;
+            }
+        }
+
         const int handled = Fl_Table_Row::handle(event);
-        if ((event == FL_PUSH && Fl::event_clicks() != 0) || (event == FL_KEYDOWN && Fl::event_key() == FL_Enter)) {
+        if (event == FL_PUSH && Fl::event_clicks() != 0) {
             owner_.EditSelectedValue();
             return 1;
         }
@@ -130,7 +190,7 @@ class DatasetTable final : public Fl_Table_Row {
 
         fl_push_clip(x, y, width, height);
         const bool selected = row_selected(row) != 0;
-        fl_color(selected ? fl_rgb_color(210, 230, 250) : FL_BACKGROUND2_COLOR);
+        fl_color(selected ? selection_color() : FL_BACKGROUND2_COLOR);
         fl_rectf(x, y, width, height);
         fl_color(selected ? fl_rgb_color(24, 32, 42) : FL_FOREGROUND_COLOR);
         fl_draw(values[static_cast<std::size_t>(column)].c_str(), x + 4, y, width - 8, height, FL_ALIGN_LEFT);
@@ -145,7 +205,8 @@ class DatasetTable final : public Fl_Table_Row {
 };
 
 DatasetTreePanel::DatasetTreePanel(int x, int y, int width, int height) : Fl_Group(x, y, width, height) {
-    filter_ = new Fl_Input(x + Padding + FilterLabelWidth, y + Padding, width - 2 * Padding - FilterLabelWidth, FilterHeight, "Filter:");
+    filter_ = new DatasetFilterInput(x + Padding + FilterLabelWidth, y + Padding, width - 2 * Padding - FilterLabelWidth, FilterHeight,
+                                     "Filter:", *this);
     filter_->align(FL_ALIGN_LEFT);
     filter_->when(FL_WHEN_CHANGED);
     filter_->callback(filterCallback, this);
@@ -180,6 +241,11 @@ void DatasetTreePanel::EditSelectedValue() {
     if (selected != nullptr && selected->editable && valueChanged_) {
         valueChanged_(selected->path, selected->value);
     }
+}
+
+void DatasetTreePanel::FocusRows(int offset) {
+    Fl::focus(table_);
+    table_->moveSelection(offset);
 }
 
 void DatasetTreePanel::resize(int x, int y, int width, int height) {

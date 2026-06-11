@@ -8,6 +8,7 @@
 #include <dcmtk/dcmdata/dctagkey.h>
 
 #include <FL/Enumerations.H>
+#include <FL/Fl.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Bar.H>
 #include <FL/Fl_Menu_Item.H>
@@ -100,6 +101,15 @@ MainFrame::MainFrame() : Fl_Double_Window(1180, 760, "DICOM Dataset Editor") {
     end();
 
     RefreshDataset();
+    datasetPanel_->FocusRows();
+}
+
+int MainFrame::handle(int event) {
+    if ((event == FL_KEYDOWN || event == FL_SHORTCUT) && Fl::event_key() == FL_Escape) {
+        datasetPanel_->FocusRows();
+        return 1;
+    }
+    return Fl_Double_Window::handle(event);
 }
 
 void MainFrame::RefreshDataset() {
