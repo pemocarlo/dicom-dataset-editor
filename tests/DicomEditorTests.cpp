@@ -158,7 +158,7 @@ void pixelDataIsNotDisplayedOrEditable() {
 
     for (const auto &node : document.nodes()) {
         if (node.keyword == "PixelData") {
-            require(node.value == "<not displayed>");
+            require(node.value == "[Pixel Data not displayed]");
             require(node.valuePreview.empty());
             require(!node.editable);
             return;
