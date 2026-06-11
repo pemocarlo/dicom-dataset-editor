@@ -12,6 +12,7 @@
 #include <dcmtk/dcmdata/dcuid.h>
 #include <dcmtk/ofstd/ofcond.h>
 #include <dcmtk/ofstd/ofstring.h>
+#include <ofstd/oftypes.h>
 
 #include <filesystem>
 #include <iostream>
@@ -150,6 +151,22 @@ void nodeKeepsFullValue() {
     require(false);
 }
 
+void pixelDataIsNotDisplayedOrEditable() {
+    DicomDocument document;
+    const Uint8 pixelData[]{0x00, 0x7f, 0xff};
+    document.dataset().putAndInsertUint8Array(DCM_PixelData, pixelData, 3);
+
+    for (const auto &node : document.nodes()) {
+        if (node.keyword == "PixelData") {
+            require(node.value == "<not displayed>");
+            require(node.valuePreview.empty());
+            require(!node.editable);
+            return;
+        }
+    }
+    require(false);
+}
+
 } // namespace
 
 int main() {
@@ -159,6 +176,7 @@ int main() {
     saveReloadPersistence();
     recursiveNodeListing();
     nodeKeepsFullValue();
+    pixelDataIsNotDisplayedOrEditable();
 
     std::cout << "All DICOM editor tests passed\n";
     return 0;

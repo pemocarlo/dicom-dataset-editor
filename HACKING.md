@@ -53,7 +53,7 @@ Enabled groups focus on defects with high signal:
 Explicit exclusions:
 
 - `bugprone-easily-swappable-parameters`: many GUI APIs intentionally pass same-type values.
-- `bugprone-exception-escape`: wxWidgets callback boundaries are not modeled well enough for this app.
+- `bugprone-exception-escape`: GUI callback boundaries are not modeled well enough for this app.
 - `bugprone-suspicious-call-argument`: heuristic name matching creates false positives.
 - `bugprone-unsafe-functions`: broad policy check is too coarse for portable third-party APIs.
 - `portability-avoid-pragma-once`: this project accepts `#pragma once`.
@@ -70,7 +70,7 @@ If the executable is local only, pass its path explicitly:
 cmake --preset iwyu -DDICOM_EDITOR_IWYU_EXECUTABLE=/path/to/include-what-you-use
 ```
 
-`iwyu.imp` maps wxWidgets platform-private implementation headers back to public headers. Without that mapping, IWYU tries to pull in platform-private `wx/gtk/*` headers on Linux builds.
+`iwyu.imp` retains mappings needed when checking the optional wxWidgets backend.
 
 ## Editor Support
 

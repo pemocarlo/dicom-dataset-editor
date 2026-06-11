@@ -9,16 +9,23 @@ class DicomDatasetEditorRecipe(ConanFile):
 
     settings = "os", "arch", "compiler", "build_type"
 
-    requires = (
-        "wxwidgets/3.3.2",
-        "dcmtk/3.7.0",
-    )
+    options = {"gui": ["fltk", "wxwidgets"]}
+    default_options = {"gui": "fltk"}
+
+    requires = ("dcmtk/3.7.0",)
+
+    def requirements(self):
+        if self.options.gui == "fltk":
+            self.requires("fltk/1.4.5")
+        else:
+            self.requires("wxwidgets/3.3.2")
 
     def layout(self):
         cmake_layout(self, build_folder="build")
 
     def generate(self):
         toolchain = CMakeToolchain(self)
+        toolchain.variables["DICOM_EDITOR_GUI"] = str(self.options.gui)
         toolchain.user_presets_path = False
         toolchain.generate()
 
