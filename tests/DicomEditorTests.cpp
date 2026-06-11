@@ -16,9 +16,12 @@
 #include <dcmtk/ofstd/ofstring.h>
 #include <ofstd/oftypes.h>
 
+#include <algorithm>
+#include <exception>
 #include <filesystem>
 #include <iostream>
 #include <optional>
+#include <ranges>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -65,11 +68,10 @@ void seedDataset(DicomDocument &document) {
 
 void scalarEdit() {
     DicomDocument document;
-    DicomEditorService editor;
     seedDataset(document);
 
     const DicomPath patientName = DicomPath::element({}, DCM_PatientName);
-    editor.editValue(document, {.path = patientName, .value = "After^Patient"});
+    DicomEditorService::editValue(document, {.path = patientName, .value = "After^Patient"});
 
     require(document.dirty());
     require(stringValue(document, patientName) == "After^Patient");
@@ -77,38 +79,35 @@ void scalarEdit() {
 
 void addDeleteElement() {
     DicomDocument document;
-    DicomEditorService editor;
     seedDataset(document);
 
     const auto tag = DCM_PatientID;
     const DicomPath patientId = DicomPath::element({}, tag);
-    editor.addAttribute(document, AddAttributeRequest{.parentItemPath = DicomPath::dataset(), .tag = tag, .value = "PID-123"});
+    DicomEditorService::addAttribute(document, AddAttributeRequest{.parentItemPath = DicomPath::dataset(), .tag = tag, .value = "PID-123"});
     require(stringValue(document, patientId) == "PID-123");
 
-    editor.deleteAttribute(document, patientId);
+    DicomEditorService::deleteAttribute(document, patientId);
     DcmElement *deleted = nullptr;
     require(document.dataset().findAndGetElement(tag, deleted).bad());
 }
 
 void nestedSequenceEdit() {
     DicomDocument document;
-    DicomEditorService editor;
     seedDataset(document);
 
     std::vector<SequenceItemRef> parents{{DCM_ReferencedStudySequence, 0}};
     const DicomPath referencedSop = DicomPath::element(parents, DCM_ReferencedSOPInstanceUID);
-    editor.editValue(document, {.path = referencedSop, .value = "1.2.826.0.1.3680043.10.543.99"});
+    DicomEditorService::editValue(document, {.path = referencedSop, .value = "1.2.826.0.1.3680043.10.543.99"});
 
     require(stringValue(document, referencedSop) == "1.2.826.0.1.3680043.10.543.99");
 }
 
 void saveReloadPersistence() {
     DicomDocument document;
-    DicomEditorService editor;
     seedDataset(document);
 
     const DicomPath patientName = DicomPath::element({}, DCM_PatientName);
-    editor.editValue(document, EditRequest{.path = patientName, .value = "Persisted^Patient"});
+    DicomEditorService::editValue(document, EditRequest{.path = patientName, .value = "Persisted^Patient"});
 
     const auto output = std::filesystem::temp_directory_path() / "dicom_editor_persistence_test.dcm";
     document.saveAs(output);
@@ -144,14 +143,11 @@ void nodeKeepsFullValue() {
     const std::string longValue(200, 'x');
     document.dataset().putAndInsertString(DCM_PatientComments, longValue.c_str());
 
-    for (const auto &node : document.nodes()) {
-        if (node.keyword == "PatientComments") {
-            require(node.value == longValue);
-            require(node.valuePreview.size() == 160);
-            return;
-        }
-    }
-    require(false);
+    const auto nodes = document.nodes();
+    const auto node = std::ranges::find_if(nodes, [](const auto &entry) { return entry.keyword == "PatientComments"; });
+    require(node != nodes.end());
+    require(node->value == longValue);
+    require(node->valuePreview.size() == 160);
 }
 
 void pixelDataIsNotDisplayedOrEditable() {
@@ -159,15 +155,12 @@ void pixelDataIsNotDisplayedOrEditable() {
     const Uint8 pixelData[]{0x00, 0x7f, 0xff};
     document.dataset().putAndInsertUint8Array(DCM_PixelData, pixelData, 3);
 
-    for (const auto &node : document.nodes()) {
-        if (node.keyword == "PixelData") {
-            require(node.value == "[Pixel Data not displayed]");
-            require(node.valuePreview.empty());
-            require(!node.editable);
-            return;
-        }
-    }
-    require(false);
+    const auto nodes = document.nodes();
+    const auto node = std::ranges::find_if(nodes, [](const auto &entry) { return entry.keyword == "PixelData"; });
+    require(node != nodes.end());
+    require(node->value == "[Pixel Data not displayed]");
+    require(node->valuePreview.empty());
+    require(!node->editable);
 }
 
 void sharedUiModelFiltersAndFormats() {
@@ -197,16 +190,21 @@ void sharedTagParserValidatesHex() {
 } // namespace
 
 int main() {
-    scalarEdit();
-    addDeleteElement();
-    nestedSequenceEdit();
-    saveReloadPersistence();
-    recursiveNodeListing();
-    nodeKeepsFullValue();
-    pixelDataIsNotDisplayedOrEditable();
-    sharedUiModelFiltersAndFormats();
-    sharedTagParserValidatesHex();
+    try {
+        scalarEdit();
+        addDeleteElement();
+        nestedSequenceEdit();
+        saveReloadPersistence();
+        recursiveNodeListing();
+        nodeKeepsFullValue();
+        pixelDataIsNotDisplayedOrEditable();
+        sharedUiModelFiltersAndFormats();
+        sharedTagParserValidatesHex();
 
-    std::cout << "All DICOM editor tests passed\n";
-    return 0;
+        std::cout << "All DICOM editor tests passed\n";
+        return 0;
+    } catch (const std::exception &error) {
+        std::cerr << "Test failed: " << error.what() << '\n';
+        return 1;
+    }
 }

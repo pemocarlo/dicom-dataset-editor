@@ -2,7 +2,6 @@
 
 #include "dicom_editor/AttributeInput.hpp"
 #include "dicom_editor/DicomDocument.hpp"
-#include "dicom_editor/DicomEditorService.hpp"
 
 #include <exception>
 #include <filesystem>
@@ -64,7 +63,6 @@ class EditorController {
 
     EditorView &view_;
     DicomDocument document_;
-    DicomEditorService editor_;
 };
 
 } // namespace dicom_editor

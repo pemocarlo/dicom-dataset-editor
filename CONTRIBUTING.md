@@ -3,7 +3,7 @@
 ## Before You Change Code
 
 - Run the documented Conan install with the profile set required by your platform. The checked-in examples use the Linux `linux-gcc-release` profiles from `dicom-dataset-editor-conf`.
-- Use `cmake --workflow --preset dev-check` before sending a change.
+- Use `cmake --workflow --preset dev-check` before sending a change. It includes formatting, clang-tidy, cppcheck, and tests.
 - Use `cmake --workflow --preset all-checks` if you touched include sets or headers.
 
 ## Style

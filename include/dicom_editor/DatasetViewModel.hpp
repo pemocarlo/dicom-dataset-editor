@@ -10,7 +10,7 @@ namespace dicom_editor {
 
 class DatasetViewModel {
   public:
-    void setNodes(std::vector<DicomNode> nodes);
+    void setNodes(std::vector<DicomNode> newNodes);
     void setFilter(std::string filter);
 
     [[nodiscard]] const DicomNode *nodeAt(std::size_t visibleIndex) const;

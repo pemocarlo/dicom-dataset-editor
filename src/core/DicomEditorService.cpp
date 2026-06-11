@@ -31,20 +31,20 @@ void requireEditable(const DcmElement &element) {
 
 } // namespace
 
-void DicomEditorService::editValue(DicomDocument &document, const EditRequest &request) const {
+void DicomEditorService::editValue(DicomDocument &document, const EditRequest &request) {
     DcmElement &element = document.elementAt(request.path);
     requireEditable(element);
     requireGood(element.putString(request.value.c_str()), "Edit element " + request.path.toString());
     document.markDirty();
 }
 
-void DicomEditorService::addAttribute(DicomDocument &document, const AddAttributeRequest &request) const {
+void DicomEditorService::addAttribute(DicomDocument &document, const AddAttributeRequest &request) {
     DcmItem &parent = document.itemAt(request.parentItemPath);
     requireGood(parent.putAndInsertString(request.tag, request.value.c_str(), true), "Add attribute");
     document.markDirty();
 }
 
-void DicomEditorService::deleteAttribute(DicomDocument &document, const DicomPath &path) const {
+void DicomEditorService::deleteAttribute(DicomDocument &document, const DicomPath &path) {
     const auto &tag = path.elementTag();
     if (!tag) {
         throw DicomError("Only attributes can be deleted");

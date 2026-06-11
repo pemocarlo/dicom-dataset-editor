@@ -1,6 +1,6 @@
 # Hacking
 
-Developer mode is opt-in. It enables strict warnings, `clang-format`, `clang-tidy`, IWYU, tests, and `compile_commands.json`.
+Developer mode is opt-in. It enables strict warnings, `clang-format`, `clang-tidy`, `cppcheck`, IWYU, tests, and `compile_commands.json`.
 
 ## Developer Workflow
 
@@ -23,6 +23,7 @@ ctest --preset dev
 cmake --build --preset format
 cmake --build --preset check-format
 cmake --build --preset lint
+cmake --build --preset cppcheck
 cmake --preset iwyu
 cmake --build --preset iwyu
 ```
@@ -59,6 +60,10 @@ Explicit exclusions:
 - `portability-avoid-pragma-once`: this project accepts `#pragma once`.
 
 `WarningsAsErrors: '*'` stays enabled.
+
+## Cppcheck
+
+The `cppcheck` target analyzes the developer preset's `compile_commands.json` with warning, style, performance, and portability checks. Findings fail the target.
 
 ## IWYU
 
