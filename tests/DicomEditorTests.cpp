@@ -1,3 +1,5 @@
+#include "dicom_editor/AttributeInput.hpp"
+#include "dicom_editor/DatasetViewModel.hpp"
 #include "dicom_editor/DicomDocument.hpp"
 #include "dicom_editor/DicomEditorService.hpp"
 #include "dicom_editor/DicomNode.hpp"
@@ -16,6 +18,7 @@
 
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -167,6 +170,30 @@ void pixelDataIsNotDisplayedOrEditable() {
     require(false);
 }
 
+void sharedUiModelFiltersAndFormats() {
+    dicom_editor::DatasetViewModel model;
+    dicom_editor::DicomNode node;
+    node.keyword = "PatientName";
+    node.tag = "(0010,0010)";
+    node.valuePreview = "Example^Patient";
+    node.depth = 2;
+    model.setNodes({node});
+
+    require(model.visibleIndices().size() == 1);
+    require(dicom_editor::DatasetViewModel::attributeLabel(node) == "    PatientName");
+    model.setFilter("example^patient");
+    require(model.visibleIndices().size() == 1);
+    model.setFilter("missing");
+    require(model.visibleIndices().empty());
+}
+
+void sharedTagParserValidatesHex() {
+    const auto tag = dicom_editor::parseTagKey("0010", "0010");
+    require(tag && *tag == DCM_PatientName);
+    require(!dicom_editor::parseTagKey("nope", "0010"));
+    require(!dicom_editor::parseTagKey("10000", "0010"));
+}
+
 } // namespace
 
 int main() {
@@ -177,6 +204,8 @@ int main() {
     recursiveNodeListing();
     nodeKeepsFullValue();
     pixelDataIsNotDisplayedOrEditable();
+    sharedUiModelFiltersAndFormats();
+    sharedTagParserValidatesHex();
 
     std::cout << "All DICOM editor tests passed\n";
     return 0;

@@ -1,13 +1,11 @@
 #pragma once
 
-#include "dicom_editor/DicomNode.hpp"
+#include "dicom_editor/DatasetViewModel.hpp"
 
 #include <wx/panel.h>
 
-#include <cstddef>
 #include <functional>
 #include <string>
-#include <vector>
 
 class wxCommandEvent;
 class wxDataViewEvent;
@@ -36,8 +34,7 @@ class DatasetTreePanel final : public wxPanel {
 
     wxSearchCtrl *filter_{};
     wxDataViewListCtrl *list_{};
-    std::vector<dicom_editor::DicomNode> allNodes_;
-    std::vector<std::size_t> visibleToNode_;
+    dicom_editor::DatasetViewModel model_;
     std::function<void()> selectionChanged_;
     std::function<void(dicom_editor::DicomPath, std::string)> valueChanged_;
 };

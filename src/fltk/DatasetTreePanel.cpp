@@ -1,5 +1,7 @@
 #include "DatasetTreePanel.hpp"
 
+#include "dicom_editor/DatasetViewModel.hpp"
+#include "dicom_editor/DicomNode.hpp"
 #include "dicom_editor/DicomPath.hpp"
 
 #include <FL/Enumerations.H>
@@ -10,7 +12,7 @@
 
 #include <algorithm>
 #include <array>
-#include <cctype>
+#include <cstddef>
 #include <string>
 #include <utility>
 
@@ -22,35 +24,6 @@ constexpr int FilterLabelWidth = 48;
 constexpr int ColumnCount = 7;
 constexpr std::array<const char *, ColumnCount> Headers{"Attribute", "Tag", "VR", "VM", "Path", "Value", "Kind"};
 constexpr std::array<int, ColumnCount> ColumnWidths{220, 105, 55, 55, 260, 420, 90};
-
-std::string lower(std::string value) {
-    std::ranges::transform(value, value.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-    return value;
-}
-
-bool containsCaseInsensitive(const std::string &haystack, const std::string &needle) {
-    return lower(haystack).find(lower(needle)) != std::string::npos;
-}
-
-std::string kindLabel(dicom_editor::DicomNodeKind kind) {
-    switch (kind) {
-    case dicom_editor::DicomNodeKind::Dataset:
-        return "Dataset";
-    case dicom_editor::DicomNodeKind::Element:
-        return "Element";
-    case dicom_editor::DicomNodeKind::Sequence:
-        return "Sequence";
-    case dicom_editor::DicomNodeKind::Item:
-        return "Item";
-    }
-    return "";
-}
-
-std::string attributeLabel(const dicom_editor::DicomNode &node) {
-    std::string text(static_cast<std::size_t>(node.depth) * 2, ' ');
-    text += node.keyword.empty() ? node.tag : node.keyword;
-    return text;
-}
 
 } // namespace
 
@@ -99,10 +72,9 @@ class DatasetTable final : public Fl_Table_Row {
         }
     }
 
-    void setRows(const std::vector<dicom_editor::DicomNode> *nodes, const std::vector<std::size_t> *visible) {
-        nodes_ = nodes;
-        visible_ = visible;
-        rows(static_cast<int>(visible_->size()));
+    void setModel(const dicom_editor::DatasetViewModel *model) {
+        model_ = model;
+        rows(static_cast<int>(model_->visibleIndices().size()));
         redraw();
     }
 
@@ -180,13 +152,17 @@ class DatasetTable final : public Fl_Table_Row {
     }
 
     void drawDataCell(int row, int column, int x, int y, int width, int height) {
-        if (nodes_ == nullptr || visible_ == nullptr || row < 0 || static_cast<std::size_t>(row) >= visible_->size()) {
+        if (model_ == nullptr || row < 0) {
             return;
         }
 
-        const auto &node = (*nodes_)[(*visible_)[static_cast<std::size_t>(row)]];
+        const auto *node = model_->nodeAt(static_cast<std::size_t>(row));
+        if (node == nullptr) {
+            return;
+        }
         const std::array<std::string, ColumnCount> values{
-            attributeLabel(node), node.tag, node.vr, node.vm, node.path.toString(), node.value, kindLabel(node.kind)};
+            dicom_editor::DatasetViewModel::attributeLabel(*node), node->tag, node->vr, node->vm, node->path.toString(), node->value,
+            dicom_editor::DatasetViewModel::kindLabel(node->kind)};
 
         fl_push_clip(x, y, width, height);
         const bool selected = row_selected(row) != 0;
@@ -200,8 +176,7 @@ class DatasetTable final : public Fl_Table_Row {
     }
 
     DatasetTreePanel &owner_;
-    const std::vector<dicom_editor::DicomNode> *nodes_{};
-    const std::vector<std::size_t> *visible_{};
+    const dicom_editor::DatasetViewModel *model_{};
 };
 
 DatasetTreePanel::DatasetTreePanel(int x, int y, int width, int height) : Fl_Group(x, y, width, height) {
@@ -218,16 +193,13 @@ DatasetTreePanel::DatasetTreePanel(int x, int y, int width, int height) : Fl_Gro
 }
 
 void DatasetTreePanel::SetNodes(std::vector<dicom_editor::DicomNode> nodes) {
-    allNodes_ = std::move(nodes);
+    model_.setNodes(std::move(nodes));
     Rebuild();
 }
 
 const dicom_editor::DicomNode *DatasetTreePanel::SelectedNode() const {
     const int row = table_->selectedRow();
-    if (row < 0 || static_cast<std::size_t>(row) >= visibleToNode_.size()) {
-        return nullptr;
-    }
-    return &allNodes_[visibleToNode_[static_cast<std::size_t>(row)]];
+    return row < 0 ? nullptr : model_.nodeAt(static_cast<std::size_t>(row));
 }
 
 void DatasetTreePanel::SetSelectionChangedHandler(std::function<void()> handler) { selectionChanged_ = std::move(handler); }
@@ -256,16 +228,8 @@ void DatasetTreePanel::resize(int x, int y, int width, int height) {
 }
 
 void DatasetTreePanel::Rebuild() {
-    visibleToNode_.clear();
-    const std::string query = filter_->value();
-    for (std::size_t index = 0; index < allNodes_.size(); ++index) {
-        const auto &node = allNodes_[index];
-        const std::string searchable = node.tag + " " + node.keyword + " " + node.vr + " " + node.valuePreview + " " + node.path.toString();
-        if (query.empty() || containsCaseInsensitive(searchable, query)) {
-            visibleToNode_.push_back(index);
-        }
-    }
-    table_->setRows(&allNodes_, &visibleToNode_);
+    model_.setFilter(filter_->value());
+    table_->setModel(&model_);
     SelectionChanged();
 }
 

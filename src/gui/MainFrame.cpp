@@ -2,10 +2,8 @@
 
 #include "AttributeEditDialog.hpp"
 #include "DatasetTreePanel.hpp"
-#include "dicom_editor/DicomNode.hpp"
-#include "dicom_editor/DicomPath.hpp"
-
-#include <dcmtk/dcmdata/dctagkey.h>
+#include "dicom_editor/AttributeInput.hpp"
+#include "dicom_editor/EditorController.hpp"
 
 #include <wx/defs.h>
 #include <wx/event.h>
@@ -16,9 +14,7 @@
 #include <wx/sizer.h>
 #include <wx/string.h>
 
-#include <exception>
 #include <filesystem>
-#include <functional>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -29,26 +25,20 @@ constexpr int IdEdit = wxID_HIGHEST + 1;
 constexpr int IdAdd = IdEdit + 1;
 constexpr int IdDelete = IdAdd + 1;
 
-wxString documentTitle(const dicom_editor::DicomDocument &document) {
-    const wxString name = document.hasFilePath() ? wxString::FromUTF8(document.filePath().filename().string()) : "Untitled";
-    return document.dirty() ? name + "*" : name;
-}
-
 } // namespace
 
-MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "DICOM Dataset Editor", wxDefaultPosition, wxSize(1180, 760)) {
+MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "DICOM Dataset Editor", wxDefaultPosition, wxSize(1180, 760)), controller_(*this) {
     BuildMenus();
     CreateStatusBar();
 
     datasetPanel_ = new DatasetTreePanel(this);
-    datasetPanel_->SetSelectionChangedHandler([this] { UpdateActions(); });
-    datasetPanel_->SetValueChangedHandler(
-        [this](dicom_editor::DicomPath path, std::string value) { EditValue(std::move(path), std::move(value)); });
+    datasetPanel_->SetSelectionChangedHandler([this] { updateActions(); });
+    datasetPanel_->SetValueChangedHandler([this](dicom_editor::DicomPath path, std::string value) { controller_.editValue(path, value); });
     auto *sizer = new wxBoxSizer(wxVERTICAL);
     sizer->Add(datasetPanel_, 1, wxEXPAND);
     SetSizer(sizer);
 
-    RefreshDataset();
+    controller_.refresh();
 }
 
 void MainFrame::BuildMenus() {
@@ -78,166 +68,63 @@ void MainFrame::BuildMenus() {
     Bind(wxEVT_MENU, &MainFrame::OnExit, this, wxID_EXIT);
 }
 
-void MainFrame::RefreshDataset() {
-    datasetPanel_->SetNodes(document_.nodes());
-    SetTitle("DICOM Dataset Editor - " + documentTitle(document_));
-    SetStatusText(document_.hasFilePath() ? wxString::FromUTF8(document_.filePath().string()) : "New dataset");
-    UpdateActions();
+std::optional<std::filesystem::path> MainFrame::chooseOpenFile() {
+    wxFileDialog dialog(this, "Open DICOM File", "", "", "DICOM files (*.dcm)|*.dcm|All files (*.*)|*.*", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+    return dialog.ShowModal() == wxID_OK ? std::optional<std::filesystem::path>(dialog.GetPath().ToStdString()) : std::nullopt;
 }
 
-bool MainFrame::ConfirmDiscardChanges() {
-    if (!document_.dirty()) {
-        return true;
-    }
+std::optional<std::filesystem::path> MainFrame::chooseSaveFile() {
+    wxFileDialog dialog(this, "Save DICOM File", "", "", "DICOM files (*.dcm)|*.dcm|All files (*.*)|*.*",
+                        wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+    return dialog.ShowModal() == wxID_OK ? std::optional<std::filesystem::path>(dialog.GetPath().ToStdString()) : std::nullopt;
+}
+
+dicom_editor::SaveChangesChoice MainFrame::confirmSaveChanges() {
     const int answer = wxMessageBox("Save changes before continuing?", "Unsaved Changes", wxYES_NO | wxCANCEL | wxICON_WARNING);
-    if (answer == wxCANCEL) {
-        return false;
-    }
     if (answer == wxYES) {
-        return SaveCurrent();
+        return dicom_editor::SaveChangesChoice::Save;
     }
-    return true;
+    return answer == wxNO ? dicom_editor::SaveChangesChoice::Discard : dicom_editor::SaveChangesChoice::Cancel;
 }
 
-bool MainFrame::SaveCurrent() {
-    try {
-        if (!document_.hasFilePath()) {
-            wxFileDialog dialog(this, "Save DICOM File", "", "", "DICOM files (*.dcm)|*.dcm|All files (*.*)|*.*",
-                                wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
-            if (dialog.ShowModal() != wxID_OK) {
-                return false;
-            }
-            document_.saveAs(dialog.GetPath().ToStdString());
-        } else {
-            document_.save();
-        }
-
-        dicom_editor::DicomDocument verified;
-        verified.load(document_.filePath());
-        RefreshDataset();
-        SetStatusText("Saved and reloaded successfully: " + wxString::FromUTF8(document_.filePath().string()));
-        return true;
-    } catch (const std::exception &error) {
-        ShowError(error.what());
-        return false;
-    }
+bool MainFrame::confirmDelete() {
+    return wxMessageBox("Delete selected attribute?", "Delete Attribute", wxYES_NO | wxICON_WARNING) == wxYES;
 }
 
-void MainFrame::ShowError(const std::string &message) {
+std::optional<dicom_editor::AttributeInput> MainFrame::editAttribute(const std::string &title, const std::string &value) {
+    return AttributeEditDialog::Edit(this, wxString::FromUTF8(title), wxString::FromUTF8(value));
+}
+
+std::optional<dicom_editor::AttributeInput> MainFrame::addAttribute() { return AttributeEditDialog::Add(this); }
+
+void MainFrame::showError(const std::string &message) {
     wxMessageBox(wxString::FromUTF8(message), "DICOM Dataset Editor", wxOK | wxICON_ERROR);
 }
 
-void MainFrame::UpdateActions() {
-    const auto *selected = datasetPanel_->SelectedNode();
-    saveItem_->Enable(document_.dirty() || !document_.hasFilePath());
-    editItem_->Enable(selected != nullptr && selected->editable);
-    deleteItem_->Enable(selected != nullptr && selected->editable);
+void MainFrame::presentDocument(std::vector<dicom_editor::DicomNode> nodes, const std::string &title, const std::string &status) {
+    datasetPanel_->SetNodes(std::move(nodes));
+    SetTitle(wxString::FromUTF8(title));
+    setStatus(status);
+    updateActions();
 }
 
-void MainFrame::OnOpen(wxCommandEvent &) {
-    if (!ConfirmDiscardChanges()) {
-        return;
-    }
+void MainFrame::setStatus(const std::string &status) { SetStatusText(wxString::FromUTF8(status)); }
 
-    wxFileDialog dialog(this, "Open DICOM File", "", "", "DICOM files (*.dcm)|*.dcm|All files (*.*)|*.*", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
-    if (dialog.ShowModal() != wxID_OK) {
-        return;
-    }
-
-    try {
-        document_.load(dialog.GetPath().ToStdString());
-        RefreshDataset();
-    } catch (const std::exception &error) {
-        ShowError(error.what());
-    }
+void MainFrame::updateActions() {
+    const auto actions = controller_.actionState(datasetPanel_->SelectedNode());
+    saveItem_->Enable(actions.saveEnabled);
+    editItem_->Enable(actions.editEnabled);
+    deleteItem_->Enable(actions.deleteEnabled);
 }
 
-void MainFrame::OnSave(wxCommandEvent &) { SaveCurrent(); }
-
-void MainFrame::OnSaveAs(wxCommandEvent &) {
-    wxFileDialog dialog(this, "Save DICOM File", "", "", "DICOM files (*.dcm)|*.dcm|All files (*.*)|*.*",
-                        wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
-    if (dialog.ShowModal() != wxID_OK) {
-        return;
-    }
-
-    try {
-        document_.saveAs(dialog.GetPath().ToStdString());
-        dicom_editor::DicomDocument verified;
-        verified.load(document_.filePath());
-        RefreshDataset();
-        SetStatusText("Saved and reloaded successfully: " + wxString::FromUTF8(document_.filePath().string()));
-    } catch (const std::exception &error) {
-        ShowError(error.what());
-    }
-}
-
-void MainFrame::OnEdit(wxCommandEvent &) { EditSelectedValue(); }
-
-void MainFrame::EditSelectedValue() {
-    const auto *selected = datasetPanel_->SelectedNode();
-    if (selected == nullptr || !selected->editable) {
-        return;
-    }
-
-    auto result = AttributeEditDialog::Edit(this, "Edit " + wxString::FromUTF8(selected->keyword), wxString::FromUTF8(selected->value));
-    if (!result) {
-        return;
-    }
-
-    EditValue(selected->path, result->value);
-}
-
-void MainFrame::EditValue(dicom_editor::DicomPath path, std::string value) {
-    try {
-        editor_.editValue(document_, {.path = std::move(path), .value = std::move(value)});
-        RefreshDataset();
-    } catch (const std::exception &error) {
-        ShowError(error.what());
-        RefreshDataset();
-    }
-}
-
-void MainFrame::OnAdd(wxCommandEvent &) {
-    const auto *selected = datasetPanel_->SelectedNode();
-    dicom_editor::DicomPath parent = dicom_editor::DicomPath::dataset();
-    if (selected != nullptr) {
-        parent =
-            selected->kind == dicom_editor::DicomNodeKind::Item ? selected->path : dicom_editor::DicomPath::item(selected->path.parents());
-    }
-
-    auto result = AttributeEditDialog::Add(this);
-    if (!result || !result->tag) {
-        return;
-    }
-
-    try {
-        editor_.addAttribute(document_, {.parentItemPath = parent, .tag = *result->tag, .value = result->value});
-        RefreshDataset();
-    } catch (const std::exception &error) {
-        ShowError(error.what());
-    }
-}
-
-void MainFrame::OnDelete(wxCommandEvent &) {
-    const auto *selected = datasetPanel_->SelectedNode();
-    if (selected == nullptr || !selected->editable) {
-        return;
-    }
-    if (wxMessageBox("Delete selected attribute?", "Delete Attribute", wxYES_NO | wxICON_WARNING) != wxYES) {
-        return;
-    }
-
-    try {
-        editor_.deleteAttribute(document_, selected->path);
-        RefreshDataset();
-    } catch (const std::exception &error) {
-        ShowError(error.what());
-    }
-}
-
+void MainFrame::OnOpen(wxCommandEvent &) { controller_.open(); }
+void MainFrame::OnSave(wxCommandEvent &) { controller_.save(); }
+void MainFrame::OnSaveAs(wxCommandEvent &) { controller_.saveAs(); }
+void MainFrame::OnEdit(wxCommandEvent &) { controller_.editSelected(datasetPanel_->SelectedNode()); }
+void MainFrame::OnAdd(wxCommandEvent &) { controller_.add(datasetPanel_->SelectedNode()); }
+void MainFrame::OnDelete(wxCommandEvent &) { controller_.remove(datasetPanel_->SelectedNode()); }
 void MainFrame::OnExit(wxCommandEvent &) {
-    if (ConfirmDiscardChanges()) {
+    if (controller_.confirmClose()) {
         Close(true);
     }
 }
