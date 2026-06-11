@@ -2,24 +2,21 @@
 
 #include "dicom_editor/EditorController.hpp"
 
-#include <wx/frame.h>
+#include <FL/Fl_Double_Window.H>
 
 #include <string>
 
-class DatasetTreePanel;
-class wxCommandEvent;
-class wxMenuItem;
+class DatasetPanel;
+class Fl_Box;
+class Fl_Menu_Bar;
+class Fl_Widget;
 
-namespace dicom_editor {
-class DicomPath;
-}
-
-class MainFrame final : public wxFrame, private dicom_editor::EditorControllerHost {
+class EditorWindow final : public Fl_Double_Window, private dicom_editor::EditorView {
   public:
-    MainFrame();
+    EditorWindow();
+    int handle(int event) override;
 
   private:
-    void BuildMenus();
     [[nodiscard]] std::optional<std::filesystem::path> chooseOpenFile() override;
     [[nodiscard]] std::optional<std::filesystem::path> chooseSaveFile() override;
     [[nodiscard]] dicom_editor::SaveChangesChoice confirmSaveChanges() override;
@@ -30,18 +27,13 @@ class MainFrame final : public wxFrame, private dicom_editor::EditorControllerHo
     void presentDocument(std::vector<dicom_editor::DicomNode> nodes, const std::string &title, const std::string &status) override;
     void setStatus(const std::string &status) override;
     void updateActions();
+    void exit();
 
-    void OnOpen(wxCommandEvent &event);
-    void OnSave(wxCommandEvent &event);
-    void OnSaveAs(wxCommandEvent &event);
-    void OnEdit(wxCommandEvent &event);
-    void OnAdd(wxCommandEvent &event);
-    void OnDelete(wxCommandEvent &event);
-    void OnExit(wxCommandEvent &event);
+    static void menuCallback(Fl_Widget *widget, void *data);
+    static void closeCallback(Fl_Widget *widget, void *data);
 
-    DatasetTreePanel *datasetPanel_{};
+    Fl_Menu_Bar *menu_{};
+    DatasetPanel *datasetPanel_{};
+    Fl_Box *status_{};
     dicom_editor::EditorController controller_;
-    wxMenuItem *saveItem_{};
-    wxMenuItem *editItem_{};
-    wxMenuItem *deleteItem_{};
 };

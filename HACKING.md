@@ -70,8 +70,6 @@ If the executable is local only, pass its path explicitly:
 cmake --preset iwyu -DDICOM_EDITOR_IWYU_EXECUTABLE=/path/to/include-what-you-use
 ```
 
-`iwyu.imp` retains mappings needed when checking the optional wxWidgets backend.
-
 ## Editor Support
 
 Developer mode enables `compile_commands.json` at source root for clangd and Neovim LSP.
@@ -81,6 +79,8 @@ Developer mode enables `compile_commands.json` at source root for clangd and Neo
 - `DicomDocument`: DICOM file ownership, load/save, dirty state, recursive node listing.
 - `DicomPath`: stable path through sequence items and optional element tag.
 - `DicomEditorService`: add/edit/delete operations.
-- `MainFrame`: menus, save prompts, app-level actions.
-- `DatasetTreePanel`: recursive tree, filtering, inline edits.
-- `AttributeEditDialog`: tag/value entry for additions and raw value editing.
+- `EditorController`: document workflows and action state.
+- `DatasetViewModel`: filtering and row presentation.
+- `EditorWindow`: FLTK menus, dialogs, and app-level event wiring.
+- `DatasetPanel`: FLTK dataset table, focus, and keyboard navigation.
+- `AttributeDialog`: FLTK tag/value entry.

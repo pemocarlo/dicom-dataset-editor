@@ -1,4 +1,4 @@
-#include "AttributeEditDialog.hpp"
+#include "AttributeDialog.hpp"
 
 #include "dicom_editor/AttributeInput.hpp"
 
@@ -19,9 +19,9 @@ class Fl_Widget;
 
 namespace {
 
-class Dialog final : public Fl_Window {
+class AttributeDialogWindow final : public Fl_Window {
   public:
-    Dialog(const std::string &title, bool includeTag, const std::string &currentValue)
+    AttributeDialogWindow(const std::string &title, bool includeTag, const std::string &currentValue)
         : Fl_Window(520, 320, title.c_str()), includeTag_(includeTag) {
         if (includeTag_) {
             group_ = new Fl_Input(115, 20, 380, 28, "Group (hex)");
@@ -50,9 +50,9 @@ class Dialog final : public Fl_Window {
     }
 
   private:
-    static void cancelCallback(Fl_Widget *, void *data) { static_cast<Dialog *>(data)->hide(); }
+    static void cancelCallback(Fl_Widget *, void *data) { static_cast<AttributeDialogWindow *>(data)->hide(); }
 
-    static void okCallback(Fl_Widget *, void *data) { static_cast<Dialog *>(data)->accept(); }
+    static void okCallback(Fl_Widget *, void *data) { static_cast<AttributeDialogWindow *>(data)->accept(); }
 
     void accept() {
         dicom_editor::AttributeInput result;
@@ -77,8 +77,8 @@ class Dialog final : public Fl_Window {
 
 } // namespace
 
-std::optional<dicom_editor::AttributeInput> AttributeEditDialog::Edit(const std::string &title, const std::string &currentValue) {
-    return Dialog(title, false, currentValue).run();
+std::optional<dicom_editor::AttributeInput> AttributeDialog::edit(const std::string &title, const std::string &currentValue) {
+    return AttributeDialogWindow(title, false, currentValue).run();
 }
 
-std::optional<dicom_editor::AttributeInput> AttributeEditDialog::Add() { return Dialog("Add Attribute", true, "").run(); }
+std::optional<dicom_editor::AttributeInput> AttributeDialog::add() { return AttributeDialogWindow("Add Attribute", true, "").run(); }

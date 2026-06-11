@@ -16,8 +16,6 @@ option(DICOM_EDITOR_DEVELOPER_MODE "Enable developer tooling targets" OFF)
 option(DICOM_EDITOR_ENABLE_LSP "Export compile commands and expose them at the source root" OFF)
 option(DICOM_EDITOR_ENABLE_STRICT_WARNINGS "Enable strict compiler warnings and treat them as errors" OFF)
 option(DICOM_EDITOR_ENABLE_IWYU "Run include-what-you-use while compiling" OFF)
-set(DICOM_EDITOR_GUI "fltk" CACHE STRING "GUI toolkit: fltk or wxwidgets")
-set_property(CACHE DICOM_EDITOR_GUI PROPERTY STRINGS fltk wxwidgets)
 
 if(DICOM_EDITOR_ENABLE_LSP)
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -26,42 +24,30 @@ endif()
 if(DICOM_EDITOR_ENABLE_IWYU)
     find_program(DICOM_EDITOR_IWYU_EXECUTABLE include-what-you-use REQUIRED)
     set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE
-        "${DICOM_EDITOR_IWYU_EXECUTABLE};-Wno-unknown-warning-option;-Xiwyu;--error=1;-Xiwyu;--mapping_file=${PROJECT_SOURCE_DIR}/iwyu.imp"
+        "${DICOM_EDITOR_IWYU_EXECUTABLE};-Wno-unknown-warning-option;-Xiwyu;--error=1"
     )
 endif()
 
 find_package(DCMTK CONFIG REQUIRED)
-if(DICOM_EDITOR_GUI STREQUAL "wxwidgets" AND UNIX AND NOT APPLE)
-    find_package(xorg-macros CONFIG REQUIRED)
-    if(NOT TARGET xorg-macros::xorg-macros)
-        add_library(xorg-macros::xorg-macros INTERFACE IMPORTED)
-    endif()
-endif()
-if(DICOM_EDITOR_GUI STREQUAL "fltk")
-    find_package(fltk CONFIG REQUIRED)
-    if(UNIX AND NOT APPLE)
-        file(STRINGS "${fltk_INCLUDE_DIR}/FL/fl_config.h"
-            DICOM_EDITOR_FLTK_WAYLAND_CONFIG
-            REGEX "^#define FLTK_USE_WAYLAND 1"
+find_package(fltk CONFIG REQUIRED)
+if(UNIX AND NOT APPLE)
+    file(STRINGS "${fltk_INCLUDE_DIR}/FL/fl_config.h"
+        DICOM_EDITOR_FLTK_WAYLAND_CONFIG
+        REGEX "^#define FLTK_USE_WAYLAND 1"
+    )
+    if(DICOM_EDITOR_FLTK_WAYLAND_CONFIG)
+        # ConanCenter FLTK 1.4.5 omits its auto-detected Wayland dependencies.
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(DICOM_EDITOR_FLTK_WAYLAND REQUIRED IMPORTED_TARGET
+            pangocairo
+            cairo
+            wayland-client
+            wayland-cursor
+            xkbcommon
+            dbus-1
+            libdecor-0
         )
-        if(DICOM_EDITOR_FLTK_WAYLAND_CONFIG)
-            # ConanCenter FLTK 1.4.5 omits its auto-detected Wayland dependencies.
-            find_package(PkgConfig REQUIRED)
-            pkg_check_modules(DICOM_EDITOR_FLTK_WAYLAND REQUIRED IMPORTED_TARGET
-                pangocairo
-                cairo
-                wayland-client
-                wayland-cursor
-                xkbcommon
-                dbus-1
-                libdecor-0
-            )
-        endif()
     endif()
-elseif(DICOM_EDITOR_GUI STREQUAL "wxwidgets")
-    find_package(wxWidgets CONFIG REQUIRED)
-else()
-    message(FATAL_ERROR "Unsupported DICOM_EDITOR_GUI: ${DICOM_EDITOR_GUI}")
 endif()
 
 set(DICOM_EDITOR_CORE_SOURCES
@@ -82,48 +68,20 @@ if(EXISTS "${dcmtk_PACKAGE_FOLDER_RELEASE}/bin/share/dcmtk-3.7.0/dicom.dic")
         PUBLIC DICOM_EDITOR_DCMTK_DICT_PATH="${dcmtk_PACKAGE_FOLDER_RELEASE}/bin/share/dcmtk-3.7.0/dicom.dic")
 endif()
 
-if(DICOM_EDITOR_GUI STREQUAL "fltk")
-    set(DICOM_EDITOR_GUI_SOURCES
-        src/fltk/App.cpp
-        src/fltk/MainFrame.cpp
-        src/fltk/DatasetTreePanel.cpp
-        src/fltk/AttributeEditDialog.cpp
-    )
-    set(DICOM_EDITOR_GUI_TARGET fltk::fltk)
-    if(TARGET PkgConfig::DICOM_EDITOR_FLTK_WAYLAND)
-        list(APPEND DICOM_EDITOR_GUI_TARGET PkgConfig::DICOM_EDITOR_FLTK_WAYLAND)
-    endif()
-else()
-    set(DICOM_EDITOR_GUI_SOURCES
-        src/gui/App.cpp
-        src/gui/MainFrame.cpp
-        src/gui/DatasetTreePanel.cpp
-        src/gui/AttributeEditDialog.cpp
-    )
-
-    if(TARGET wx::wxWidgets)
-        set(DICOM_EDITOR_GUI_TARGET wx::wxWidgets)
-    elseif(TARGET wxWidgets::wxWidgets)
-        set(DICOM_EDITOR_GUI_TARGET wxWidgets::wxWidgets)
-    elseif(TARGET wxWidgets::wx)
-        set(DICOM_EDITOR_GUI_TARGET wxWidgets::wx)
-    else()
-        message(FATAL_ERROR "Unsupported wxWidgets Conan CMake target")
-    endif()
+set(DICOM_EDITOR_UI_SOURCES
+    src/ui/App.cpp
+    src/ui/EditorWindow.cpp
+    src/ui/DatasetPanel.cpp
+    src/ui/AttributeDialog.cpp
+)
+set(DICOM_EDITOR_UI_LIBRARIES fltk::fltk)
+if(TARGET PkgConfig::DICOM_EDITOR_FLTK_WAYLAND)
+    list(APPEND DICOM_EDITOR_UI_LIBRARIES PkgConfig::DICOM_EDITOR_FLTK_WAYLAND)
 endif()
 
-add_executable(dicom-dataset-editor ${DICOM_EDITOR_GUI_SOURCES})
+add_executable(dicom-dataset-editor ${DICOM_EDITOR_UI_SOURCES})
 target_include_directories(dicom-dataset-editor PRIVATE include)
-if(DICOM_EDITOR_GUI STREQUAL "wxwidgets" AND EXISTS "${fontconfig_PACKAGE_FOLDER_RELEASE}/res/etc/fonts")
-    target_compile_definitions(dicom-dataset-editor
-        PRIVATE DICOM_EDITOR_FONTCONFIG_PATH="${fontconfig_PACKAGE_FOLDER_RELEASE}/res/etc/fonts")
-endif()
-if(DICOM_EDITOR_GUI STREQUAL "wxwidgets" AND EXISTS "${gdk-pixbuf_PACKAGE_FOLDER_RELEASE}/bin/gdk-pixbuf-pixdata")
-    target_compile_definitions(dicom-dataset-editor
-        PRIVATE DICOM_EDITOR_GDK_PIXBUF_PIXDATA="${gdk-pixbuf_PACKAGE_FOLDER_RELEASE}/bin/gdk-pixbuf-pixdata")
-endif()
-
-target_link_libraries(dicom-dataset-editor PRIVATE dicom_editor_core ${DICOM_EDITOR_GUI_TARGET})
+target_link_libraries(dicom-dataset-editor PRIVATE dicom_editor_core ${DICOM_EDITOR_UI_LIBRARIES})
 
 if(DICOM_EDITOR_RELOCATABLE_INSTALL)
     set(DICOM_EDITOR_INSTALL_DATADIR "../${CMAKE_INSTALL_DATADIR}/dicom-dataset-editor")
@@ -181,9 +139,6 @@ if(DICOM_EDITOR_RELOCATABLE_INSTALL)
     install(FILES
         "${dcmtk_PACKAGE_FOLDER_RELEASE}/bin/share/dcmtk-3.7.0/dicom.dic"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/dicom-dataset-editor/dcmtk"
-    )
-    install(FILES resources/fonts.conf
-        DESTINATION "${CMAKE_INSTALL_DATADIR}/dicom-dataset-editor/fontconfig"
     )
 else()
     install(TARGETS dicom-dataset-editor
