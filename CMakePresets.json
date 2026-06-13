@@ -19,8 +19,7 @@
             "cacheVariables": {
                 "BUILD_TESTING": true,
                 "DICOM_EDITOR_DEVELOPER_MODE": true,
-                "DICOM_EDITOR_ENABLE_LSP": true,
-                "DICOM_EDITOR_ENABLE_STRICT_WARNINGS": true
+                "CMAKE_EXPORT_COMPILE_COMMANDS": true
             }
         },
         {
