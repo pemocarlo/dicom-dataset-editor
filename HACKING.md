@@ -30,7 +30,8 @@ cmake --build --preset iwyu
 
 ## Strict Warnings
 
-Developer preset turns on `DICOM_EDITOR_ENABLE_STRICT_WARNINGS`.
+Developer mode enables strict warnings by default. Override with
+`-DDICOM_EDITOR_ENABLE_STRICT_WARNINGS=OFF` only when diagnosing compiler issues.
 
 GCC flags include `-Wall`, `-Wextra`, `-Wpedantic`, `-Werror`, conversion checks, shadowing, format checks, switch coverage, null-dereference, pointer-arithmetic, overflow, fallthrough, VLA, and string literal diagnostics.
 
@@ -77,7 +78,8 @@ cmake --preset iwyu -DDICOM_EDITOR_IWYU_EXECUTABLE=/path/to/include-what-you-use
 
 ## Editor Support
 
-Developer mode enables `compile_commands.json` at source root for clangd and Neovim LSP.
+Developer preset sets native CMake variable `CMAKE_EXPORT_COMPILE_COMMANDS=ON`.
+Developer mode exposes generated `compile_commands.json` at source root for clangd and Neovim LSP.
 
 ## Code Layout
 

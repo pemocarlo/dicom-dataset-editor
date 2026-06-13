@@ -18,6 +18,7 @@
 - `ctest --preset conan-release --output-on-failure`
 - `cmake --workflow --preset dev-check`
 - `cmake --workflow --preset all-checks`
+- `conan create . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release -c tools.build:skip_test=False` when changing CMake, Conan, or install behavior
 
 ## Pull Requests
 

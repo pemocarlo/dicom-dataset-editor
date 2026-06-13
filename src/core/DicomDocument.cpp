@@ -51,8 +51,8 @@ void ensureDictionaryPath() {
         return;
     }
 
-#ifdef DICOM_EDITOR_DCMTK_DICT_PATH
-    const auto configuredPath = std::filesystem::path(DICOM_EDITOR_DCMTK_DICT_PATH);
+#ifdef DICOM_EDITOR_DCMTK_DICT_FILE
+    const auto configuredPath = std::filesystem::path(DICOM_EDITOR_DCMTK_DICT_FILE);
     if ((current == nullptr || !std::filesystem::exists(current)) && std::filesystem::exists(configuredPath)) {
         setenv("DCMDICTPATH", configuredPath.string().c_str(), 1);
     }

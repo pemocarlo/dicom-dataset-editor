@@ -1,3 +1,5 @@
+include_guard()
+
 function(dicom_editor_enable_strict_warnings)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         set(warnings

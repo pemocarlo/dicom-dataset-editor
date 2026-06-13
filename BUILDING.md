@@ -7,8 +7,11 @@ conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -p
 ```
 
 That command generates `build/Release/generators/CMakePresets.json` and the Conan toolchain.
+It also passes the DCMTK dictionary location required by the application to CMake.
 
-## Configure And Build
+In-source builds are not supported.
+
+## Build And Test
 
 ```bash
 cmake --preset conan-release
@@ -16,26 +19,30 @@ cmake --build --preset conan-release
 ctest --preset conan-release
 ```
 
-## Relocatable Install
+Run the Conan install again after changing the recipe, lockfile, profiles, or dependencies.
+CMake configuration is expected to use the generated Conan toolchain; configuring without it requires manually providing all dependencies and `DICOM_EDITOR_DCMTK_DICT_FILE`.
 
-Use `DICOM_EDITOR_RELOCATABLE_INSTALL=ON` when you want a per-user install with bundled non-system shared libraries and relative runtime paths:
+## Install
+
+Install to any prefix with:
 
 ```bash
-cmake --preset conan-release -DDICOM_EDITOR_RELOCATABLE_INSTALL=ON
-cmake --build --preset conan-release
 cmake --install build/Release --prefix <your-install-prefix>
 ```
 
 Expected layout:
 
 - `<your-install-prefix>/bin/dicom-dataset-editor`
-- Bundled non-system shared libraries under `<your-install-prefix>/lib`
-- Runtime data under `<your-install-prefix>/share/dicom-dataset-editor`
+- `<your-install-prefix>/share/dicom-dataset-editor/dcmtk/dicom.dic`
 
-System libraries stay system-provided. The executable uses relative runtime paths so the installed prefix can be moved.
+The executable locates installed runtime data relative to itself, so the complete install prefix can be moved. CMake does not bundle dependency libraries; provide them through the system, Conan, or a platform-specific deployment step.
 
-## Notes
+## Conan Package
 
-- `DICOM_EDITOR_RELOCATABLE_INSTALL` defaults to `OFF`.
-- Use `--prefix` for one-off installs. It keeps the build tree unchanged.
-- If you install under another writable directory, replace `<your-install-prefix>` with that prefix.
+Build, test, and package the application with:
+
+```bash
+conan create . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release -c tools.build:skip_test=False
+```
+
+Use `-c tools.build:skip_test=True` when package creation should skip tests.
