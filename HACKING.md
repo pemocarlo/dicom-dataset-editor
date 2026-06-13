@@ -2,6 +2,44 @@
 
 Developer mode is opt-in. It enables strict warnings, `clang-format`, `clang-tidy`, `cppcheck`, IWYU, tests, and `compile_commands.json`.
 
+## Developer Tools
+
+Conan installs pinned CMake and cppcheck versions as build requirements:
+
+- `cmake/4.3.2`
+- `cppcheck/2.20.0`
+
+Both pins have ConanCenter binaries for Linux and Windows.
+
+Run the normal Conan install before developer workflows:
+
+```bash
+conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release
+```
+
+The Conan toolchain adds cppcheck to CMake's program search path, so the
+`cppcheck` target does not depend on a system cppcheck. Conan also generates
+build-environment activation scripts under `build/Release/generators` for pinned
+command-line tools:
+
+```bash
+# Linux
+source build/Release/generators/conanbuild.sh
+
+# Windows cmd.exe
+call build\Release\generators\conanbuild.bat
+```
+
+ConanCenter does not currently package `clang-format`, `clang-tidy`, `clangd`, or
+`include-what-you-use`. Install one matching LLVM toolchain for these. IWYU must
+match the LLVM major version it was built against. Tested developer-tool pairing:
+
+- LLVM/Clang `22.1.6`
+- include-what-you-use `0.26`, built against Clang `22.1.6`
+
+On Windows, LLVM's installer provides `clang-format`, `clang-tidy`, and `clangd`.
+IWYU still needs a separate compatible build or installation.
+
 ## Developer Workflow
 
 ```bash
@@ -80,6 +118,52 @@ cmake --preset iwyu -DDICOM_EDITOR_IWYU_EXECUTABLE=/path/to/include-what-you-use
 
 Developer preset sets native CMake variable `CMAKE_EXPORT_COMPILE_COMMANDS=ON`.
 Developer mode exposes generated `compile_commands.json` at source root for clangd and Neovim LSP.
+
+Launch an editor from the activated Conan build environment when it needs the
+Conan-managed CMake or cppcheck:
+
+```bash
+# Linux
+source build/Release/generators/conanbuild.sh
+code .
+nvim .
+emacs .
+
+# Windows cmd.exe
+call build\Release\generators\conanbuild.bat
+code .
+```
+
+VS Code uses the checked-in `.vscode/settings.json`: CMake Tools uses the `dev`
+preset and clangd reads source-root `compile_commands.json`. Launching VS Code
+from the activated environment makes CMake Tools resolve Conan's CMake.
+
+LazyVim's clangd setup discovers source-root `compile_commands.json`
+automatically. If overriding its command, use `cmd = { "clangd",
+"--compile-commands-dir=." }`; launch Neovim from the environment that contains
+the intended clangd.
+
+For Emacs, start it from the same environment and use clangd with Eglot:
+
+```elisp
+(add-to-list 'eglot-server-programs '((c++-mode c-mode) . ("clangd" "--compile-commands-dir=.")))
+```
+
+On Linux and macOS, `mise` can pin LLVM and launch editors without manually
+activating a shell environment. Its current `clang` plugin builds LLVM from
+source, so installation is slow. Configure LLVM `22.1.6` in your user or project
+mise config:
+
+```bash
+mise use clang@22.1.6
+mise exec -- code .
+mise exec -- nvim .
+mise exec -- emacs .
+```
+
+Keep Conan responsible for build dependencies and cppcheck; use mise only for
+editor-facing LLVM tools that ConanCenter does not provide. On Windows, prefer
+the official LLVM installer and point the editor at its `bin` directory.
 
 ## Code Layout
 
