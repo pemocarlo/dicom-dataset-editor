@@ -8,6 +8,10 @@ conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -p
 
 That command generates `build/Release/generators/CMakePresets.json` and the Conan toolchain.
 It also passes the DCMTK dictionary location required by the application to CMake.
+Pinned build tools declared by the recipe are installed in Conan's build context and
+recorded by the lockfile. Activate the generated Conan build environment before
+running CMake to select the pinned CMake. The Conan toolchain adds pinned build
+tools to CMake's program search path.
 
 In-source builds are not supported.
 
