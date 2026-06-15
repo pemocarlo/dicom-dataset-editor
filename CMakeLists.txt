@@ -95,7 +95,7 @@ if(TARGET PkgConfig::DICOM_EDITOR_FLTK_WAYLAND)
     list(APPEND DICOM_EDITOR_UI_LIBRARIES PkgConfig::DICOM_EDITOR_FLTK_WAYLAND)
 endif()
 
-add_executable(dicom-dataset-editor)
+add_executable(dicom-dataset-editor WIN32)
 target_sources(dicom-dataset-editor
     PRIVATE
         ${DICOM_EDITOR_UI_HEADERS}

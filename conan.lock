@@ -3,9 +3,10 @@
     "requires": [
         "zlib/1.3.2#1cb806da49011867778ffb6ac7190fcb%1777558780.503",
         "xorg/system#98f82cb669e4ebc6b4d9d8a4f3f1faf4%1725460968.361",
+        "opengl/system#cfcf523b9d2bad75cbf377f56562634c%1762526044.744",
         "libpng/1.6.58#19cb72905ae54f54948401f753faa2c1%1776606503.628",
         "libjpeg/9f#8edfe2699565c80c825d0256002504ff%1723665907.087",
-        "libiconv/1.17#9923bc6dc6f106646d6967e0039a5ada%1774021608.288",
+        "glu/system#5f205c4daa8fe4f820869771146885de%1781079534.704",
         "freetype/2.14.3#4ee27b7918b546a96d7e6898e3a02b34%1774443541.191",
         "fontconfig/2.17.1#c7138aa09e0fcc0e337511719c9bfb12%1768840806.404",
         "fltk/1.4.5#c92e7c2acd4f29462ddfd2f694efabc3%1779724760.688",
@@ -19,6 +20,7 @@
         "pkgconf/2.5.1#93c2051284cba1279494a43a4fcfeae2%1757684701.089",
         "pcre/8.45#ea02d0edf6281712760a317037a862a2%1742314123.243",
         "ninja/1.13.2#c8c5dc2a52ed6e4e42a66d75b4717ceb%1764096931.974",
+        "msys2/cci.latest#d22fe7b2808f5fd34d0a7923ace9c54f%1770657326.649",
         "meson/1.10.2#9d2d10681fe7fe61c788c58626c89b25%1775558003.754",
         "gperf/3.1#a7afdf8f7cccdc2dcd4d962370c33d4f%1755780571.156",
         "cppcheck/2.20.0#574d30b24de40c2912c6a2a6c307bc76%1780320366.355",
@@ -27,6 +29,6 @@
     ],
     "python_requires": [],
     "config_requires": [
-        "dicom-dataset-editor-conf/0.1.0#eaf12d9656389cf9faa761d6e238f8da%1781111454.158775"
+        "dicom-dataset-editor-conf/0.2.0#44ea8fc64fe632c7bf04de10cd7f30c7%1781461743.1215918"
     ]
 }

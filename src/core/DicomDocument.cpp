@@ -43,18 +43,26 @@ void requireGood(const OFCondition &condition, const std::string &action) {
     }
 }
 
+void setDictionaryPath(const std::filesystem::path &path) {
+#ifdef _WIN32
+    _putenv_s("DCMDICTPATH", path.string().c_str());
+#else
+    setenv("DCMDICTPATH", path.string().c_str(), 1);
+#endif
+}
+
 void ensureDictionaryPath() {
     const auto installedPath = installedDataPath("dcmtk/dicom.dic");
     const char *current = std::getenv("DCMDICTPATH");
     if ((current == nullptr || !std::filesystem::exists(current)) && std::filesystem::exists(installedPath)) {
-        setenv("DCMDICTPATH", installedPath.string().c_str(), 1);
+        setDictionaryPath(installedPath);
         return;
     }
 
 #ifdef DICOM_EDITOR_DCMTK_DICT_FILE
     const auto configuredPath = std::filesystem::path(DICOM_EDITOR_DCMTK_DICT_FILE);
     if ((current == nullptr || !std::filesystem::exists(current)) && std::filesystem::exists(configuredPath)) {
-        setenv("DCMDICTPATH", configuredPath.string().c_str(), 1);
+        setDictionaryPath(configuredPath);
     }
 #endif
 }
