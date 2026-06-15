@@ -17,13 +17,22 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
 
 ## Quick Build
 
-If you already have the Conan config package installed and are using the Linux profile set from that package:
+If you already have the Conan config package installed, use its profile for your platform.
+
+Linux:
 
 ```bash
 conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release
 cmake --preset conan-release
 cmake --build --preset conan-release
 ctest --preset conan-release
+```
+
+Windows:
+
+```powershell
+conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release
+conan build . -pr:h=windows-msvc-release -pr:b=windows-msvc-release
 ```
 
 Use [BUILDING.md](BUILDING.md) for install and Conan package creation.

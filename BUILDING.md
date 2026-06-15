@@ -1,9 +1,17 @@
 # Building
 
-This project uses Conan profiles from the installed `dicom-dataset-editor-conf` package. On Linux, build with the profile set from that package:
+This project uses Conan profiles from the installed `dicom-dataset-editor-conf` package.
+
+On Linux:
 
 ```bash
 conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release
+```
+
+On Windows from PowerShell:
+
+```powershell
+conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release
 ```
 
 That command generates `build/Release/generators/CMakePresets.json` and the Conan toolchain.
@@ -17,10 +25,20 @@ In-source builds are not supported.
 
 ## Build And Test
 
+On Linux, use the generated single-config CMake presets:
+
 ```bash
 cmake --preset conan-release
 cmake --build --preset conan-release
 ctest --preset conan-release
+```
+
+On Windows, use Conan to drive the Visual Studio configure, build, and tests.
+Conan names Visual Studio's generated configure preset `conan-default`, so it
+does not match the Linux-oriented checked-in presets.
+
+```powershell
+conan build . -pr:h=windows-msvc-release -pr:b=windows-msvc-release
 ```
 
 Run the Conan install again after changing the recipe, lockfile, profiles, or dependencies.
@@ -34,12 +52,21 @@ Install to any prefix with:
 cmake --install build/Release --prefix <your-install-prefix>
 ```
 
+Visual Studio builds require the configuration:
+
+```powershell
+cmake --install build/Release --prefix build/install --config Release
+.\build\install\bin\dicom-dataset-editor.exe
+```
+
 Expected layout:
 
 - `<your-install-prefix>/bin/dicom-dataset-editor`
+- `<your-install-prefix>/bin/dicom-dataset-editor.exe` on Windows
 - `<your-install-prefix>/share/dicom-dataset-editor/dcmtk/dicom.dic`
 
 The executable locates installed runtime data relative to itself, so the complete install prefix can be moved. CMake does not bundle dependency libraries; provide them through the system, Conan, or a platform-specific deployment step.
+The Windows executable uses the GUI subsystem and does not open a separate console window.
 
 ## Conan Package
 
