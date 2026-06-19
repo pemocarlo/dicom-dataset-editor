@@ -3,7 +3,9 @@
 #include "dicom_editor/DicomNode.hpp"
 
 #include <cstddef>
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace dicom_editor {
@@ -14,11 +16,11 @@ class DatasetViewModel {
     void setFilter(std::string filter);
 
     [[nodiscard]] const DicomNode *nodeAt(std::size_t visibleIndex) const;
-    [[nodiscard]] const std::vector<DicomNode> &nodes() const;
-    [[nodiscard]] const std::vector<std::size_t> &visibleIndices() const;
+    [[nodiscard]] std::span<const DicomNode> nodes() const;
+    [[nodiscard]] std::span<const std::size_t> visibleIndices() const;
 
     [[nodiscard]] static std::string attributeLabel(const DicomNode &node);
-    [[nodiscard]] static std::string kindLabel(DicomNodeKind kind);
+    [[nodiscard]] static std::string_view kindLabel(DicomNodeKind kind);
 
   private:
     void rebuild();

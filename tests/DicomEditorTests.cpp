@@ -17,13 +17,16 @@
 #include <ofstd/oftypes.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <exception>
 #include <filesystem>
-#include <iostream>
 #include <optional>
+#include <print>
 #include <ranges>
+#include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using dicom_editor::AddAttributeRequest;
@@ -124,18 +127,12 @@ void recursiveNodeListing() {
     seedDataset(document);
     const auto nodes = document.nodes();
 
-    bool sawPatientName = false;
-    bool sawSequence = false;
-    bool sawNestedValue = false;
-    for (const auto &node : nodes) {
-        sawPatientName = sawPatientName || node.keyword == "PatientName";
-        sawSequence = sawSequence || node.keyword == "ReferencedStudySequence";
-        sawNestedValue = sawNestedValue || node.keyword == "ReferencedSOPInstanceUID";
-    }
-
-    require(sawPatientName);
-    require(sawSequence);
-    require(sawNestedValue);
+    const auto hasKeyword = [&nodes](std::string_view keyword) {
+        return std::ranges::any_of(nodes, [keyword](const auto &node) { return node.keyword == keyword; });
+    };
+    require(hasKeyword("PatientName"));
+    require(hasKeyword("ReferencedStudySequence"));
+    require(hasKeyword("ReferencedSOPInstanceUID"));
 }
 
 void nodeKeepsFullValue() {
@@ -201,10 +198,10 @@ int main() {
         sharedUiModelFiltersAndFormats();
         sharedTagParserValidatesHex();
 
-        std::cout << "All DICOM editor tests passed\n";
+        std::println("All DICOM editor tests passed");
         return 0;
     } catch (const std::exception &error) {
-        std::cerr << "Test failed: " << error.what() << '\n';
+        std::println(stderr, "Test failed: {}", error.what());
         return 1;
     }
 }

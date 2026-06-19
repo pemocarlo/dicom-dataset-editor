@@ -2,25 +2,18 @@
 
 #include <dcmtk/dcmdata/dctagkey.h>
 
-#include <iomanip>
-#include <sstream>
+#include <format>
+#include <iterator>
+#include <string>
 #include <utility>
 
 namespace dicom_editor {
 
 namespace {
 
-std::string tagToString(const DcmTagKey &tag) {
-    std::ostringstream out;
-    out << '(' << std::hex << std::setw(4) << std::setfill('0') << tag.getGroup() << ',' << std::setw(4) << tag.getElement() << ')';
-    return out.str();
-}
+std::string tagToString(const DcmTagKey &tag) { return std::format("({:04x},{:04x})", tag.getGroup(), tag.getElement()); }
 
 } // namespace
-
-bool SequenceItemRef::operator==(const SequenceItemRef &other) const {
-    return sequenceTag == other.sequenceTag && itemIndex == other.itemIndex;
-}
 
 DicomPath DicomPath::dataset() { return {}; }
 
@@ -46,15 +39,14 @@ bool DicomPath::pointsToDatasetItem() const { return !elementTag_.has_value(); }
 bool DicomPath::pointsToElement() const { return elementTag_.has_value(); }
 
 std::string DicomPath::toString() const {
-    std::ostringstream out;
-    out << "/";
+    std::string result = "/";
     for (const auto &parent : parents_) {
-        out << tagToString(parent.sequenceTag) << "/Item[" << parent.itemIndex << "]/";
+        std::format_to(std::back_inserter(result), "{}/Item[{}]/", tagToString(parent.sequenceTag), parent.itemIndex);
     }
-    if (elementTag_.has_value()) {
-        out << tagToString(*elementTag_);
+    if (elementTag_) {
+        result += tagToString(*elementTag_);
     }
-    return out.str();
+    return result;
 }
 
 } // namespace dicom_editor

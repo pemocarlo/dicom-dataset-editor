@@ -18,9 +18,8 @@
 #include <dcmtk/ofstd/ofstring.h>
 
 #include <cstdlib>
-#include <iomanip>
+#include <format>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -39,7 +38,7 @@ std::string conditionMessage(const OFCondition &condition) {
 
 void requireGood(const OFCondition &condition, const std::string &action) {
     if (condition.bad()) {
-        throw DicomError(action + ": " + conditionMessage(condition));
+        throw DicomError(std::format("{}: {}", action, conditionMessage(condition)));
     }
 }
 
@@ -67,38 +66,25 @@ void ensureDictionaryPath() {
 #endif
 }
 
-std::string tagToString(const DcmTagKey &key) {
-    std::ostringstream out;
-    out << '(' << std::hex << std::setw(4) << std::setfill('0') << key.getGroup() << ',' << std::setw(4) << key.getElement() << ')';
-    return out.str();
-}
+std::string tagToString(const DcmTagKey &key) { return std::format("({:04x},{:04x})", key.getGroup(), key.getElement()); }
 
 std::string keywordFor(DcmTag &tag) {
     const char *name = tag.getTagName();
-    return name == nullptr ? "" : name;
+    return name == nullptr ? std::string{} : std::string{name};
 }
 
 std::string vrFor(const DcmElement &element) {
     DcmVR vr(element.getVR());
     const char *vrName = vr.getVRName();
-    return vrName == nullptr ? "" : vrName;
+    return vrName == nullptr ? std::string{} : std::string{vrName};
 }
 
-std::string vmFor(DcmElement &element) {
-    std::ostringstream out;
-    out << element.getVM();
-    return out.str();
-}
+std::string vmFor(DcmElement &element) { return std::to_string(element.getVM()); }
 
 std::string valueFor(DcmElement &element) {
     if (element.ident() == EVR_SQ) {
         const auto &sequence = static_cast<DcmSequenceOfItems &>(element);
-        std::ostringstream out;
-        out << sequence.card() << " item";
-        if (sequence.card() != 1) {
-            out << 's';
-        }
-        return out.str();
+        return std::format("{} item{}", sequence.card(), sequence.card() == 1 ? "" : "s");
     }
 
     OFString value;
@@ -133,17 +119,20 @@ void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &par
         const bool sequence = element->ident() == EVR_SQ;
         const bool pixelData = isPixelData(key);
 
-        DicomNode node;
-        node.kind = sequence ? DicomNodeKind::Sequence : DicomNodeKind::Element;
-        node.path = DicomPath::element(parents, key);
-        node.tag = tagToString(key);
-        node.keyword = keywordFor(tag);
-        node.vr = vrFor(*element);
-        node.vm = vmFor(*element);
-        node.value = pixelData ? PixelDataPlaceholder : valueFor(*element);
-        node.valuePreview = pixelData ? "" : valuePreviewFor(node.value);
-        node.depth = depth;
-        node.editable = isEditable(*element);
+        std::string value = pixelData ? std::string{PixelDataPlaceholder} : valueFor(*element);
+        std::string valuePreview = pixelData ? std::string{} : valuePreviewFor(value);
+        DicomNode node{
+            .kind = sequence ? DicomNodeKind::Sequence : DicomNodeKind::Element,
+            .path = DicomPath::element(parents, key),
+            .tag = tagToString(key),
+            .keyword = keywordFor(tag),
+            .vr = vrFor(*element),
+            .vm = vmFor(*element),
+            .value = std::move(value),
+            .valuePreview = std::move(valuePreview),
+            .depth = depth,
+            .editable = isEditable(*element),
+        };
         nodes.push_back(std::move(node));
 
         if (!sequence) {
@@ -155,17 +144,19 @@ void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &par
             std::vector<SequenceItemRef> itemParents = parents;
             itemParents.push_back({key, itemIndex});
 
-            DicomNode itemNode;
-            itemNode.kind = DicomNodeKind::Item;
-            itemNode.path = DicomPath::item(itemParents);
-            itemNode.tag = "";
-            itemNode.keyword = "Item";
-            itemNode.vr = "";
-            itemNode.vm = "";
-            itemNode.value = "#" + std::to_string(itemIndex);
-            itemNode.valuePreview = itemNode.value;
-            itemNode.depth = depth + 1;
-            itemNode.editable = false;
+            const auto itemValue = std::format("#{}", itemIndex);
+            DicomNode itemNode{
+                .kind = DicomNodeKind::Item,
+                .path = DicomPath::item(itemParents),
+                .tag = {},
+                .keyword = "Item",
+                .vr = {},
+                .vm = {},
+                .value = itemValue,
+                .valuePreview = itemValue,
+                .depth = depth + 1,
+                .editable = false,
+            };
             nodes.push_back(std::move(itemNode));
 
             DcmItem *nested = sequenceElement.getItem(itemIndex);
@@ -188,7 +179,7 @@ DcmItem &resolveItem(DcmItem &root, const DicomPath &path) {
         auto *sequence = static_cast<DcmSequenceOfItems *>(element);
         DcmItem *next = sequence->getItem(parent.itemIndex);
         if (next == nullptr) {
-            throw DicomError("Sequence item index is out of range: " + std::to_string(parent.itemIndex));
+            throw DicomError(std::format("Sequence item index is out of range: {}", parent.itemIndex));
         }
         current = next;
     }
@@ -266,15 +257,19 @@ DcmElement &DicomDocument::elementAt(const DicomPath &path) {
 const DcmElement &DicomDocument::elementAt(const DicomPath &path) const { return const_cast<DicomDocument &>(*this).elementAt(path); }
 
 std::vector<DicomNode> DicomDocument::nodes() const {
-    std::vector<DicomNode> result;
-    DicomNode root;
-    root.kind = DicomNodeKind::Dataset;
-    root.path = DicomPath::dataset();
-    root.keyword = "Dataset";
-    root.value = filePath_.empty() ? "<new>" : filePath_.string();
-    root.valuePreview = root.value;
-    root.editable = false;
-    result.push_back(std::move(root));
+    const auto rootValue = filePath_.empty() ? std::string{"<new>"} : filePath_.string();
+    std::vector<DicomNode> result{{
+        .kind = DicomNodeKind::Dataset,
+        .path = DicomPath::dataset(),
+        .tag = {},
+        .keyword = "Dataset",
+        .vr = {},
+        .vm = {},
+        .value = rootValue,
+        .valuePreview = rootValue,
+        .depth = 0,
+        .editable = false,
+    }};
     collectNodesFromItem(const_cast<DcmDataset &>(dataset()), {}, 1, result);
     return result;
 }

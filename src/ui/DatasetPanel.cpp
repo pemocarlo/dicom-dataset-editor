@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -160,9 +161,13 @@ class DatasetTable final : public Fl_Table_Row {
         if (node == nullptr) {
             return;
         }
-        const std::array<std::string, ColumnCount> values{
-            dicom_editor::DatasetViewModel::attributeLabel(*node), node->tag, node->vr, node->vm, node->path.toString(), node->value,
-            dicom_editor::DatasetViewModel::kindLabel(node->kind)};
+        const std::array<std::string, ColumnCount> values{dicom_editor::DatasetViewModel::attributeLabel(*node),
+                                                          node->tag,
+                                                          node->vr,
+                                                          node->vm,
+                                                          node->path.toString(),
+                                                          node->value,
+                                                          std::string{dicom_editor::DatasetViewModel::kindLabel(node->kind)}};
 
         fl_push_clip(x, y, width, height);
         const bool selected = row_selected(row) != 0;

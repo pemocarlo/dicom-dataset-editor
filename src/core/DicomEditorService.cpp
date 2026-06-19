@@ -10,6 +10,7 @@
 #include <dcmtk/dcmdata/dcvr.h>
 #include <dcmtk/ofstd/ofcond.h>
 
+#include <format>
 #include <optional>
 #include <vector>
 
@@ -19,7 +20,7 @@ namespace {
 
 void requireGood(const OFCondition &condition, const std::string &action) {
     if (condition.bad()) {
-        throw DicomError(action + ": " + condition.text());
+        throw DicomError(std::format("{}: {}", action, condition.text()));
     }
 }
 
@@ -34,7 +35,7 @@ void requireEditable(const DcmElement &element) {
 void DicomEditorService::editValue(DicomDocument &document, const EditRequest &request) {
     DcmElement &element = document.elementAt(request.path);
     requireEditable(element);
-    requireGood(element.putString(request.value.c_str()), "Edit element " + request.path.toString());
+    requireGood(element.putString(request.value.c_str()), std::format("Edit element {}", request.path.toString()));
     document.markDirty();
 }
 
@@ -55,7 +56,7 @@ void DicomEditorService::deleteAttribute(DicomDocument &document, const DicomPat
 
     DicomPath parentPath = DicomPath::item(path.parents());
     DcmItem &parent = document.itemAt(parentPath);
-    requireGood(parent.findAndDeleteElement(*tag, true, true), "Delete attribute " + path.toString());
+    requireGood(parent.findAndDeleteElement(*tag, true, true), std::format("Delete attribute {}", path.toString()));
     document.markDirty();
 }
 

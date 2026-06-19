@@ -4,7 +4,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace dicom_editor {
@@ -16,9 +18,7 @@ std::string lower(std::string value) {
     return value;
 }
 
-bool containsCaseInsensitive(const std::string &haystack, const std::string &needle) {
-    return lower(haystack).find(lower(needle)) != std::string::npos;
-}
+bool containsCaseInsensitive(const std::string &haystack, const std::string &needle) { return lower(haystack).contains(lower(needle)); }
 
 } // namespace
 
@@ -36,9 +36,9 @@ const DicomNode *DatasetViewModel::nodeAt(std::size_t visibleIndex) const {
     return visibleIndex < visibleIndices_.size() ? &nodes_[visibleIndices_[visibleIndex]] : nullptr;
 }
 
-const std::vector<DicomNode> &DatasetViewModel::nodes() const { return nodes_; }
+std::span<const DicomNode> DatasetViewModel::nodes() const { return nodes_; }
 
-const std::vector<std::size_t> &DatasetViewModel::visibleIndices() const { return visibleIndices_; }
+std::span<const std::size_t> DatasetViewModel::visibleIndices() const { return visibleIndices_; }
 
 std::string DatasetViewModel::attributeLabel(const DicomNode &node) {
     std::string label(static_cast<std::size_t>(node.depth) * 2, ' ');
@@ -46,18 +46,20 @@ std::string DatasetViewModel::attributeLabel(const DicomNode &node) {
     return label;
 }
 
-std::string DatasetViewModel::kindLabel(DicomNodeKind kind) {
+std::string_view DatasetViewModel::kindLabel(DicomNodeKind kind) {
+    using enum DicomNodeKind;
     switch (kind) {
-    case DicomNodeKind::Dataset:
+    case Dataset:
         return "Dataset";
-    case DicomNodeKind::Element:
+    case Element:
         return "Element";
-    case DicomNodeKind::Sequence:
+    case Sequence:
         return "Sequence";
-    case DicomNodeKind::Item:
+    case Item:
         return "Item";
+    default:
+        std::unreachable();
     }
-    return "";
 }
 
 void DatasetViewModel::rebuild() {
