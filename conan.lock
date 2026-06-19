@@ -29,6 +29,6 @@
     ],
     "python_requires": [],
     "config_requires": [
-        "dicom-dataset-editor-conf/0.2.0#44ea8fc64fe632c7bf04de10cd7f30c7%1781461743.1215918"
+        "dicom-dataset-editor-conf/0.2.0#be8344f22ab49594b805e8cb0688f59a%1781905640.0226152"
     ]
 }
