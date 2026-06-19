@@ -2,6 +2,22 @@
 
 This project uses Conan profiles from the installed `dicom-dataset-editor-conf` package.
 
+## Install Or Update The Conan Configuration
+
+No custom Conan remote exists yet. The configuration recipe and package are
+handled locally in the Conan cache from the sibling repository.
+
+Create the configuration package from the sibling configuration repository, upgrade
+its revision in the lockfile, and only then install it:
+
+```bash
+conan create ../dicom-dataset-editor-conf -s os=Linux
+conan lock upgrade-config . --no-remote --lockfile=conan.lock --lockfile-out=conan.lock --update-config-requires=dicom-dataset-editor-conf/0.2.0
+conan config install-pkg conanconfig.yml --lockfile=conan.lock --force
+```
+
+Commit the updated `conan.lock` when its configuration package revision changes.
+
 On Linux:
 
 ```bash
