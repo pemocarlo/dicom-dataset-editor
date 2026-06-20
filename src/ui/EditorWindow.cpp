@@ -60,8 +60,7 @@ MenuAction pixelDataPreviewVerticalAction = MenuAction::PixelDataPreviewVertical
 
 class PixelSplitter final : public Fl_Widget {
   public:
-    explicit PixelSplitter(int x, int y, int width, int height, EditorWindow &owner)
-        : Fl_Widget(x, y, width, height), owner_(owner) {}
+    explicit PixelSplitter(int x, int y, int width, int height, EditorWindow &owner) : Fl_Widget(x, y, width, height), owner_(owner) {}
 
   private:
     int handle(int event) override {
@@ -269,8 +268,7 @@ void EditorWindow::layoutContent() {
     const int contentHeight = h() - MenuHeight - StatusHeight;
     if (pixelDataPanel_->visible() != 0) {
         if (pixelDataPreviewVertical_) {
-            const int maxPreviewWidth =
-                std::max(PixelDataPanelMinHeight, w() - PixelDataSplitterHeight - PixelDataPanelMinHeight);
+            const int maxPreviewWidth = std::max(PixelDataPanelMinHeight, w() - PixelDataSplitterHeight - PixelDataPanelMinHeight);
             const int previewWidth = std::clamp(pixelDataPanelExtent_, PixelDataPanelMinHeight, maxPreviewWidth);
             const int datasetWidth = std::max(1, w() - previewWidth - PixelDataSplitterHeight);
             datasetPanel_->resize(0, MenuHeight, datasetWidth, contentHeight);
