@@ -40,6 +40,7 @@ set(DICOM_EDITOR_PUBLIC_HEADERS
     include/dicom_editor/DicomError.hpp
     include/dicom_editor/DicomNode.hpp
     include/dicom_editor/DicomPath.hpp
+    include/dicom_editor/DicomWorkspace.hpp
     include/dicom_editor/EditorController.hpp
     include/dicom_editor/RuntimePaths.hpp
 )
@@ -50,6 +51,7 @@ set(DICOM_EDITOR_CORE_SOURCES
     src/core/DicomEditorService.cpp
     src/core/DicomNode.cpp
     src/core/DicomPath.cpp
+    src/core/DicomWorkspace.cpp
     src/core/EditorController.cpp
 )
 

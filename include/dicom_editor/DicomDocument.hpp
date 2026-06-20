@@ -88,6 +88,8 @@ class DicomDocument {
     [[nodiscard]] PixelDataPreview renderPixelData(unsigned long frameIndex) const;
     /// Reads the patient/study/series grouping fields for the workspace tree.
     [[nodiscard]] DicomHierarchy hierarchy() const;
+    /// Returns true when loaded object is a DICOM media directory.
+    [[nodiscard]] bool isDicomDirectory() const;
     /// Returns the active file path.
     [[nodiscard]] const std::filesystem::path &filePath() const;
     /// Returns `true` when the document has an active file path.

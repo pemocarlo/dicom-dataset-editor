@@ -5,6 +5,7 @@
 #include "dicom_editor/DicomError.hpp"
 #include "dicom_editor/DicomNode.hpp"
 #include "dicom_editor/DicomPath.hpp"
+#include "dicom_editor/DicomWorkspace.hpp"
 #include "dicom_editor/EditorController.hpp"
 
 #include <dcmtk/dcmdata/dcdatset.h>
@@ -31,13 +32,13 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 using dicom_editor::AddAttributeRequest;
 using dicom_editor::DicomDocument;
 using dicom_editor::DicomEditorService;
 using dicom_editor::DicomPath;
+using dicom_editor::DicomWorkspace;
 using dicom_editor::EditorController;
 using dicom_editor::EditRequest;
 using dicom_editor::SequenceItemRef;
@@ -59,7 +60,7 @@ class ControllerView final : public dicom_editor::EditorView {
     std::optional<dicom_editor::AttributeInput> addAttribute() override { return std::nullopt; }
     void showError(const std::string &message) override { error = message; }
     void presentDocument(std::vector<dicom_editor::DicomNode>, const std::string &, const std::string &) override {}
-    void presentOpenFiles(std::vector<dicom_editor::OpenDicomFile> files) override { openFiles = std::move(files); }
+    void presentOpenFiles(const std::vector<dicom_editor::OpenDicomFile> &files, bool) override { openFiles = files; }
     void presentPixelData(std::optional<dicom_editor::PixelDataPreview>) override {}
     void setStatus(const std::string &) override {}
 };
@@ -318,6 +319,29 @@ void controllerOpensAndNavigatesMultipleFiles() {
     std::filesystem::remove(secondPath);
 }
 
+void dicomDirectoryIsRecognizedAndSkipped() {
+    const auto path = std::filesystem::temp_directory_path() / "DICOMDIR";
+    DicomDocument directory;
+    seedDataset(directory);
+    directory.dataset().putAndInsertString(DCM_SOPClassUID, UID_MediaStorageDirectoryStorage);
+    require(directory.isDicomDirectory());
+    require(directory.saveAs(path).has_value());
+
+    DicomDocument reloaded;
+    require(reloaded.load(path).has_value());
+    require(reloaded.isDicomDirectory());
+
+    DicomWorkspace workspace;
+    const auto result = workspace.open({path});
+    require(result.opened == 0);
+    require(result.dicomDirectories == 1);
+    require(result.failures.empty());
+    require(workspace.size() == 1);
+    require(!workspace.active().hasFilePath());
+
+    std::filesystem::remove(path);
+}
+
 } // namespace
 
 int main() {
@@ -335,6 +359,7 @@ int main() {
         sharedUiModelFiltersAndFormats();
         sharedTagParserValidatesHex();
         controllerOpensAndNavigatesMultipleFiles();
+        dicomDirectoryIsRecognizedAndSkipped();
 
         std::println("All DICOM editor tests passed");
         return 0;
