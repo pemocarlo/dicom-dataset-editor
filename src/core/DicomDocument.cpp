@@ -9,10 +9,12 @@
 #include <dcmtk/dcmdata/dcelem.h>
 #include <dcmtk/dcmdata/dcfilefo.h>
 #include <dcmtk/dcmdata/dcitem.h>
+#include <dcmtk/dcmdata/dcmetinf.h>
 #include <dcmtk/dcmdata/dcrledrg.h>
 #include <dcmtk/dcmdata/dcsequen.h>
 #include <dcmtk/dcmdata/dctag.h>
 #include <dcmtk/dcmdata/dctagkey.h>
+#include <dcmtk/dcmdata/dcuid.h>
 #include <dcmtk/dcmdata/dcvr.h>
 #include <dcmtk/dcmdata/dcxfer.h>
 #include <dcmtk/dcmimage/diregist.h> // IWYU pragma: keep
@@ -473,6 +475,15 @@ DicomHierarchy DicomDocument::hierarchy() const {
     result.studyLabel = labelOr(datasetString(mutableDataset, DCM_StudyDescription), result.studyId, "Unknown study");
     result.seriesLabel = labelOr(datasetString(mutableDataset, DCM_SeriesDescription), result.seriesId, "Unknown series");
     return result;
+}
+
+bool DicomDocument::isDicomDirectory() const {
+    OFString sopClassUid;
+    if (file_->getMetaInfo()->findAndGetOFString(DCM_MediaStorageSOPClassUID, sopClassUid).good() &&
+        sopClassUid == UID_MediaStorageDirectoryStorage) {
+        return true;
+    }
+    return datasetString(const_cast<DcmDataset &>(dataset()), DCM_SOPClassUID) == UID_MediaStorageDirectoryStorage;
 }
 
 const std::filesystem::path &DicomDocument::filePath() const { return filePath_; }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "dicom_editor/AttributeInput.hpp"
-#include "dicom_editor/DicomDocument.hpp"
+#include "dicom_editor/DicomWorkspace.hpp"
 
 #include <cstddef>
 #include <exception>
@@ -12,8 +12,10 @@
 
 namespace dicom_editor {
 
+class DicomDocument;
 class DicomPath;
 struct DicomNode;
+struct PixelDataPreview;
 
 /// User choice when closing or reopening with unsaved changes.
 enum class SaveChangesChoice {
@@ -33,15 +35,6 @@ struct ActionState {
     bool editEnabled{};
     /// Delete action enabled.
     bool deleteEnabled{};
-};
-
-/// One file displayed in the workspace hierarchy.
-struct OpenDicomFile {
-    std::size_t index{};
-    std::filesystem::path path;
-    DicomHierarchy hierarchy;
-    bool dirty{};
-    bool active{};
 };
 
 /// View interface used by the controller.
@@ -69,7 +62,7 @@ class EditorView {
     /// Updates the document tree and window title.
     virtual void presentDocument(std::vector<DicomNode> nodes, const std::string &title, const std::string &status) = 0;
     /// Updates the patient/study/series/file hierarchy.
-    virtual void presentOpenFiles(std::vector<OpenDicomFile> files) = 0;
+    virtual void presentOpenFiles(const std::vector<OpenDicomFile> &files, bool hasLoadedFiles) = 0;
     /// Shows or hides the pixel preview.
     virtual void presentPixelData(std::optional<PixelDataPreview> preview) = 0;
     /// Updates the status bar text.
@@ -126,11 +119,9 @@ class EditorController {
     void openPaths(const std::vector<std::filesystem::path> &paths);
     [[nodiscard]] DicomDocument &document();
     [[nodiscard]] const DicomDocument &document() const;
-    [[nodiscard]] std::vector<OpenDicomFile> openFiles() const;
 
     EditorView &view_;
-    std::vector<DicomDocument> documents_;
-    std::size_t activeDocument_{};
+    DicomWorkspace workspace_;
     bool validationEnabled_{true};
     bool pixelDataVisible_{};
     unsigned long pixelFrame_{};

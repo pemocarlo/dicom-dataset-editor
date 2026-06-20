@@ -22,6 +22,10 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     int handle(int event) override;
     /// Sets the preview pane size.
     void setPixelDataPanelExtent(int extent);
+    /// Sets the file-tree pane width.
+    void setFileTreePanelExtent(int extent);
+    /// Shows or hides the open-files tree.
+    void setFileTreeVisible(bool visible);
     /// Chooses whether the preview pane is shown below or beside the dataset.
     void setPixelDataPreviewVertical(bool vertical);
     /// Returns `true` when the preview pane is on the right.
@@ -37,7 +41,7 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     [[nodiscard]] std::optional<dicom_editor::AttributeInput> addAttribute() override;
     void showError(const std::string &message) override;
     void presentDocument(std::vector<dicom_editor::DicomNode> nodes, const std::string &title, const std::string &status) override;
-    void presentOpenFiles(std::vector<dicom_editor::OpenDicomFile> files) override;
+    void presentOpenFiles(const std::vector<dicom_editor::OpenDicomFile> &files, bool hasLoadedFiles) override;
     void presentPixelData(std::optional<dicom_editor::PixelDataPreview> preview) override;
     void setStatus(const std::string &status) override;
     void updateActions();
@@ -50,11 +54,15 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
 
     Fl_Menu_Bar *menu_{};
     FileTreePanel *fileTreePanel_{};
+    Fl_Widget *fileTreeSplitter_{};
     DatasetPanel *datasetPanel_{};
     Fl_Widget *pixelSplitter_{};
     PixelDataPanel *pixelDataPanel_{};
     Fl_Box *status_{};
     dicom_editor::EditorController controller_;
     int pixelDataPanelExtent_{280};
+    int fileTreePanelExtent_{280};
     bool pixelDataPreviewVertical_{false};
+    bool fileTreeVisible_{};
+    bool workspaceHadFiles_{};
 };

@@ -12,6 +12,7 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
 
 - Open one or many DICOM files at once.
 - Recursively scan a folder and keep every valid DICOM file open.
+- Recognize and skip DICOMDIR media directories instead of opening them as datasets.
 - Browse open files in a patient/study/series hierarchy and switch files without losing edits.
 - Browse recursive dataset tree, including sequence items.
 - Toggle an aspect-fitted pixel data preview with separate file and frame navigation and a draggable split, either below or beside the
@@ -27,6 +28,7 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
   summarized after the scan.
 - Select a leaf in the left sidebar to activate that dataset. The hierarchy uses Patient, Study, and Series DICOM attributes, with stable
   identifiers shown where available.
+- The open-files panel stays hidden until a dataset is loaded. Toggle it with `View > Open Files Panel` and drag its right edge to resize it.
 - `View > Previous File` (`Ctrl+Page Up`) and `View > Next File` (`Ctrl+Page Down`) navigate the open workspace. The same controls are
   available in the pixel preview beside the independent frame controls.
 - An asterisk marks an open file with unsaved changes. Switching files keeps those changes in memory; closing prompts for each modified

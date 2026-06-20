@@ -1,5 +1,6 @@
 #include "dicom_editor/EditorController.hpp"
 
+#include "dicom_editor/DicomDocument.hpp"
 #include "dicom_editor/DicomEditorService.hpp"
 #include "dicom_editor/DicomError.hpp"
 #include "dicom_editor/DicomNode.hpp"
@@ -12,41 +13,28 @@
 #include <expected>
 #include <filesystem>
 #include <format>
-#include <iterator>
 #include <optional>
-#include <ranges>
 #include <string>
-#include <system_error>
 #include <utility>
 #include <vector>
 
 namespace dicom_editor {
 
-namespace {
+EditorController::EditorController(EditorView &view) : view_(view) {}
 
-std::filesystem::path normalizedPath(const std::filesystem::path &path) {
-    std::error_code error;
-    auto normalized = std::filesystem::weakly_canonical(path, error);
-    return error ? std::filesystem::absolute(path, error).lexically_normal() : normalized;
-}
+DicomDocument &EditorController::document() { return workspace_.active(); }
 
-} // namespace
-
-EditorController::EditorController(EditorView &view) : view_(view) { documents_.emplace_back(); }
-
-DicomDocument &EditorController::document() { return documents_[activeDocument_]; }
-
-const DicomDocument &EditorController::document() const { return documents_[activeDocument_]; }
+const DicomDocument &EditorController::document() const { return workspace_.active(); }
 
 void EditorController::refreshView() {
     const auto &active = document();
     const std::string name = active.hasFilePath() ? active.filePath().filename().string() : "Untitled";
     const std::string title = std::format("DICOM Dataset Editor - {}{}", name, active.dirty() ? "*" : "");
-    const std::string status = active.hasFilePath()
-                                   ? std::format("File {} of {} | {}", activeDocument_ + 1, documents_.size(), active.filePath().string())
-                                   : "New dataset";
+    const std::string status = active.hasFilePath() ? std::format("File {} of {} | {}", workspace_.activeIndex() + 1, workspace_.size(),
+                                                                  active.filePath().string())
+                                                    : "New dataset";
     view_.presentDocument(active.nodes(validationEnabled_), title, status);
-    view_.presentOpenFiles(openFiles());
+    view_.presentOpenFiles(workspace_.files(), workspace_.hasLoadedFiles());
     refreshPixelData();
 }
 
@@ -63,89 +51,52 @@ void EditorController::openFolder() {
     if (!folder) {
         return;
     }
-    std::vector<std::filesystem::path> paths;
-    std::error_code error;
-    const auto options = std::filesystem::directory_options::skip_permission_denied;
-    for (std::filesystem::recursive_directory_iterator iterator(*folder, options, error), end; iterator != end; iterator.increment(error)) {
-        if (error) {
-            error.clear();
-            continue;
-        }
-        if (iterator->is_regular_file(error) && !error) {
-            paths.push_back(iterator->path());
-        }
-        error.clear();
-    }
-    std::ranges::sort(paths);
-    openPaths(paths);
+    openPaths(DicomWorkspace::discoverFiles(*folder));
 }
 
 void EditorController::openPaths(const std::vector<std::filesystem::path> &paths) {
-    std::vector<std::string> errors;
-    std::size_t opened{};
-    std::size_t failed{};
-    for (const auto &path : paths) {
-        const auto normalized = normalizedPath(path);
-        const auto duplicate = std::ranges::find_if(documents_, [&normalized](const DicomDocument &candidate) {
-            return candidate.hasFilePath() && normalizedPath(candidate.filePath()) == normalized;
-        });
-        if (duplicate != documents_.end()) {
-            activeDocument_ = static_cast<std::size_t>(std::distance(documents_.begin(), duplicate));
-            continue;
-        }
-
-        DicomDocument loaded;
-        const auto result = loaded.load(path);
-        if (!result) {
-            ++failed;
-            if (errors.size() < 8) {
-                errors.push_back(std::format("{}: {}", path.string(), result.error().what()));
-            }
-            continue;
-        }
-
-        if (documents_.size() == 1 && !document().hasFilePath() && !document().dirty()) {
-            documents_.clear();
-        }
-        documents_.push_back(std::move(loaded));
-        activeDocument_ = documents_.size() - 1;
-        ++opened;
-    }
-
+    const auto summary = workspace_.open(paths);
     pixelFrame_ = 0;
     refreshView();
-    if (!errors.empty()) {
-        std::string message = std::format("Opened {} DICOM file(s). Skipped {} non-DICOM or unreadable file(s).", opened, failed);
-        for (const auto &error : errors) {
-            message += "\n" + error;
+    if (!summary.failures.empty()) {
+        std::string message =
+            std::format("Opened {} DICOM file(s). Skipped {} non-DICOM or unreadable file(s).", summary.opened, summary.failures.size());
+        const auto displayed = std::min<std::size_t>(summary.failures.size(), 8);
+        for (std::size_t index = 0; index < displayed; ++index) {
+            const auto &failure = summary.failures[index];
+            message += std::format("\n{}: {}", failure.path.string(), failure.message);
         }
-        if (failed > errors.size()) {
-            message += std::format("\n...and {} more.", failed - errors.size());
+        if (summary.failures.size() > displayed) {
+            message += std::format("\n...and {} more.", summary.failures.size() - displayed);
         }
         view_.showError(message);
     } else if (paths.empty()) {
         view_.showError("The selected folder contains no regular files.");
     }
+    if (summary.dicomDirectories > 0) {
+        view_.setStatus(std::format("Skipped {} DICOMDIR file(s); opened {} dataset(s).", summary.dicomDirectories, summary.opened));
+    }
 }
 
 void EditorController::activateDocument(std::size_t index) {
-    if (index >= documents_.size() || index == activeDocument_) {
+    if (!workspace_.activate(index)) {
         return;
     }
-    activeDocument_ = index;
     pixelFrame_ = 0;
     refreshView();
 }
 
 void EditorController::showPreviousDocument() {
-    if (activeDocument_ > 0) {
-        activateDocument(activeDocument_ - 1);
+    if (workspace_.activatePrevious()) {
+        pixelFrame_ = 0;
+        refreshView();
     }
 }
 
 void EditorController::showNextDocument() {
-    if (activeDocument_ + 1 < documents_.size()) {
-        activateDocument(activeDocument_ + 1);
+    if (workspace_.activateNext()) {
+        pixelFrame_ = 0;
+        refreshView();
     }
 }
 
@@ -246,24 +197,24 @@ void EditorController::refreshPixelData() {
     pixelFrame_ = preview.frameIndex;
     pixelFrameCount_ = preview.frameCount;
     preview.sourceName = document().hasFilePath() ? document().filePath().filename().string() : "Untitled";
-    preview.sourceIndex = activeDocument_;
-    preview.sourceCount = documents_.size();
+    preview.sourceIndex = workspace_.activeIndex();
+    preview.sourceCount = workspace_.size();
     view_.presentPixelData(std::move(preview));
 }
 
 bool EditorController::confirmClose() {
-    const std::size_t original = activeDocument_;
-    for (std::size_t index = 0; index < documents_.size(); ++index) {
-        if (!documents_[index].dirty()) {
+    const std::size_t original = workspace_.activeIndex();
+    for (std::size_t index = 0; index < workspace_.size(); ++index) {
+        if (!workspace_.at(index).dirty()) {
             continue;
         }
-        activeDocument_ = index;
+        static_cast<void>(workspace_.activate(index));
         refreshView();
         if (!confirmDiscardChanges()) {
             return false;
         }
     }
-    activeDocument_ = original;
+    static_cast<void>(workspace_.activate(original));
     return true;
 }
 
@@ -320,20 +271,6 @@ void EditorController::reportError(const std::exception &error, bool refreshAfte
     if (refreshAfter) {
         refreshView();
     }
-}
-
-std::vector<OpenDicomFile> EditorController::openFiles() const {
-    std::vector<OpenDicomFile> result;
-    result.reserve(documents_.size());
-    for (std::size_t index = 0; index < documents_.size(); ++index) {
-        const auto &entry = documents_[index];
-        result.push_back({.index = index,
-                          .path = entry.filePath(),
-                          .hierarchy = entry.hierarchy(),
-                          .dirty = entry.dirty(),
-                          .active = index == activeDocument_});
-    }
-    return result;
 }
 
 } // namespace dicom_editor

@@ -1,7 +1,7 @@
 #include "FileTreePanel.hpp"
 
 #include "dicom_editor/DicomDocument.hpp"
-#include "dicom_editor/EditorController.hpp"
+#include "dicom_editor/DicomWorkspace.hpp"
 
 #include <FL/Enumerations.H>
 #include <FL/Fl_Tree.H>
