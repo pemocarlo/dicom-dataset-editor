@@ -3,6 +3,7 @@
 #include "dicom_editor/AttributeInput.hpp"
 #include "dicom_editor/DicomDocument.hpp"
 
+#include <cstddef>
 #include <exception>
 #include <filesystem>
 #include <optional>
@@ -34,6 +35,15 @@ struct ActionState {
     bool deleteEnabled{};
 };
 
+/// One file displayed in the workspace hierarchy.
+struct OpenDicomFile {
+    std::size_t index{};
+    std::filesystem::path path;
+    DicomHierarchy hierarchy;
+    bool dirty{};
+    bool active{};
+};
+
 /// View interface used by the controller.
 class EditorView {
   public:
@@ -41,7 +51,9 @@ class EditorView {
     virtual ~EditorView() = default;
 
     /// Prompts for a file to open.
-    [[nodiscard]] virtual std::optional<std::filesystem::path> chooseOpenFile() = 0;
+    [[nodiscard]] virtual std::vector<std::filesystem::path> chooseOpenFiles() = 0;
+    /// Prompts for a folder to scan recursively.
+    [[nodiscard]] virtual std::optional<std::filesystem::path> chooseOpenFolder() = 0;
     /// Prompts for a file to save.
     [[nodiscard]] virtual std::optional<std::filesystem::path> chooseSaveFile() = 0;
     /// Resolves unsaved changes.
@@ -56,6 +68,8 @@ class EditorView {
     virtual void showError(const std::string &message) = 0;
     /// Updates the document tree and window title.
     virtual void presentDocument(std::vector<DicomNode> nodes, const std::string &title, const std::string &status) = 0;
+    /// Updates the patient/study/series/file hierarchy.
+    virtual void presentOpenFiles(std::vector<OpenDicomFile> files) = 0;
     /// Shows or hides the pixel preview.
     virtual void presentPixelData(std::optional<PixelDataPreview> preview) = 0;
     /// Updates the status bar text.
@@ -72,6 +86,14 @@ class EditorController {
     void refreshView();
     /// Opens a document chosen by the view.
     void openDocument();
+    /// Recursively opens all valid DICOM files from a chosen folder.
+    void openFolder();
+    /// Makes an open file active.
+    void activateDocument(std::size_t index);
+    /// Moves to the previous open file.
+    void showPreviousDocument();
+    /// Moves to the next open file.
+    void showNextDocument();
     /// Saves the document.
     bool saveDocument();
     /// Saves the document to a new file.
@@ -101,9 +123,14 @@ class EditorController {
     void editValue(const DicomPath &path, const std::string &value);
     void refreshPixelData();
     void reportError(const std::exception &error, bool refreshAfter);
+    void openPaths(const std::vector<std::filesystem::path> &paths);
+    [[nodiscard]] DicomDocument &document();
+    [[nodiscard]] const DicomDocument &document() const;
+    [[nodiscard]] std::vector<OpenDicomFile> openFiles() const;
 
     EditorView &view_;
-    DicomDocument document_;
+    std::vector<DicomDocument> documents_;
+    std::size_t activeDocument_{};
     bool validationEnabled_{true};
     bool pixelDataVisible_{};
     unsigned long pixelFrame_{};

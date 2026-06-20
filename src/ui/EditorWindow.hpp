@@ -7,6 +7,7 @@
 #include <string>
 
 class DatasetPanel;
+class FileTreePanel;
 class Fl_Box;
 class Fl_Menu_Bar;
 class Fl_Widget;
@@ -27,7 +28,8 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     [[nodiscard]] bool pixelDataPreviewVertical() const;
 
   private:
-    [[nodiscard]] std::optional<std::filesystem::path> chooseOpenFile() override;
+    [[nodiscard]] std::vector<std::filesystem::path> chooseOpenFiles() override;
+    [[nodiscard]] std::optional<std::filesystem::path> chooseOpenFolder() override;
     [[nodiscard]] std::optional<std::filesystem::path> chooseSaveFile() override;
     [[nodiscard]] dicom_editor::SaveChangesChoice confirmSaveChanges() override;
     [[nodiscard]] bool confirmDelete() override;
@@ -35,6 +37,7 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     [[nodiscard]] std::optional<dicom_editor::AttributeInput> addAttribute() override;
     void showError(const std::string &message) override;
     void presentDocument(std::vector<dicom_editor::DicomNode> nodes, const std::string &title, const std::string &status) override;
+    void presentOpenFiles(std::vector<dicom_editor::OpenDicomFile> files) override;
     void presentPixelData(std::optional<dicom_editor::PixelDataPreview> preview) override;
     void setStatus(const std::string &status) override;
     void updateActions();
@@ -46,6 +49,7 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     static void closeCallback(Fl_Widget *widget, void *data);
 
     Fl_Menu_Bar *menu_{};
+    FileTreePanel *fileTreePanel_{};
     DatasetPanel *datasetPanel_{};
     Fl_Widget *pixelSplitter_{};
     PixelDataPanel *pixelDataPanel_{};

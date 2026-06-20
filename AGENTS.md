@@ -24,6 +24,13 @@ Read this first if you are an agent working in this repo.
 - `cmake --workflow --preset all-checks` when headers or include sets change
 - `cmake --install build/Release --prefix "$HOME/tmp"` for relocatable install checks
 
+## Current Architecture
+
+- The application uses FLTK and DCMTK with C++23.
+- `EditorController` owns the open multi-document workspace.
+- `FileTreePanel` presents Patient/Study/Series/File hierarchy; `DatasetPanel` presents the active dataset.
+- `PixelDataPanel` has independent open-file and multi-frame navigation.
+
 ## Useful Skills
 
 - `caveman`: terse but accurate chat mode.
