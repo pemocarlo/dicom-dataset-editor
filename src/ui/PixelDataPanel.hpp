@@ -13,13 +13,19 @@ namespace dicom_editor {
 struct PixelDataPreview;
 } // namespace dicom_editor
 
+/// Pixel preview panel used by the main window.
 class PixelDataPanel final : public Fl_Group {
   public:
+    /// Creates the panel with navigation controls and canvas.
     PixelDataPanel(int x, int y, int width, int height);
 
+    /// Updates the rendered preview and title text.
     void setPreview(dicom_editor::PixelDataPreview preview);
+    /// Sets the callback for the Previous button.
     void setPreviousHandler(std::function<void()> handler);
+    /// Sets the callback for the Next button.
     void setNextHandler(std::function<void()> handler);
+    /// Repositions child widgets after resize.
     void resize(int x, int y, int width, int height) override;
 
   private:

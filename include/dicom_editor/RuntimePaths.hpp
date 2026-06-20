@@ -15,6 +15,7 @@
 
 namespace dicom_editor {
 
+/// Returns the directory containing the running executable.
 inline std::filesystem::path executableDirectory() {
 #if defined(__linux__)
     std::error_code error;
@@ -42,6 +43,7 @@ inline std::filesystem::path executableDirectory() {
 #endif
 }
 
+/// Resolves an installed data file relative to the executable directory.
 inline std::filesystem::path installedDataPath([[maybe_unused]] const std::filesystem::path &relativePath) {
 #ifdef DICOM_EDITOR_INSTALL_DATADIR
     const auto executableDir = executableDirectory();
