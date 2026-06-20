@@ -105,6 +105,34 @@ void nestedSequenceEdit() {
     require(stringValue(document, referencedSop) == "1.2.826.0.1.3680043.10.543.99");
 }
 
+void invalidStandardValuesAreRejectedWithoutMutation() {
+    DicomDocument document;
+    seedDataset(document);
+
+    const DicomPath sopInstanceUid = DicomPath::element({}, DCM_SOPInstanceUID);
+    bool editRejected = false;
+    try {
+        DicomEditorService::editValue(document, {.path = sopInstanceUid, .value = "not a uid"});
+    } catch (const std::exception &) {
+        editRejected = true;
+    }
+    require(editRejected);
+    require(stringValue(document, sopInstanceUid) == "1.2.826.0.1.3680043.10.543.1");
+    require(!document.dirty());
+
+    bool addRejected = false;
+    try {
+        DicomEditorService::addAttribute(document,
+                                         {.parentItemPath = DicomPath::dataset(), .tag = DCM_PatientBirthDate, .value = "2026-99-99"});
+    } catch (const std::exception &) {
+        addRejected = true;
+    }
+    require(addRejected);
+    DcmElement *birthDate = nullptr;
+    require(document.dataset().findAndGetElement(DCM_PatientBirthDate, birthDate).bad());
+    require(!document.dirty());
+}
+
 void saveReloadPersistence() {
     DicomDocument document;
     seedDataset(document);
@@ -191,6 +219,7 @@ int main() {
         scalarEdit();
         addDeleteElement();
         nestedSequenceEdit();
+        invalidStandardValuesAreRejectedWithoutMutation();
         saveReloadPersistence();
         recursiveNodeListing();
         nodeKeepsFullValue();
