@@ -36,6 +36,7 @@ enum class MenuAction : std::uint8_t {
     Edit,
     Add,
     Delete,
+    ValidateValues,
 };
 
 MenuAction openAction = MenuAction::Open;
@@ -45,6 +46,7 @@ MenuAction exitAction = MenuAction::Exit;
 MenuAction editAction = MenuAction::Edit;
 MenuAction addAction = MenuAction::Add;
 MenuAction deleteAction = MenuAction::Delete;
+MenuAction validateValuesAction = MenuAction::ValidateValues;
 
 std::optional<std::filesystem::path> chooseFile(Fl_Native_File_Chooser::Type type, const char *title) {
     Fl_Native_File_Chooser chooser(type);
@@ -67,7 +69,7 @@ void setMenuActive(Fl_Menu_Bar &menu, const char *path, bool active) {
 
 } // namespace
 
-EditorWindow::EditorWindow() : Fl_Double_Window(1180, 760, "DICOM Dataset Editor"), controller_(*this) {
+EditorWindow::EditorWindow() : Fl_Double_Window(920, 640, "DICOM Dataset Editor"), controller_(*this) {
     menu_ = new Fl_Menu_Bar(0, 0, w(), MenuHeight);
     menu_->add("&File/&Open...", FL_CTRL + 'o', menuCallback, &openAction);
     menu_->add("&File/&Save", FL_CTRL + 's', menuCallback, &saveAction);
@@ -76,6 +78,7 @@ EditorWindow::EditorWindow() : Fl_Double_Window(1180, 760, "DICOM Dataset Editor
     menu_->add("&Edit/&Edit Value...", FL_Enter, menuCallback, &editAction);
     menu_->add("&Edit/&Add Attribute...", FL_CTRL + 'n', menuCallback, &addAction);
     menu_->add("&Edit/&Delete Attribute", FL_Delete, menuCallback, &deleteAction);
+    menu_->add("&Settings/&Validate DICOM Values", 0, menuCallback, &validateValuesAction, FL_MENU_TOGGLE | FL_MENU_VALUE);
 
     datasetPanel_ = new DatasetPanel(0, MenuHeight, w(), h() - MenuHeight - StatusHeight);
     datasetPanel_->setSelectionChangedHandler([this] { updateActions(); });
@@ -176,6 +179,9 @@ void EditorWindow::menuCallback(Fl_Widget *widget, void *data) {
         break;
     case MenuAction::Delete:
         window->controller_.deleteAttribute(window->datasetPanel_->selectedNode());
+        break;
+    case MenuAction::ValidateValues:
+        window->controller_.setValidationEnabled(window->menu_->mvalue()->value() != 0);
         break;
     }
 }

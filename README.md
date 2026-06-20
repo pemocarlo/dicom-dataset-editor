@@ -13,6 +13,7 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
 - Open DICOM files.
 - Browse recursive dataset tree, including sequence items.
 - Edit scalar values inline by double-clicking the `Value` column.
+- Optionally validate DICOM values and highlight invalid values in red.
 - Add, delete, save, and reload datasets.
 
 ## Quick Build

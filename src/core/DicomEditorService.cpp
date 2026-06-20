@@ -44,14 +44,18 @@ void validateValue(const DcmTag &tag, const std::string &value) {
 void DicomEditorService::editValue(DicomDocument &document, const EditRequest &request) {
     DcmElement &element = document.elementAt(request.path);
     requireEditable(element);
-    validateValue(element.getTag(), request.value);
+    if (request.validate) {
+        validateValue(element.getTag(), request.value);
+    }
     requireGood(element.putString(request.value.c_str()), std::format("Edit element {}", request.path.toString()));
     document.markDirty();
 }
 
 void DicomEditorService::addAttribute(DicomDocument &document, const AddAttributeRequest &request) {
     DcmItem &parent = document.itemAt(request.parentItemPath);
-    validateValue(DcmTag(request.tag), request.value);
+    if (request.validate) {
+        validateValue(DcmTag(request.tag), request.value);
+    }
     requireGood(parent.putAndInsertString(request.tag, request.value.c_str(), true), "Add attribute");
     document.markDirty();
 }

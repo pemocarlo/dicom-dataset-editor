@@ -13,12 +13,14 @@ class DicomDocument;
 struct EditRequest {
     DicomPath path;
     std::string value;
+    bool validate{true};
 };
 
 struct AddAttributeRequest {
     DicomPath parentItemPath;
     DcmTagKey tag;
     std::string value;
+    bool validate{true};
 };
 
 class DicomEditorService {
