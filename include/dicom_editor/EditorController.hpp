@@ -38,6 +38,7 @@ class EditorView {
     [[nodiscard]] virtual std::optional<AttributeInput> addAttribute() = 0;
     virtual void showError(const std::string &message) = 0;
     virtual void presentDocument(std::vector<DicomNode> nodes, const std::string &title, const std::string &status) = 0;
+    virtual void presentPixelData(std::optional<PixelDataPreview> preview) = 0;
     virtual void setStatus(const std::string &status) = 0;
 };
 
@@ -53,6 +54,9 @@ class EditorController {
     void addAttribute(const DicomNode *selected);
     void deleteAttribute(const DicomNode *selected);
     void setValidationEnabled(bool enabled);
+    void setPixelDataVisible(bool visible);
+    void showPreviousPixelFrame();
+    void showNextPixelFrame();
     [[nodiscard]] bool confirmClose();
     [[nodiscard]] ActionState actionState(const DicomNode *selected) const;
 
@@ -60,11 +64,15 @@ class EditorController {
     [[nodiscard]] bool confirmDiscardChanges();
     bool saveTo(const std::optional<std::filesystem::path> &path);
     void editValue(const DicomPath &path, const std::string &value);
+    void refreshPixelData();
     void reportError(const std::exception &error, bool refreshAfter);
 
     EditorView &view_;
     DicomDocument document_;
     bool validationEnabled_{true};
+    bool pixelDataVisible_{};
+    unsigned long pixelFrame_{};
+    unsigned long pixelFrameCount_{};
 };
 
 } // namespace dicom_editor

@@ -4,8 +4,10 @@
 
 #include <dcmtk/dcmdata/dcfilefo.h>
 
+#include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <string>
 #include <vector>
 
 class DcmDataset;
@@ -15,6 +17,16 @@ class DcmItem;
 namespace dicom_editor {
 
 class DicomPath;
+
+struct PixelDataPreview {
+    std::vector<std::uint8_t> pixels;
+    std::string message;
+    unsigned int width{};
+    unsigned int height{};
+    int channels{};
+    unsigned long frameIndex{};
+    unsigned long frameCount{};
+};
 
 class DicomDocument {
   public:
@@ -32,6 +44,7 @@ class DicomDocument {
     [[nodiscard]] DcmElement &elementAt(const DicomPath &path);
     [[nodiscard]] const DcmElement &elementAt(const DicomPath &path) const;
     [[nodiscard]] std::vector<DicomNode> nodes(bool validateValues = false) const;
+    [[nodiscard]] PixelDataPreview renderPixelData(unsigned long frameIndex) const;
     [[nodiscard]] const std::filesystem::path &filePath() const;
     [[nodiscard]] bool hasFilePath() const;
     [[nodiscard]] bool dirty() const;

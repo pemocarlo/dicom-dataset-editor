@@ -22,6 +22,7 @@ void EditorController::refreshView() {
     const std::string title = std::format("DICOM Dataset Editor - {}{}", name, document_.dirty() ? "*" : "");
     const std::string status = document_.hasFilePath() ? document_.filePath().string() : "New dataset";
     view_.presentDocument(document_.nodes(validationEnabled_), title, status);
+    refreshPixelData();
 }
 
 void EditorController::openDocument() {
@@ -33,6 +34,7 @@ void EditorController::openDocument() {
         return;
     }
     try {
+        pixelFrame_ = 0;
         document_.load(*path);
         refreshView();
     } catch (const std::exception &error) {
@@ -102,6 +104,41 @@ void EditorController::setValidationEnabled(bool enabled) {
         validationEnabled_ = enabled;
         refreshView();
     }
+}
+
+void EditorController::setPixelDataVisible(bool visible) {
+    pixelDataVisible_ = visible;
+    if (visible) {
+        pixelFrame_ = 0;
+    }
+    refreshPixelData();
+}
+
+void EditorController::showPreviousPixelFrame() {
+    if (pixelDataVisible_ && pixelFrame_ > 0) {
+        --pixelFrame_;
+        refreshPixelData();
+    }
+}
+
+void EditorController::showNextPixelFrame() {
+    if (pixelDataVisible_ && pixelFrame_ + 1 < pixelFrameCount_) {
+        ++pixelFrame_;
+        refreshPixelData();
+    }
+}
+
+void EditorController::refreshPixelData() {
+    if (!pixelDataVisible_) {
+        pixelFrameCount_ = 0;
+        view_.presentPixelData(std::nullopt);
+        return;
+    }
+
+    auto preview = document_.renderPixelData(pixelFrame_);
+    pixelFrame_ = preview.frameIndex;
+    pixelFrameCount_ = preview.frameCount;
+    view_.presentPixelData(std::move(preview));
 }
 
 bool EditorController::confirmClose() { return confirmDiscardChanges(); }
