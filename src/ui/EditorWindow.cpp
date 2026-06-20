@@ -16,6 +16,7 @@
 #include <FL/Fl_Native_File_Chooser.H>
 #include <FL/Fl_Widget.H>
 #include <FL/fl_ask.H>
+#include <FL/fl_draw.H>
 
 #include <algorithm>
 #include <cstdint>
@@ -30,6 +31,8 @@ namespace {
 
 constexpr int MenuHeight = 28;
 constexpr int StatusHeight = 26;
+constexpr int PixelDataSplitterHeight = 6;
+constexpr int PixelDataPanelMinHeight = 180;
 
 enum class MenuAction : std::uint8_t {
     Open,
@@ -41,6 +44,7 @@ enum class MenuAction : std::uint8_t {
     Delete,
     ValidateValues,
     PixelDataPreview,
+    PixelDataPreviewVertical,
 };
 
 MenuAction openAction = MenuAction::Open;
@@ -52,6 +56,70 @@ MenuAction addAction = MenuAction::Add;
 MenuAction deleteAction = MenuAction::Delete;
 MenuAction validateValuesAction = MenuAction::ValidateValues;
 MenuAction pixelDataPreviewAction = MenuAction::PixelDataPreview;
+MenuAction pixelDataPreviewVerticalAction = MenuAction::PixelDataPreviewVertical;
+
+class PixelSplitter final : public Fl_Widget {
+  public:
+    explicit PixelSplitter(int x, int y, int width, int height, EditorWindow &owner)
+        : Fl_Widget(x, y, width, height), owner_(owner) {}
+
+  private:
+    int handle(int event) override {
+        const bool vertical = owner_.pixelDataPreviewVertical();
+        switch (event) {
+        case FL_PUSH:
+            if (Fl::event_button() == FL_LEFT_MOUSE) {
+                dragging_ = true;
+                dragOffset_ = vertical ? Fl::event_x() - x() : Fl::event_y() - y();
+                return 1;
+            }
+            break;
+        case FL_DRAG:
+            if (dragging_) {
+                if (vertical) {
+                    const int splitX = Fl::event_x() - dragOffset_;
+                    const int previewWidth = owner_.w() - splitX - PixelDataSplitterHeight;
+                    owner_.setPixelDataPanelExtent(previewWidth);
+                } else {
+                    const int splitY = Fl::event_y() - dragOffset_;
+                    const int previewHeight = owner_.h() - StatusHeight - (splitY + PixelDataSplitterHeight);
+                    owner_.setPixelDataPanelExtent(previewHeight);
+                }
+                return 1;
+            }
+            break;
+        case FL_RELEASE:
+            if (dragging_) {
+                dragging_ = false;
+                return 1;
+            }
+            break;
+        default:
+            break;
+        }
+        return Fl_Widget::handle(event);
+    }
+
+    void draw() override {
+        fl_color(fl_rgb_color(190, 197, 205));
+        fl_rectf(x(), y(), w(), h());
+        fl_color(fl_rgb_color(150, 158, 166));
+        const bool vertical = owner_.pixelDataPreviewVertical();
+        if (vertical) {
+            fl_rectf(x() + w() / 2 - 1, y() + h() / 2 - 18, 2, 36);
+            fl_rectf(x() + w() / 2 - 5, y() + h() / 2 - 18, 2, 36);
+            fl_rectf(x() + w() / 2 + 3, y() + h() / 2 - 18, 2, 36);
+        } else {
+            fl_rectf(x() + w() / 2 - 18, y() + h() / 2 - 1, 36, 2);
+            fl_rectf(x() + w() / 2 - 18, y() + h() / 2 - 5, 36, 2);
+            fl_rectf(x() + w() / 2 - 18, y() + h() / 2 + 3, 36, 2);
+        }
+    }
+
+    EditorWindow &owner_;
+    bool dragging_{};
+    int dragOffset_{};
+};
 
 std::optional<std::filesystem::path> chooseFile(Fl_Native_File_Chooser::Type type, const char *title) {
     Fl_Native_File_Chooser chooser(type);
@@ -85,10 +153,14 @@ EditorWindow::EditorWindow() : Fl_Double_Window(920, 700, "DICOM Dataset Editor"
     menu_->add("&Edit/&Delete Attribute", FL_Delete, menuCallback, &deleteAction);
     menu_->add("&Settings/&Validate DICOM Values", 0, menuCallback, &validateValuesAction, FL_MENU_TOGGLE | FL_MENU_VALUE);
     menu_->add("&View/&Pixel Data Preview", 0, menuCallback, &pixelDataPreviewAction, FL_MENU_TOGGLE);
+    menu_->add("&View/Pixel Data Preview on &Right", 0, menuCallback, &pixelDataPreviewVerticalAction, FL_MENU_TOGGLE);
 
     datasetPanel_ = new DatasetPanel(0, MenuHeight, w(), h() - MenuHeight - StatusHeight);
     datasetPanel_->setSelectionChangedHandler([this] { updateActions(); });
     datasetPanel_->setEditRequestedHandler([this] { controller_.editSelected(datasetPanel_->selectedNode()); });
+
+    pixelSplitter_ = new PixelSplitter(0, 0, 1, PixelDataSplitterHeight, *this);
+    pixelSplitter_->hide();
 
     pixelDataPanel_ = new PixelDataPanel(0, 0, 1, 1);
     pixelDataPanel_->setPreviousHandler([this] { controller_.showPreviousPixelFrame(); });
@@ -154,8 +226,10 @@ void EditorWindow::presentPixelData(std::optional<dicom_editor::PixelDataPreview
     if (preview) {
         pixelDataPanel_->setPreview(std::move(*preview));
         pixelDataPanel_->show();
+        pixelSplitter_->show();
     } else {
         pixelDataPanel_->hide();
+        pixelSplitter_->hide();
     }
     layoutContent();
 }
@@ -169,18 +243,51 @@ void EditorWindow::resize(int x, int y, int width, int height) {
     }
 }
 
+void EditorWindow::setPixelDataPanelExtent(int extent) {
+    const int contentExtent = pixelDataPreviewVertical_ ? w() : h() - MenuHeight - StatusHeight;
+    const int maximumPreviewExtent = std::max(PixelDataPanelMinHeight, contentExtent - PixelDataSplitterHeight - PixelDataPanelMinHeight);
+    const int clamped = std::clamp(extent, PixelDataPanelMinHeight, maximumPreviewExtent);
+    if (pixelDataPanelExtent_ != clamped) {
+        pixelDataPanelExtent_ = clamped;
+        layoutContent();
+    }
+}
+
+void EditorWindow::setPixelDataPreviewVertical(bool vertical) {
+    if (pixelDataPreviewVertical_ != vertical) {
+        pixelDataPreviewVertical_ = vertical;
+        layoutContent();
+    }
+}
+
+bool EditorWindow::pixelDataPreviewVertical() const { return pixelDataPreviewVertical_; }
+
 void EditorWindow::layoutContent() {
     menu_->resize(0, 0, w(), MenuHeight);
     status_->resize(6, h() - StatusHeight, w() - 12, StatusHeight);
 
     const int contentHeight = h() - MenuHeight - StatusHeight;
     if (pixelDataPanel_->visible() != 0) {
-        const int previewHeight = std::clamp(contentHeight * 45 / 100, 220, 360);
-        const int datasetHeight = contentHeight - previewHeight;
-        datasetPanel_->resize(0, MenuHeight, w(), datasetHeight);
-        pixelDataPanel_->resize(6, MenuHeight + datasetHeight, w() - 12, previewHeight);
+        if (pixelDataPreviewVertical_) {
+            const int maxPreviewWidth =
+                std::max(PixelDataPanelMinHeight, w() - PixelDataSplitterHeight - PixelDataPanelMinHeight);
+            const int previewWidth = std::clamp(pixelDataPanelExtent_, PixelDataPanelMinHeight, maxPreviewWidth);
+            const int datasetWidth = std::max(1, w() - previewWidth - PixelDataSplitterHeight);
+            datasetPanel_->resize(0, MenuHeight, datasetWidth, contentHeight);
+            pixelSplitter_->resize(datasetWidth, MenuHeight, PixelDataSplitterHeight, contentHeight);
+            pixelDataPanel_->resize(datasetWidth + PixelDataSplitterHeight, MenuHeight, previewWidth, contentHeight);
+        } else {
+            const int maxPreviewHeight =
+                std::max(PixelDataPanelMinHeight, contentHeight - PixelDataSplitterHeight - PixelDataPanelMinHeight);
+            const int previewHeight = std::clamp(pixelDataPanelExtent_, PixelDataPanelMinHeight, maxPreviewHeight);
+            const int datasetHeight = std::max(1, contentHeight - previewHeight - PixelDataSplitterHeight);
+            datasetPanel_->resize(0, MenuHeight, w(), datasetHeight);
+            pixelSplitter_->resize(0, MenuHeight + datasetHeight, w(), PixelDataSplitterHeight);
+            pixelDataPanel_->resize(6, MenuHeight + datasetHeight + PixelDataSplitterHeight, w() - 12, previewHeight);
+        }
     } else {
         datasetPanel_->resize(0, MenuHeight, w(), contentHeight);
+        pixelSplitter_->hide();
     }
     redraw();
 }
@@ -229,6 +336,9 @@ void EditorWindow::menuCallback(Fl_Widget *widget, void *data) {
         break;
     case MenuAction::PixelDataPreview:
         window->controller_.setPixelDataVisible(window->menu_->mvalue()->value() != 0);
+        break;
+    case MenuAction::PixelDataPreviewVertical:
+        window->setPixelDataPreviewVertical(window->menu_->mvalue()->value() != 0);
         break;
     }
 }

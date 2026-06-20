@@ -16,6 +16,9 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
   public:
     EditorWindow();
     int handle(int event) override;
+    void setPixelDataPanelExtent(int extent);
+    void setPixelDataPreviewVertical(bool vertical);
+    [[nodiscard]] bool pixelDataPreviewVertical() const;
 
   private:
     [[nodiscard]] std::optional<std::filesystem::path> chooseOpenFile() override;
@@ -38,7 +41,10 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
 
     Fl_Menu_Bar *menu_{};
     DatasetPanel *datasetPanel_{};
+    Fl_Widget *pixelSplitter_{};
     PixelDataPanel *pixelDataPanel_{};
     Fl_Box *status_{};
     dicom_editor::EditorController controller_;
+    int pixelDataPanelExtent_{280};
+    bool pixelDataPreviewVertical_{false};
 };
