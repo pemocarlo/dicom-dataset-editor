@@ -52,6 +52,7 @@ class EditorController {
     void editSelected(const DicomNode *selected);
     void addAttribute(const DicomNode *selected);
     void deleteAttribute(const DicomNode *selected);
+    void setValidationEnabled(bool enabled);
     [[nodiscard]] bool confirmClose();
     [[nodiscard]] ActionState actionState(const DicomNode *selected) const;
 
@@ -63,6 +64,7 @@ class EditorController {
 
     EditorView &view_;
     DicomDocument document_;
+    bool validationEnabled_{true};
 };
 
 } // namespace dicom_editor

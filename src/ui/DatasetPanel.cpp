@@ -23,7 +23,7 @@ constexpr int FilterHeight = 28;
 constexpr int FilterLabelWidth = 48;
 constexpr int ColumnCount = 5;
 constexpr std::array<const char *, ColumnCount> Headers{"Attribute", "Tag", "VR", "VM", "Value"};
-constexpr std::array<int, ColumnCount> ColumnWidths{260, 105, 55, 55, 590};
+constexpr std::array<int, ColumnCount> ColumnWidths{230, 105, 50, 50, 445};
 
 } // namespace
 
@@ -165,9 +165,11 @@ class DatasetTable final : public Fl_Table_Row {
 
         fl_push_clip(x, y, width, height);
         const bool selected = row_selected(row) != 0;
-        fl_color(selected ? selection_color() : FL_BACKGROUND2_COLOR);
+        const Fl_Color normalBackground = selected ? selection_color() : FL_BACKGROUND2_COLOR;
+        const Fl_Color invalidBackground = selected ? fl_rgb_color(245, 150, 150) : fl_rgb_color(255, 220, 220);
+        fl_color(node->invalidValue ? invalidBackground : normalBackground);
         fl_rectf(x, y, width, height);
-        fl_color(selected ? fl_rgb_color(24, 32, 42) : FL_FOREGROUND_COLOR);
+        fl_color(node->invalidValue ? fl_rgb_color(125, 18, 18) : (selected ? fl_rgb_color(24, 32, 42) : FL_FOREGROUND_COLOR));
         fl_draw(values[static_cast<std::size_t>(column)].c_str(), x + 4, y, width - 8, height, FL_ALIGN_LEFT);
         fl_color(FL_LIGHT2);
         fl_rect(x, y, width, height);

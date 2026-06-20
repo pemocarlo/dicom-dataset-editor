@@ -133,6 +133,23 @@ void invalidStandardValuesAreRejectedWithoutMutation() {
     require(!document.dirty());
 }
 
+void validationCanBeDisabled() {
+    DicomDocument document;
+    seedDataset(document);
+
+    const DicomPath sopInstanceUid = DicomPath::element({}, DCM_SOPInstanceUID);
+    DicomEditorService::editValue(document, {.path = sopInstanceUid, .value = "not-a-uid", .validate = false});
+    require(stringValue(document, sopInstanceUid) == "not-a-uid");
+
+    const auto uncheckedNodes = document.nodes(false);
+    require(std::ranges::none_of(uncheckedNodes, [](const auto &node) { return node.invalidValue; }));
+
+    const auto checkedNodes = document.nodes(true);
+    const auto invalid = std::ranges::find_if(checkedNodes, [](const auto &node) { return node.keyword == "SOPInstanceUID"; });
+    require(invalid != checkedNodes.end());
+    require(invalid->invalidValue);
+}
+
 void saveReloadPersistence() {
     DicomDocument document;
     seedDataset(document);
@@ -220,6 +237,7 @@ int main() {
         addDeleteElement();
         nestedSequenceEdit();
         invalidStandardValuesAreRejectedWithoutMutation();
+        validationCanBeDisabled();
         saveReloadPersistence();
         recursiveNodeListing();
         nodeKeepsFullValue();

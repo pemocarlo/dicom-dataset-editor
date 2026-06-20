@@ -107,7 +107,8 @@ std::string valuePreviewFor(const std::string &value) {
 
 bool isEditable(const DcmElement &element) { return element.ident() != EVR_SQ && !isPixelData(element.getTag().getXTag()); }
 
-void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &parents, unsigned int depth, std::vector<DicomNode> &nodes) {
+void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &parents, unsigned int depth, bool validateValues,
+                          std::vector<DicomNode> &nodes) {
     for (unsigned long index = 0; index < item.card(); ++index) {
         DcmElement *element = item.getElement(index);
         if (element == nullptr) {
@@ -118,6 +119,7 @@ void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &par
         const DcmTagKey key = tag.getXTag();
         const bool sequence = element->ident() == EVR_SQ;
         const bool pixelData = isPixelData(key);
+        const bool editable = isEditable(*element);
 
         std::string value = pixelData ? std::string{PixelDataPlaceholder} : valueFor(*element);
         std::string valuePreview = pixelData ? std::string{} : valuePreviewFor(value);
@@ -131,7 +133,8 @@ void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &par
             .value = std::move(value),
             .valuePreview = std::move(valuePreview),
             .depth = depth,
-            .editable = isEditable(*element),
+            .editable = editable,
+            .invalidValue = validateValues && editable && element->checkValue("1-n").bad(),
         };
         nodes.push_back(std::move(node));
 
@@ -161,7 +164,7 @@ void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &par
 
             DcmItem *nested = sequenceElement.getItem(itemIndex);
             if (nested != nullptr) {
-                collectNodesFromItem(*nested, itemParents, depth + 2, nodes);
+                collectNodesFromItem(*nested, itemParents, depth + 2, validateValues, nodes);
             }
         }
     }
@@ -256,7 +259,7 @@ DcmElement &DicomDocument::elementAt(const DicomPath &path) {
 
 const DcmElement &DicomDocument::elementAt(const DicomPath &path) const { return const_cast<DicomDocument &>(*this).elementAt(path); }
 
-std::vector<DicomNode> DicomDocument::nodes() const {
+std::vector<DicomNode> DicomDocument::nodes(bool validateValues) const {
     const auto rootValue = filePath_.empty() ? std::string{"<new>"} : filePath_.string();
     std::vector<DicomNode> result{{
         .kind = DicomNodeKind::Dataset,
@@ -270,7 +273,7 @@ std::vector<DicomNode> DicomDocument::nodes() const {
         .depth = 0,
         .editable = false,
     }};
-    collectNodesFromItem(const_cast<DcmDataset &>(dataset()), {}, 1, result);
+    collectNodesFromItem(const_cast<DcmDataset &>(dataset()), {}, 1, validateValues, result);
     return result;
 }
 
