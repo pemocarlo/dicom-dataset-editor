@@ -83,12 +83,14 @@ set(DICOM_EDITOR_UI_HEADERS
     src/ui/AttributeDialog.hpp
     src/ui/DatasetPanel.hpp
     src/ui/EditorWindow.hpp
+    src/ui/PixelDataPanel.hpp
 )
 set(DICOM_EDITOR_UI_SOURCES
     src/ui/App.cpp
     src/ui/AttributeDialog.cpp
     src/ui/DatasetPanel.cpp
     src/ui/EditorWindow.cpp
+    src/ui/PixelDataPanel.cpp
 )
 set(DICOM_EDITOR_UI_LIBRARIES fltk::fltk)
 if(TARGET PkgConfig::DICOM_EDITOR_FLTK_WAYLAND)

@@ -12,6 +12,7 @@
 #include <dcmtk/dcmdata/dcsequen.h>
 #include <dcmtk/dcmdata/dctagkey.h>
 #include <dcmtk/dcmdata/dcuid.h>
+#include <dcmtk/dcmdata/dcxfer.h>
 #include <dcmtk/ofstd/ofcond.h>
 #include <dcmtk/ofstd/ofstring.h>
 #include <ofstd/oftypes.h>
@@ -205,6 +206,31 @@ void pixelDataIsNotDisplayedOrEditable() {
     require(!node->editable);
 }
 
+void pixelDataRendersForPreview() {
+    DicomDocument document;
+    auto &dataset = document.dataset();
+    dataset.putAndInsertUint16(DCM_Rows, 2);
+    dataset.putAndInsertUint16(DCM_Columns, 2);
+    dataset.putAndInsertUint16(DCM_SamplesPerPixel, 1);
+    dataset.putAndInsertString(DCM_PhotometricInterpretation, "MONOCHROME2");
+    dataset.putAndInsertUint16(DCM_BitsAllocated, 8);
+    dataset.putAndInsertUint16(DCM_BitsStored, 8);
+    dataset.putAndInsertUint16(DCM_HighBit, 7);
+    dataset.putAndInsertUint16(DCM_PixelRepresentation, 0);
+    const Uint8 pixels[]{0, 64, 128, 255};
+    dataset.putAndInsertUint8Array(DCM_PixelData, pixels, 4);
+    dataset.initializeXfer(EXS_JPEGProcess1);
+
+    const auto preview = document.renderPixelData(0);
+    require(preview.message.empty());
+    require(preview.width == 2);
+    require(preview.height == 2);
+    require(preview.channels == 1);
+    require(preview.frameIndex == 0);
+    require(preview.frameCount == 1);
+    require(preview.pixels.size() == 4);
+}
+
 void sharedUiModelFiltersAndFormats() {
     dicom_editor::DatasetViewModel model;
     dicom_editor::DicomNode node;
@@ -242,6 +268,7 @@ int main() {
         recursiveNodeListing();
         nodeKeepsFullValue();
         pixelDataIsNotDisplayedOrEditable();
+        pixelDataRendersForPreview();
         sharedUiModelFiltersAndFormats();
         sharedTagParserValidatesHex();
 

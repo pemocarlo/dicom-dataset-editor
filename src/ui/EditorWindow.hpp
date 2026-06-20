@@ -10,6 +10,7 @@ class DatasetPanel;
 class Fl_Box;
 class Fl_Menu_Bar;
 class Fl_Widget;
+class PixelDataPanel;
 
 class EditorWindow final : public Fl_Double_Window, private dicom_editor::EditorView {
   public:
@@ -25,15 +26,19 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     [[nodiscard]] std::optional<dicom_editor::AttributeInput> addAttribute() override;
     void showError(const std::string &message) override;
     void presentDocument(std::vector<dicom_editor::DicomNode> nodes, const std::string &title, const std::string &status) override;
+    void presentPixelData(std::optional<dicom_editor::PixelDataPreview> preview) override;
     void setStatus(const std::string &status) override;
     void updateActions();
+    void layoutContent();
     void exit();
+    void resize(int x, int y, int width, int height) override;
 
     static void menuCallback(Fl_Widget *widget, void *data);
     static void closeCallback(Fl_Widget *widget, void *data);
 
     Fl_Menu_Bar *menu_{};
     DatasetPanel *datasetPanel_{};
+    PixelDataPanel *pixelDataPanel_{};
     Fl_Box *status_{};
     dicom_editor::EditorController controller_;
 };

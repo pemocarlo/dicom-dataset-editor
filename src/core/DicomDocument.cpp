@@ -5,30 +5,100 @@
 #include "dicom_editor/RuntimePaths.hpp"
 
 #include <dcmtk/dcmdata/dcdatset.h>
+#include <dcmtk/dcmdata/dcdeftag.h>
 #include <dcmtk/dcmdata/dcelem.h>
 #include <dcmtk/dcmdata/dcfilefo.h>
 #include <dcmtk/dcmdata/dcitem.h>
+#include <dcmtk/dcmdata/dcrledrg.h>
 #include <dcmtk/dcmdata/dcsequen.h>
 #include <dcmtk/dcmdata/dctag.h>
 #include <dcmtk/dcmdata/dctagkey.h>
 #include <dcmtk/dcmdata/dcvr.h>
 #include <dcmtk/dcmdata/dcxfer.h>
+#include <dcmtk/dcmimage/diregist.h> // IWYU pragma: keep
+#include <dcmtk/dcmimgle/dcmimage.h>
+#include <dcmtk/dcmimgle/diutils.h>
+#include <dcmtk/dcmjpeg/djdecode.h>
+#include <dcmtk/dcmjpls/djdecode.h>
 #include <dcmtk/ofstd/ofcond.h>
 #include <dcmtk/ofstd/offile.h>
 #include <dcmtk/ofstd/ofstring.h>
+#include <ofstd/oftypes.h>
 
+#include <cstdio>
 #include <cstdlib>
 #include <format>
+#include <limits>
 #include <optional>
+#include <print>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace dicom_editor {
 
 namespace {
 
 constexpr std::string_view PixelDataPlaceholder = "[Pixel Data not displayed]";
+
+class DecoderRegistry final {
+  public:
+    DecoderRegistry() {
+        DcmRLEDecoderRegistration::registerCodecs();
+        DJDecoderRegistration::registerCodecs();
+        DJLSDecoderRegistration::registerCodecs();
+    }
+
+    ~DecoderRegistry() {
+        DJLSDecoderRegistration::cleanup();
+        DJDecoderRegistration::cleanup();
+        DcmRLEDecoderRegistration::cleanup();
+    }
+
+    DecoderRegistry(const DecoderRegistry &) = delete;
+    DecoderRegistry &operator=(const DecoderRegistry &) = delete;
+};
+
+void ensureDecodersRegistered() {
+    static const DecoderRegistry registry;
+    static_cast<void>(registry);
+}
+
+void logPixelPreview(std::string_view message) { std::println(stderr, "[pixel-preview] {}", message); }
+
+std::string transferSyntaxName(E_TransferSyntax syntax) {
+    const DcmXfer transferSyntax(syntax);
+    const char *name = transferSyntax.getXferName();
+    const char *uid = transferSyntax.getXferID();
+    return std::format("{} ({})", name == nullptr ? "unknown" : name, uid == nullptr ? "unknown UID" : uid);
+}
+
+std::string missingImageAttributes(DcmDataset &dataset) {
+    std::vector<std::string_view> missing;
+    const auto require = [&dataset, &missing](const DcmTagKey &tag, std::string_view name) {
+        if (dataset.tagExistsWithValue(tag) == OFFalse) {
+            missing.push_back(name);
+        }
+    };
+    require(DCM_Rows, "Rows");
+    require(DCM_Columns, "Columns");
+    require(DCM_SamplesPerPixel, "SamplesPerPixel");
+    require(DCM_PhotometricInterpretation, "PhotometricInterpretation");
+    require(DCM_BitsAllocated, "BitsAllocated");
+    require(DCM_BitsStored, "BitsStored");
+    require(DCM_HighBit, "HighBit");
+    require(DCM_PixelRepresentation, "PixelRepresentation");
+
+    std::string result;
+    for (const auto name : missing) {
+        if (!result.empty()) {
+            result += ", ";
+        }
+        result += name;
+    }
+    return result;
+}
 
 bool isPixelData(const DcmTagKey &key) { return key.getGroup() == 0x7fe0 && key.getElement() == 0x0010; }
 
@@ -275,6 +345,97 @@ std::vector<DicomNode> DicomDocument::nodes(bool validateValues) const {
     }};
     collectNodesFromItem(const_cast<DcmDataset &>(dataset()), {}, 1, validateValues, result);
     return result;
+}
+
+PixelDataPreview DicomDocument::renderPixelData(unsigned long frameIndex) const {
+    PixelDataPreview preview;
+    auto &mutableDataset = const_cast<DcmDataset &>(dataset());
+    logPixelPreview(std::format("request file='{}' frame={} original={} current={}",
+                                filePath_.empty() ? "<new dataset>" : filePath_.string(), frameIndex + 1,
+                                transferSyntaxName(mutableDataset.getOriginalXfer()), transferSyntaxName(mutableDataset.getCurrentXfer())));
+
+    DcmElement *pixelData = nullptr;
+    const auto findPixelData = mutableDataset.findAndGetElement(DCM_PixelData, pixelData);
+    if (findPixelData.bad() || pixelData == nullptr) {
+        logPixelPreview(std::format("PixelData lookup failed: {}", conditionMessage(findPixelData)));
+        preview.message = "No pixel data in this dataset.";
+        return preview;
+    }
+    const auto originalLength = pixelData->getLength(mutableDataset.getOriginalXfer());
+    const auto currentLength = pixelData->getLength(mutableDataset.getCurrentXfer());
+    logPixelPreview(std::format("PixelData found: VR={} class={} original-length={} current-length={}",
+                                DcmVR(pixelData->getVR()).getVRName(), DcmVR(pixelData->ident()).getVRName(), originalLength,
+                                currentLength));
+
+    if (pixelData->ident() != EVR_PixelData) {
+        preview.message = std::format("Pixel Data has unsupported internal VR {}.", DcmVR(pixelData->ident()).getVRName());
+        logPixelPreview(preview.message);
+        return preview;
+    }
+    const std::string missing = missingImageAttributes(mutableDataset);
+    if (!missing.empty()) {
+        preview.message = "Missing required image attribute(s): " + missing + ".";
+        logPixelPreview(preview.message);
+        return preview;
+    }
+
+    ensureDecodersRegistered();
+    const auto representation = mutableDataset.chooseRepresentation(EXS_LittleEndianExplicit, nullptr);
+    if (representation.bad()) {
+        preview.message = std::format("Cannot decode {} pixel data: {}", transferSyntaxName(mutableDataset.getOriginalXfer()),
+                                      conditionMessage(representation));
+        logPixelPreview(preview.message);
+        return preview;
+    }
+    const auto nativeLength = pixelData->getLength(EXS_LittleEndianExplicit);
+    logPixelPreview(std::format("native representation ready: {} bytes", nativeLength));
+    if (nativeLength == 0) {
+        preview.message = "Pixel Data element is present but empty.";
+        logPixelPreview(preview.message);
+        return preview;
+    }
+
+    DicomImage image(&mutableDataset, EXS_LittleEndianExplicit, 0, frameIndex, 1);
+    if (image.getStatus() != EIS_Normal) {
+        const char *status = DicomImage::getString(image.getStatus());
+        preview.message = std::format("Pixel data cannot be displayed: {}", status == nullptr ? "unknown error" : status);
+        logPixelPreview(std::format("DicomImage failed: status={} ({})", static_cast<int>(image.getStatus()), preview.message));
+        return preview;
+    }
+
+    const auto width = image.getWidth();
+    const auto height = image.getHeight();
+    const auto frameCount = image.getNumberOfFrames();
+    if (width == 0 || height == 0 || width > static_cast<unsigned long>(std::numeric_limits<int>::max()) ||
+        height > static_cast<unsigned long>(std::numeric_limits<int>::max())) {
+        preview.message = "Pixel data has unsupported dimensions.";
+        logPixelPreview(std::format("unsupported dimensions: {} x {}", width, height));
+        return preview;
+    }
+
+    const auto outputSize = image.getOutputDataSize(8);
+    if (outputSize == 0) {
+        preview.message = "Pixel data could not be rendered.";
+        logPixelPreview("DCMTK reported zero-byte rendered output");
+        return preview;
+    }
+
+    preview.pixels.resize(static_cast<std::size_t>(outputSize));
+    if (image.getOutputData(preview.pixels.data(), outputSize, 8, 0, 0) == 0) {
+        preview.pixels.clear();
+        preview.message = "Pixel data could not be rendered.";
+        logPixelPreview("DCMTK getOutputData failed");
+        return preview;
+    }
+
+    preview.width = static_cast<unsigned int>(width);
+    preview.height = static_cast<unsigned int>(height);
+    preview.channels = image.isMonochrome() != 0 ? 1 : 3;
+    preview.frameIndex = frameIndex;
+    preview.frameCount = frameCount;
+    logPixelPreview(std::format("rendered {} x {}, channels={}, bytes={}, frame={}/{}", preview.width, preview.height, preview.channels,
+                                preview.pixels.size(), preview.frameIndex + 1, preview.frameCount));
+    return preview;
 }
 
 const std::filesystem::path &DicomDocument::filePath() const { return filePath_; }

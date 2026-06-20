@@ -2,7 +2,9 @@
 
 #include "AttributeDialog.hpp"
 #include "DatasetPanel.hpp"
+#include "PixelDataPanel.hpp"
 #include "dicom_editor/AttributeInput.hpp"
+#include "dicom_editor/DicomDocument.hpp"
 #include "dicom_editor/DicomNode.hpp"
 #include "dicom_editor/EditorController.hpp"
 
@@ -15,6 +17,7 @@
 #include <FL/Fl_Widget.H>
 #include <FL/fl_ask.H>
 
+#include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -37,6 +40,7 @@ enum class MenuAction : std::uint8_t {
     Add,
     Delete,
     ValidateValues,
+    PixelDataPreview,
 };
 
 MenuAction openAction = MenuAction::Open;
@@ -47,6 +51,7 @@ MenuAction editAction = MenuAction::Edit;
 MenuAction addAction = MenuAction::Add;
 MenuAction deleteAction = MenuAction::Delete;
 MenuAction validateValuesAction = MenuAction::ValidateValues;
+MenuAction pixelDataPreviewAction = MenuAction::PixelDataPreview;
 
 std::optional<std::filesystem::path> chooseFile(Fl_Native_File_Chooser::Type type, const char *title) {
     Fl_Native_File_Chooser chooser(type);
@@ -69,7 +74,7 @@ void setMenuActive(Fl_Menu_Bar &menu, const char *path, bool active) {
 
 } // namespace
 
-EditorWindow::EditorWindow() : Fl_Double_Window(920, 640, "DICOM Dataset Editor"), controller_(*this) {
+EditorWindow::EditorWindow() : Fl_Double_Window(920, 700, "DICOM Dataset Editor"), controller_(*this) {
     menu_ = new Fl_Menu_Bar(0, 0, w(), MenuHeight);
     menu_->add("&File/&Open...", FL_CTRL + 'o', menuCallback, &openAction);
     menu_->add("&File/&Save", FL_CTRL + 's', menuCallback, &saveAction);
@@ -79,10 +84,16 @@ EditorWindow::EditorWindow() : Fl_Double_Window(920, 640, "DICOM Dataset Editor"
     menu_->add("&Edit/&Add Attribute...", FL_CTRL + 'n', menuCallback, &addAction);
     menu_->add("&Edit/&Delete Attribute", FL_Delete, menuCallback, &deleteAction);
     menu_->add("&Settings/&Validate DICOM Values", 0, menuCallback, &validateValuesAction, FL_MENU_TOGGLE | FL_MENU_VALUE);
+    menu_->add("&View/&Pixel Data Preview", 0, menuCallback, &pixelDataPreviewAction, FL_MENU_TOGGLE);
 
     datasetPanel_ = new DatasetPanel(0, MenuHeight, w(), h() - MenuHeight - StatusHeight);
     datasetPanel_->setSelectionChangedHandler([this] { updateActions(); });
     datasetPanel_->setEditRequestedHandler([this] { controller_.editSelected(datasetPanel_->selectedNode()); });
+
+    pixelDataPanel_ = new PixelDataPanel(0, 0, 1, 1);
+    pixelDataPanel_->setPreviousHandler([this] { controller_.showPreviousPixelFrame(); });
+    pixelDataPanel_->setNextHandler([this] { controller_.showNextPixelFrame(); });
+    pixelDataPanel_->hide();
 
     status_ = new Fl_Box(6, h() - StatusHeight, w() - 12, StatusHeight);
     status_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
@@ -139,7 +150,40 @@ void EditorWindow::presentDocument(std::vector<dicom_editor::DicomNode> nodes, c
     updateActions();
 }
 
+void EditorWindow::presentPixelData(std::optional<dicom_editor::PixelDataPreview> preview) {
+    if (preview) {
+        pixelDataPanel_->setPreview(std::move(*preview));
+        pixelDataPanel_->show();
+    } else {
+        pixelDataPanel_->hide();
+    }
+    layoutContent();
+}
+
 void EditorWindow::setStatus(const std::string &status) { status_->copy_label(status.c_str()); }
+
+void EditorWindow::resize(int x, int y, int width, int height) {
+    Fl_Double_Window::resize(x, y, width, height);
+    if (menu_ != nullptr && datasetPanel_ != nullptr && pixelDataPanel_ != nullptr && status_ != nullptr) {
+        layoutContent();
+    }
+}
+
+void EditorWindow::layoutContent() {
+    menu_->resize(0, 0, w(), MenuHeight);
+    status_->resize(6, h() - StatusHeight, w() - 12, StatusHeight);
+
+    const int contentHeight = h() - MenuHeight - StatusHeight;
+    if (pixelDataPanel_->visible() != 0) {
+        const int previewHeight = std::clamp(contentHeight * 45 / 100, 220, 360);
+        const int datasetHeight = contentHeight - previewHeight;
+        datasetPanel_->resize(0, MenuHeight, w(), datasetHeight);
+        pixelDataPanel_->resize(6, MenuHeight + datasetHeight, w() - 12, previewHeight);
+    } else {
+        datasetPanel_->resize(0, MenuHeight, w(), contentHeight);
+    }
+    redraw();
+}
 
 void EditorWindow::updateActions() {
     const auto actions = controller_.actionState(datasetPanel_->selectedNode());
@@ -182,6 +226,9 @@ void EditorWindow::menuCallback(Fl_Widget *widget, void *data) {
         break;
     case MenuAction::ValidateValues:
         window->controller_.setValidationEnabled(window->menu_->mvalue()->value() != 0);
+        break;
+    case MenuAction::PixelDataPreview:
+        window->controller_.setPixelDataVisible(window->menu_->mvalue()->value() != 0);
         break;
     }
 }
