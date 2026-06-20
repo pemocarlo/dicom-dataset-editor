@@ -2,7 +2,6 @@
 
 #include "dicom_editor/DatasetViewModel.hpp"
 #include "dicom_editor/DicomNode.hpp"
-#include "dicom_editor/DicomPath.hpp"
 
 #include <FL/Enumerations.H>
 #include <FL/Fl.H>
@@ -22,9 +21,9 @@ namespace {
 constexpr int Padding = 6;
 constexpr int FilterHeight = 28;
 constexpr int FilterLabelWidth = 48;
-constexpr int ColumnCount = 7;
-constexpr std::array<const char *, ColumnCount> Headers{"Attribute", "Tag", "VR", "VM", "Path", "Value", "Kind"};
-constexpr std::array<int, ColumnCount> ColumnWidths{220, 105, 55, 55, 260, 420, 90};
+constexpr int ColumnCount = 5;
+constexpr std::array<const char *, ColumnCount> Headers{"Attribute", "Tag", "VR", "VM", "Value"};
+constexpr std::array<int, ColumnCount> ColumnWidths{260, 105, 55, 55, 590};
 
 } // namespace
 
@@ -161,13 +160,8 @@ class DatasetTable final : public Fl_Table_Row {
         if (node == nullptr) {
             return;
         }
-        const std::array<std::string, ColumnCount> values{dicom_editor::DatasetViewModel::attributeLabel(*node),
-                                                          node->tag,
-                                                          node->vr,
-                                                          node->vm,
-                                                          node->path.toString(),
-                                                          node->value,
-                                                          std::string{dicom_editor::DatasetViewModel::kindLabel(node->kind)}};
+        const std::array<std::string, ColumnCount> values{dicom_editor::DatasetViewModel::attributeLabel(*node), node->tag, node->vr,
+                                                          node->vm, node->value};
 
         fl_push_clip(x, y, width, height);
         const bool selected = row_selected(row) != 0;
