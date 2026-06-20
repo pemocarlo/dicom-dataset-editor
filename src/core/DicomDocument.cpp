@@ -27,6 +27,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <expected>
 #include <format>
 #include <limits>
 #include <optional>
@@ -110,6 +111,10 @@ void requireGood(const OFCondition &condition, const std::string &action) {
     if (condition.bad()) {
         throw DicomError(std::format("{}: {}", action, conditionMessage(condition)));
     }
+}
+
+std::expected<void, DicomError> makeUnexpected(std::string action, const OFCondition &condition) {
+    return std::unexpected(DicomError(std::format("{}: {}", action, conditionMessage(condition))));
 }
 
 void setDictionaryPath(const std::filesystem::path &path) {
@@ -274,25 +279,33 @@ void DicomDocument::createEmpty() {
     dirty_ = false;
 }
 
-void DicomDocument::load(const std::filesystem::path &path) {
+std::expected<void, DicomError> DicomDocument::load(const std::filesystem::path &path) {
     auto loaded = std::make_unique<DcmFileFormat>();
-    requireGood(loaded->loadFile(path.string().c_str()), "Load DICOM file");
+    const auto result = loaded->loadFile(path.string().c_str());
+    if (result.bad()) {
+        return makeUnexpected("Load DICOM file", result);
+    }
     file_ = std::move(loaded);
     filePath_ = path;
     dirty_ = false;
+    return {};
 }
 
-void DicomDocument::save() {
+std::expected<void, DicomError> DicomDocument::save() {
     if (filePath_.empty()) {
-        throw DicomError("Cannot save without a file path");
+        return std::unexpected(DicomError("Cannot save without a file path"));
     }
-    requireGood(file_->saveFile(filePath_.string().c_str(), EXS_LittleEndianExplicit), "Save DICOM file");
+    const auto result = file_->saveFile(filePath_.string().c_str(), EXS_LittleEndianExplicit);
+    if (result.bad()) {
+        return makeUnexpected("Save DICOM file", result);
+    }
     dirty_ = false;
+    return {};
 }
 
-void DicomDocument::saveAs(const std::filesystem::path &path) {
+std::expected<void, DicomError> DicomDocument::saveAs(const std::filesystem::path &path) {
     filePath_ = path;
-    save();
+    return save();
 }
 
 DcmDataset &DicomDocument::dataset() { return *file_->getDataset(); }

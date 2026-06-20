@@ -1,12 +1,14 @@
 #include "dicom_editor/EditorController.hpp"
 
 #include "dicom_editor/DicomEditorService.hpp"
+#include "dicom_editor/DicomError.hpp"
 #include "dicom_editor/DicomNode.hpp"
 #include "dicom_editor/DicomPath.hpp"
 
 #include <dcmtk/dcmdata/dctagkey.h>
 
 #include <exception>
+#include <expected>
 #include <filesystem>
 #include <format>
 #include <optional>
@@ -33,13 +35,13 @@ void EditorController::openDocument() {
     if (!path) {
         return;
     }
-    try {
-        pixelFrame_ = 0;
-        document_.load(*path);
-        refreshView();
-    } catch (const std::exception &error) {
-        reportError(error, false);
+    pixelFrame_ = 0;
+    const auto result = document_.load(*path);
+    if (!result) {
+        reportError(result.error(), false);
+        return;
     }
+    refreshView();
 }
 
 bool EditorController::saveDocument() { return document_.hasFilePath() ? saveTo(std::nullopt) : saveDocumentAs(); }
@@ -172,21 +174,23 @@ bool EditorController::saveTo(const std::optional<std::filesystem::path> &path) 
     if (path && path->empty()) {
         return false;
     }
-    try {
-        if (path) {
-            document_.saveAs(*path);
-        } else {
-            document_.save();
-        }
-        DicomDocument verified;
-        verified.load(document_.filePath());
-        refreshView();
-        view_.setStatus(std::format("Saved and reloaded successfully: {}", document_.filePath().string()));
-        return true;
-    } catch (const std::exception &error) {
-        reportError(error, false);
+
+    const auto saveResult = path ? document_.saveAs(*path) : document_.save();
+    if (!saveResult) {
+        reportError(saveResult.error(), false);
         return false;
     }
+
+    DicomDocument verified;
+    const auto verifyResult = verified.load(document_.filePath());
+    if (!verifyResult) {
+        reportError(verifyResult.error(), false);
+        return false;
+    }
+
+    refreshView();
+    view_.setStatus(std::format("Saved and reloaded successfully: {}", document_.filePath().string()));
+    return true;
 }
 
 void EditorController::reportError(const std::exception &error, bool refreshAfter) {
