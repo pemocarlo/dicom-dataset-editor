@@ -10,16 +10,24 @@
 
 namespace dicom_editor {
 
+/// Prepares the flattened dataset tree for the table view.
 class DatasetViewModel {
   public:
+    /// Replaces the node list and reapplies the current filter.
     void setNodes(std::vector<DicomNode> newNodes);
+    /// Updates the visible rows using a case-insensitive substring filter.
     void setFilter(std::string filter);
 
+    /// Returns the node shown at a visible row index.
     [[nodiscard]] const DicomNode *nodeAt(std::size_t visibleIndex) const;
+    /// Returns all nodes in tree order.
     [[nodiscard]] std::span<const DicomNode> nodes() const;
+    /// Returns indexes of rows currently visible after filtering.
     [[nodiscard]] std::span<const std::size_t> visibleIndices() const;
 
+    /// Builds the indented label shown in the attribute column.
     [[nodiscard]] static std::string attributeLabel(const DicomNode &node);
+    /// Returns a label for the node kind.
     [[nodiscard]] static std::string_view kindLabel(DicomNodeKind kind);
 
   private:
