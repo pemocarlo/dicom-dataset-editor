@@ -18,8 +18,8 @@
 
 namespace {
 
-constexpr int HeaderHeight = 38;
-constexpr int ButtonWidth = 72;
+constexpr int HeaderHeight = 68;
+constexpr int ButtonWidth = 64;
 constexpr int Padding = 8;
 
 } // namespace
@@ -82,9 +82,13 @@ PixelDataPanel::PixelDataPanel(int x, int y, int width, int height) : Fl_Group(x
     title_ = new Fl_Box(0, 0, 1, 1, "Pixel Data");
     title_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     title_->labelfont(FL_HELVETICA_BOLD);
-    previous_ = new Fl_Button(0, 0, 1, 1, "Previous");
+    previousFile_ = new Fl_Button(0, 0, 1, 1, "< File");
+    previousFile_->callback(previousFileCallback, this);
+    nextFile_ = new Fl_Button(0, 0, 1, 1, "File >");
+    nextFile_->callback(nextFileCallback, this);
+    previous_ = new Fl_Button(0, 0, 1, 1, "< Frame");
     previous_->callback(previousCallback, this);
-    next_ = new Fl_Button(0, 0, 1, 1, "Next");
+    next_ = new Fl_Button(0, 0, 1, 1, "Frame >");
     next_->callback(nextCallback, this);
     canvas_ = new PixelCanvas(0, 0, 1, 1);
     resizable(canvas_);
@@ -95,11 +99,12 @@ PixelDataPanel::PixelDataPanel(int x, int y, int width, int height) : Fl_Group(x
 void PixelDataPanel::setPreview(dicom_editor::PixelDataPreview preview) {
     const bool hasFrames = preview.frameCount > 0;
     if (!preview.pixels.empty()) {
-        title_->copy_label(
-            std::format("Pixel Data | {} x {} | Frame {} of {}", preview.width, preview.height, preview.frameIndex + 1, preview.frameCount)
-                .c_str());
+        title_->copy_label(std::format("{} | File {} of {} | {} x {} | Frame {} of {}", preview.sourceName, preview.sourceIndex + 1,
+                                       preview.sourceCount, preview.width, preview.height, preview.frameIndex + 1, preview.frameCount)
+                               .c_str());
     } else {
-        title_->copy_label("Pixel Data");
+        title_->copy_label(
+            std::format("{} | File {} of {} | Pixel Data", preview.sourceName, preview.sourceIndex + 1, preview.sourceCount).c_str());
     }
     if (hasFrames && preview.frameIndex > 0) {
         previous_->activate();
@@ -111,12 +116,18 @@ void PixelDataPanel::setPreview(dicom_editor::PixelDataPreview preview) {
     } else {
         next_->deactivate();
     }
+    preview.sourceIndex > 0 ? previousFile_->activate() : previousFile_->deactivate();
+    preview.sourceIndex + 1 < preview.sourceCount ? nextFile_->activate() : nextFile_->deactivate();
     canvas_->setPreview(std::move(preview));
 }
 
 void PixelDataPanel::setPreviousHandler(std::function<void()> handler) { previousHandler_ = std::move(handler); }
 
 void PixelDataPanel::setNextHandler(std::function<void()> handler) { nextHandler_ = std::move(handler); }
+
+void PixelDataPanel::setPreviousFileHandler(std::function<void()> handler) { previousFileHandler_ = std::move(handler); }
+
+void PixelDataPanel::setNextFileHandler(std::function<void()> handler) { nextFileHandler_ = std::move(handler); }
 
 void PixelDataPanel::resize(int x, int y, int width, int height) {
     Fl_Group::resize(x, y, width, height);
@@ -137,10 +148,26 @@ void PixelDataPanel::nextCallback(Fl_Widget *, void *data) {
     }
 }
 
+void PixelDataPanel::previousFileCallback(Fl_Widget *, void *data) {
+    auto &panel = *static_cast<PixelDataPanel *>(data);
+    if (panel.previousFileHandler_) {
+        panel.previousFileHandler_();
+    }
+}
+
+void PixelDataPanel::nextFileCallback(Fl_Widget *, void *data) {
+    auto &panel = *static_cast<PixelDataPanel *>(data);
+    if (panel.nextFileHandler_) {
+        panel.nextFileHandler_();
+    }
+}
+
 void PixelDataPanel::layout() {
-    const int buttonHeight = HeaderHeight - 2 * Padding;
-    next_->resize(x() + w() - Padding - ButtonWidth, y() + Padding, ButtonWidth, buttonHeight);
-    previous_->resize(next_->x() - Padding - ButtonWidth, y() + Padding, ButtonWidth, buttonHeight);
-    title_->resize(x() + Padding, y(), std::max(1, previous_->x() - x() - 2 * Padding), HeaderHeight);
+    const int buttonHeight = 28;
+    title_->resize(x() + Padding, y(), std::max(1, w() - 2 * Padding), HeaderHeight - buttonHeight - Padding);
+    previousFile_->resize(x() + Padding, y() + HeaderHeight - buttonHeight, ButtonWidth, buttonHeight);
+    nextFile_->resize(previousFile_->x() + ButtonWidth + Padding, previousFile_->y(), ButtonWidth, buttonHeight);
+    next_->resize(x() + w() - Padding - ButtonWidth, previousFile_->y(), ButtonWidth, buttonHeight);
+    previous_->resize(next_->x() - Padding - ButtonWidth, previousFile_->y(), ButtonWidth, buttonHeight);
     canvas_->resize(x() + Padding, y() + HeaderHeight, std::max(1, w() - 2 * Padding), std::max(1, h() - HeaderHeight - Padding));
 }

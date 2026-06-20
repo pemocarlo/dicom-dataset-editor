@@ -180,6 +180,18 @@ std::string valuePreviewFor(const std::string &value) {
     return preview;
 }
 
+std::string datasetString(DcmDataset &dataset, const DcmTagKey &tag) {
+    OFString value;
+    return dataset.findAndGetOFString(tag, value).good() ? std::string{value} : std::string{};
+}
+
+std::string labelOr(const std::string &preferred, const std::string &fallback, std::string_view missing) {
+    if (!preferred.empty()) {
+        return preferred;
+    }
+    return fallback.empty() ? std::string{missing} : fallback;
+}
+
 bool isEditable(const DcmElement &element) { return element.ident() != EVR_SQ && !isPixelData(element.getTag().getXTag()); }
 
 void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &parents, unsigned int depth, bool validateValues,
@@ -449,6 +461,18 @@ PixelDataPreview DicomDocument::renderPixelData(unsigned long frameIndex) const 
     logPixelPreview(std::format("rendered {} x {}, channels={}, bytes={}, frame={}/{}", preview.width, preview.height, preview.channels,
                                 preview.pixels.size(), preview.frameIndex + 1, preview.frameCount));
     return preview;
+}
+
+DicomHierarchy DicomDocument::hierarchy() const {
+    auto &mutableDataset = const_cast<DcmDataset &>(dataset());
+    DicomHierarchy result;
+    result.patientId = datasetString(mutableDataset, DCM_PatientID);
+    result.studyId = datasetString(mutableDataset, DCM_StudyInstanceUID);
+    result.seriesId = datasetString(mutableDataset, DCM_SeriesInstanceUID);
+    result.patientLabel = labelOr(datasetString(mutableDataset, DCM_PatientName), result.patientId, "Unknown patient");
+    result.studyLabel = labelOr(datasetString(mutableDataset, DCM_StudyDescription), result.studyId, "Unknown study");
+    result.seriesLabel = labelOr(datasetString(mutableDataset, DCM_SeriesDescription), result.seriesId, "Unknown series");
+    return result;
 }
 
 const std::filesystem::path &DicomDocument::filePath() const { return filePath_; }

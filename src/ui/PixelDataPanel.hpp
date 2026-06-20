@@ -25,18 +25,28 @@ class PixelDataPanel final : public Fl_Group {
     void setPreviousHandler(std::function<void()> handler);
     /// Sets the callback for the Next button.
     void setNextHandler(std::function<void()> handler);
+    /// Sets the callback for the previous-file button.
+    void setPreviousFileHandler(std::function<void()> handler);
+    /// Sets the callback for the next-file button.
+    void setNextFileHandler(std::function<void()> handler);
     /// Repositions child widgets after resize.
     void resize(int x, int y, int width, int height) override;
 
   private:
     static void previousCallback(Fl_Widget *widget, void *data);
     static void nextCallback(Fl_Widget *widget, void *data);
+    static void previousFileCallback(Fl_Widget *widget, void *data);
+    static void nextFileCallback(Fl_Widget *widget, void *data);
     void layout();
 
     Fl_Box *title_{};
     Fl_Button *previous_{};
     Fl_Button *next_{};
+    Fl_Button *previousFile_{};
+    Fl_Button *nextFile_{};
     PixelCanvas *canvas_{};
     std::function<void()> previousHandler_;
     std::function<void()> nextHandler_;
+    std::function<void()> previousFileHandler_;
+    std::function<void()> nextFileHandler_;
 };

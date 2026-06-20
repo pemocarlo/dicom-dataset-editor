@@ -5,6 +5,7 @@
 
 #include <dcmtk/dcmdata/dcfilefo.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
@@ -36,6 +37,22 @@ struct PixelDataPreview {
     unsigned long frameIndex{};
     /// Total frame count reported by the source image.
     unsigned long frameCount{};
+    /// Name of the source file displayed above the preview.
+    std::string sourceName;
+    /// Zero-based source file index in the open workspace.
+    std::size_t sourceIndex{};
+    /// Number of files in the open workspace.
+    std::size_t sourceCount{};
+};
+
+/// Patient/study/series labels and stable identifiers used by the file tree.
+struct DicomHierarchy {
+    std::string patientLabel;
+    std::string patientId;
+    std::string studyLabel;
+    std::string studyId;
+    std::string seriesLabel;
+    std::string seriesId;
 };
 
 /// Owns the loaded DICOM file and exposes tree, edit, and preview operations.
@@ -69,6 +86,8 @@ class DicomDocument {
     [[nodiscard]] std::vector<DicomNode> nodes(bool validateValues = false) const;
     /// Renders the requested pixel frame, if available.
     [[nodiscard]] PixelDataPreview renderPixelData(unsigned long frameIndex) const;
+    /// Reads the patient/study/series grouping fields for the workspace tree.
+    [[nodiscard]] DicomHierarchy hierarchy() const;
     /// Returns the active file path.
     [[nodiscard]] const std::filesystem::path &filePath() const;
     /// Returns `true` when the document has an active file path.

@@ -7,44 +7,149 @@
 
 #include <dcmtk/dcmdata/dctagkey.h>
 
+#include <algorithm>
 #include <exception>
 #include <expected>
 #include <filesystem>
 #include <format>
+#include <iterator>
 #include <optional>
+#include <ranges>
 #include <string>
+#include <system_error>
 #include <utility>
+#include <vector>
 
 namespace dicom_editor {
 
-EditorController::EditorController(EditorView &view) : view_(view) {}
+namespace {
+
+std::filesystem::path normalizedPath(const std::filesystem::path &path) {
+    std::error_code error;
+    auto normalized = std::filesystem::weakly_canonical(path, error);
+    return error ? std::filesystem::absolute(path, error).lexically_normal() : normalized;
+}
+
+} // namespace
+
+EditorController::EditorController(EditorView &view) : view_(view) { documents_.emplace_back(); }
+
+DicomDocument &EditorController::document() { return documents_[activeDocument_]; }
+
+const DicomDocument &EditorController::document() const { return documents_[activeDocument_]; }
 
 void EditorController::refreshView() {
-    const std::string name = document_.hasFilePath() ? document_.filePath().filename().string() : "Untitled";
-    const std::string title = std::format("DICOM Dataset Editor - {}{}", name, document_.dirty() ? "*" : "");
-    const std::string status = document_.hasFilePath() ? document_.filePath().string() : "New dataset";
-    view_.presentDocument(document_.nodes(validationEnabled_), title, status);
+    const auto &active = document();
+    const std::string name = active.hasFilePath() ? active.filePath().filename().string() : "Untitled";
+    const std::string title = std::format("DICOM Dataset Editor - {}{}", name, active.dirty() ? "*" : "");
+    const std::string status = active.hasFilePath()
+                                   ? std::format("File {} of {} | {}", activeDocument_ + 1, documents_.size(), active.filePath().string())
+                                   : "New dataset";
+    view_.presentDocument(active.nodes(validationEnabled_), title, status);
+    view_.presentOpenFiles(openFiles());
     refreshPixelData();
 }
 
 void EditorController::openDocument() {
-    if (!confirmDiscardChanges()) {
+    const auto paths = view_.chooseOpenFiles();
+    if (paths.empty()) {
         return;
     }
-    const auto path = view_.chooseOpenFile();
-    if (!path) {
+    openPaths(paths);
+}
+
+void EditorController::openFolder() {
+    const auto folder = view_.chooseOpenFolder();
+    if (!folder) {
         return;
     }
+    std::vector<std::filesystem::path> paths;
+    std::error_code error;
+    const auto options = std::filesystem::directory_options::skip_permission_denied;
+    for (std::filesystem::recursive_directory_iterator iterator(*folder, options, error), end; iterator != end; iterator.increment(error)) {
+        if (error) {
+            error.clear();
+            continue;
+        }
+        if (iterator->is_regular_file(error) && !error) {
+            paths.push_back(iterator->path());
+        }
+        error.clear();
+    }
+    std::ranges::sort(paths);
+    openPaths(paths);
+}
+
+void EditorController::openPaths(const std::vector<std::filesystem::path> &paths) {
+    std::vector<std::string> errors;
+    std::size_t opened{};
+    std::size_t failed{};
+    for (const auto &path : paths) {
+        const auto normalized = normalizedPath(path);
+        const auto duplicate = std::ranges::find_if(documents_, [&normalized](const DicomDocument &candidate) {
+            return candidate.hasFilePath() && normalizedPath(candidate.filePath()) == normalized;
+        });
+        if (duplicate != documents_.end()) {
+            activeDocument_ = static_cast<std::size_t>(std::distance(documents_.begin(), duplicate));
+            continue;
+        }
+
+        DicomDocument loaded;
+        const auto result = loaded.load(path);
+        if (!result) {
+            ++failed;
+            if (errors.size() < 8) {
+                errors.push_back(std::format("{}: {}", path.string(), result.error().what()));
+            }
+            continue;
+        }
+
+        if (documents_.size() == 1 && !document().hasFilePath() && !document().dirty()) {
+            documents_.clear();
+        }
+        documents_.push_back(std::move(loaded));
+        activeDocument_ = documents_.size() - 1;
+        ++opened;
+    }
+
     pixelFrame_ = 0;
-    const auto result = document_.load(*path);
-    if (!result) {
-        reportError(result.error(), false);
+    refreshView();
+    if (!errors.empty()) {
+        std::string message = std::format("Opened {} DICOM file(s). Skipped {} non-DICOM or unreadable file(s).", opened, failed);
+        for (const auto &error : errors) {
+            message += "\n" + error;
+        }
+        if (failed > errors.size()) {
+            message += std::format("\n...and {} more.", failed - errors.size());
+        }
+        view_.showError(message);
+    } else if (paths.empty()) {
+        view_.showError("The selected folder contains no regular files.");
+    }
+}
+
+void EditorController::activateDocument(std::size_t index) {
+    if (index >= documents_.size() || index == activeDocument_) {
         return;
     }
+    activeDocument_ = index;
+    pixelFrame_ = 0;
     refreshView();
 }
 
-bool EditorController::saveDocument() { return document_.hasFilePath() ? saveTo(std::nullopt) : saveDocumentAs(); }
+void EditorController::showPreviousDocument() {
+    if (activeDocument_ > 0) {
+        activateDocument(activeDocument_ - 1);
+    }
+}
+
+void EditorController::showNextDocument() {
+    if (activeDocument_ + 1 < documents_.size()) {
+        activateDocument(activeDocument_ + 1);
+    }
+}
+
+bool EditorController::saveDocument() { return document().hasFilePath() ? saveTo(std::nullopt) : saveDocumentAs(); }
 
 bool EditorController::saveDocumentAs() {
     const auto path = view_.chooseSaveFile();
@@ -63,7 +168,7 @@ void EditorController::editSelected(const DicomNode *selected) {
 
 void EditorController::editValue(const DicomPath &path, const std::string &value) {
     try {
-        DicomEditorService::editValue(document_, {.path = path, .value = value, .validate = validationEnabled_});
+        DicomEditorService::editValue(document(), {.path = path, .value = value, .validate = validationEnabled_});
         refreshView();
     } catch (const std::exception &error) {
         reportError(error, true);
@@ -82,7 +187,7 @@ void EditorController::addAttribute(const DicomNode *selected) {
     }
     try {
         DicomEditorService::addAttribute(
-            document_, {.parentItemPath = parent, .tag = *result->tag, .value = result->value, .validate = validationEnabled_});
+            document(), {.parentItemPath = parent, .tag = *result->tag, .value = result->value, .validate = validationEnabled_});
         refreshView();
     } catch (const std::exception &error) {
         reportError(error, false);
@@ -94,7 +199,7 @@ void EditorController::deleteAttribute(const DicomNode *selected) {
         return;
     }
     try {
-        DicomEditorService::deleteAttribute(document_, selected->path);
+        DicomEditorService::deleteAttribute(document(), selected->path);
         refreshView();
     } catch (const std::exception &error) {
         reportError(error, false);
@@ -137,21 +242,38 @@ void EditorController::refreshPixelData() {
         return;
     }
 
-    auto preview = document_.renderPixelData(pixelFrame_);
+    auto preview = document().renderPixelData(pixelFrame_);
     pixelFrame_ = preview.frameIndex;
     pixelFrameCount_ = preview.frameCount;
+    preview.sourceName = document().hasFilePath() ? document().filePath().filename().string() : "Untitled";
+    preview.sourceIndex = activeDocument_;
+    preview.sourceCount = documents_.size();
     view_.presentPixelData(std::move(preview));
 }
 
-bool EditorController::confirmClose() { return confirmDiscardChanges(); }
+bool EditorController::confirmClose() {
+    const std::size_t original = activeDocument_;
+    for (std::size_t index = 0; index < documents_.size(); ++index) {
+        if (!documents_[index].dirty()) {
+            continue;
+        }
+        activeDocument_ = index;
+        refreshView();
+        if (!confirmDiscardChanges()) {
+            return false;
+        }
+    }
+    activeDocument_ = original;
+    return true;
+}
 
 ActionState EditorController::actionState(const DicomNode *selected) const {
     const bool editable = selected != nullptr && selected->editable;
-    return {.saveEnabled = document_.dirty() || !document_.hasFilePath(), .editEnabled = editable, .deleteEnabled = editable};
+    return {.saveEnabled = document().dirty() || !document().hasFilePath(), .editEnabled = editable, .deleteEnabled = editable};
 }
 
 bool EditorController::confirmDiscardChanges() {
-    if (!document_.dirty()) {
+    if (!document().dirty()) {
         return true;
     }
     using enum SaveChangesChoice;
@@ -168,28 +290,28 @@ bool EditorController::confirmDiscardChanges() {
 }
 
 bool EditorController::saveTo(const std::optional<std::filesystem::path> &path) {
-    if (!document_.hasFilePath() && !path) {
+    if (!document().hasFilePath() && !path) {
         return false;
     }
     if (path && path->empty()) {
         return false;
     }
 
-    const auto saveResult = path ? document_.saveAs(*path) : document_.save();
+    const auto saveResult = path ? document().saveAs(*path) : document().save();
     if (!saveResult) {
         reportError(saveResult.error(), false);
         return false;
     }
 
     DicomDocument verified;
-    const auto verifyResult = verified.load(document_.filePath());
+    const auto verifyResult = verified.load(document().filePath());
     if (!verifyResult) {
         reportError(verifyResult.error(), false);
         return false;
     }
 
     refreshView();
-    view_.setStatus(std::format("Saved and reloaded successfully: {}", document_.filePath().string()));
+    view_.setStatus(std::format("Saved and reloaded successfully: {}", document().filePath().string()));
     return true;
 }
 
@@ -198,6 +320,20 @@ void EditorController::reportError(const std::exception &error, bool refreshAfte
     if (refreshAfter) {
         refreshView();
     }
+}
+
+std::vector<OpenDicomFile> EditorController::openFiles() const {
+    std::vector<OpenDicomFile> result;
+    result.reserve(documents_.size());
+    for (std::size_t index = 0; index < documents_.size(); ++index) {
+        const auto &entry = documents_[index];
+        result.push_back({.index = index,
+                          .path = entry.filePath(),
+                          .hierarchy = entry.hierarchy(),
+                          .dirty = entry.dirty(),
+                          .active = index == activeDocument_});
+    }
+    return result;
 }
 
 } // namespace dicom_editor

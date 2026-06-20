@@ -5,6 +5,7 @@
 #include "dicom_editor/DicomError.hpp"
 #include "dicom_editor/DicomNode.hpp"
 #include "dicom_editor/DicomPath.hpp"
+#include "dicom_editor/EditorController.hpp"
 
 #include <dcmtk/dcmdata/dcdatset.h>
 #include <dcmtk/dcmdata/dcdeftag.h>
@@ -30,16 +31,38 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 using dicom_editor::AddAttributeRequest;
 using dicom_editor::DicomDocument;
 using dicom_editor::DicomEditorService;
 using dicom_editor::DicomPath;
+using dicom_editor::EditorController;
 using dicom_editor::EditRequest;
 using dicom_editor::SequenceItemRef;
 
 namespace {
+
+class ControllerView final : public dicom_editor::EditorView {
+  public:
+    std::vector<std::filesystem::path> chosenFiles;
+    std::vector<dicom_editor::OpenDicomFile> openFiles;
+    std::string error;
+
+    std::vector<std::filesystem::path> chooseOpenFiles() override { return chosenFiles; }
+    std::optional<std::filesystem::path> chooseOpenFolder() override { return std::nullopt; }
+    std::optional<std::filesystem::path> chooseSaveFile() override { return std::nullopt; }
+    dicom_editor::SaveChangesChoice confirmSaveChanges() override { return dicom_editor::SaveChangesChoice::Discard; }
+    bool confirmDelete() override { return false; }
+    std::optional<dicom_editor::AttributeInput> editAttribute(const std::string &, const std::string &) override { return std::nullopt; }
+    std::optional<dicom_editor::AttributeInput> addAttribute() override { return std::nullopt; }
+    void showError(const std::string &message) override { error = message; }
+    void presentDocument(std::vector<dicom_editor::DicomNode>, const std::string &, const std::string &) override {}
+    void presentOpenFiles(std::vector<dicom_editor::OpenDicomFile> files) override { openFiles = std::move(files); }
+    void presentPixelData(std::optional<dicom_editor::PixelDataPreview>) override {}
+    void setStatus(const std::string &) override {}
+};
 
 void require(bool condition) {
     if (!condition) {
@@ -257,6 +280,44 @@ void sharedTagParserValidatesHex() {
     require(!dicom_editor::parseTagKey("10000", "0010"));
 }
 
+void controllerOpensAndNavigatesMultipleFiles() {
+    const auto directory = std::filesystem::temp_directory_path();
+    const auto firstPath = directory / "dicom_editor_workspace_first.dcm";
+    const auto secondPath = directory / "dicom_editor_workspace_second.dcm";
+
+    DicomDocument first;
+    seedDataset(first);
+    first.dataset().putAndInsertString(DCM_PatientID, "PATIENT-1");
+    first.dataset().putAndInsertString(DCM_StudyDescription, "Workspace study");
+    first.dataset().putAndInsertString(DCM_SeriesDescription, "Series A");
+    require(first.saveAs(firstPath).has_value());
+
+    DicomDocument second;
+    seedDataset(second);
+    second.dataset().putAndInsertString(DCM_PatientID, "PATIENT-1");
+    second.dataset().putAndInsertString(DCM_StudyDescription, "Workspace study");
+    second.dataset().putAndInsertString(DCM_SeriesDescription, "Series B");
+    require(second.saveAs(secondPath).has_value());
+
+    ControllerView view;
+    view.chosenFiles = {firstPath, secondPath};
+    EditorController controller(view);
+    controller.openDocument();
+    require(view.error.empty());
+    require(view.openFiles.size() == 2);
+    require(view.openFiles[1].active);
+    require(view.openFiles[0].hierarchy.patientId == "PATIENT-1");
+    require(view.openFiles[0].hierarchy.studyLabel == "Workspace study");
+
+    controller.showPreviousDocument();
+    require(view.openFiles[0].active);
+    controller.showNextDocument();
+    require(view.openFiles[1].active);
+
+    std::filesystem::remove(firstPath);
+    std::filesystem::remove(secondPath);
+}
+
 } // namespace
 
 int main() {
@@ -273,6 +334,7 @@ int main() {
         pixelDataRendersForPreview();
         sharedUiModelFiltersAndFormats();
         sharedTagParserValidatesHex();
+        controllerOpensAndNavigatesMultipleFiles();
 
         std::println("All DICOM editor tests passed");
         return 0;
