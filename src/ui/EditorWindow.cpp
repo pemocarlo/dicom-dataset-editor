@@ -321,6 +321,18 @@ dicom_editor::SaveChangesChoice EditorWindow::confirmSaveChanges() {
     }
 }
 
+dicom_editor::SaveChangesChoice EditorWindow::confirmWorkspaceChanges(std::size_t dirtyCount) {
+    const int answer = fl_choice("%zu datasets have unsaved changes.", "Cancel", "Discard All", "Save All", dirtyCount);
+    switch (answer) {
+    case 1:
+        return dicom_editor::SaveChangesChoice::Discard;
+    case 2:
+        return dicom_editor::SaveChangesChoice::Save;
+    default:
+        return dicom_editor::SaveChangesChoice::Cancel;
+    }
+}
+
 bool EditorWindow::confirmDelete() { return fl_choice("Delete selected attribute?", "Cancel", "Delete", nullptr) == 1; }
 
 std::optional<dicom_editor::AttributeInput> EditorWindow::editAttribute(const std::string &title, const std::string &value) {
