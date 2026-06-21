@@ -27,15 +27,19 @@
 #include <dcmtk/ofstd/ofstring.h>
 #include <ofstd/oftypes.h>
 
+#include <algorithm>
+#include <charconv>
 #include <cstdio>
 #include <cstdlib>
 #include <expected>
 #include <format>
+#include <iterator>
 #include <limits>
 #include <optional>
 #include <print>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -233,8 +237,13 @@ void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &par
 
         auto &sequenceElement = static_cast<DcmSequenceOfItems &>(*element);
         for (unsigned long itemIndex = 0; itemIndex < sequenceElement.card(); ++itemIndex) {
-            std::vector<SequenceItemRef> itemParents = parents;
-            itemParents.push_back({key, itemIndex});
+            std::vector<SequenceItemRef> itemParents;
+            itemParents.reserve(parents.size() + 1);
+            std::transform(parents.begin(), parents.end(), std::back_inserter(itemParents), [](const SequenceItemRef &parent) {
+                return SequenceItemRef{.sequenceTag = DcmTagKey(parent.sequenceTag.getGroup(), parent.sequenceTag.getElement()),
+                                       .itemIndex = parent.itemIndex};
+            });
+            itemParents.push_back({.sequenceTag = DcmTagKey(key.getGroup(), key.getElement()), .itemIndex = itemIndex});
 
             const auto itemValue = std::format("#{}", itemIndex);
             DicomNode itemNode{
@@ -474,7 +483,23 @@ DicomHierarchy DicomDocument::hierarchy() const {
     result.patientLabel = labelOr(datasetString(mutableDataset, DCM_PatientName), result.patientId, "Unknown patient");
     result.studyLabel = labelOr(datasetString(mutableDataset, DCM_StudyDescription), result.studyId, "Unknown study");
     result.seriesLabel = labelOr(datasetString(mutableDataset, DCM_SeriesDescription), result.seriesId, "Unknown series");
+    const auto instance = attributeValue(DCM_InstanceNumber);
+    if (instance) {
+        long number{};
+        const auto [end, error] = std::from_chars(instance->data(), instance->data() + instance->size(), number);
+        if (error == std::errc{} && end == instance->data() + instance->size()) {
+            result.instanceNumber = number;
+        }
+    }
     return result;
+}
+
+std::optional<std::string> DicomDocument::attributeValue(const DcmTagKey &tag) const {
+    OFString value;
+    if (const_cast<DcmDataset &>(dataset()).findAndGetOFStringArray(tag, value).bad()) {
+        return std::nullopt;
+    }
+    return std::string{value};
 }
 
 bool DicomDocument::isDicomDirectory() const {

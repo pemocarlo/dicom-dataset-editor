@@ -34,7 +34,7 @@ void EditorController::refreshView() {
                                                                   active.filePath().string())
                                                     : "New dataset";
     view_.presentDocument(active.nodes(validationEnabled_), title, status);
-    view_.presentOpenFiles(workspace_.files(), workspace_.hasLoadedFiles());
+    view_.presentOpenFiles(workspace_.files(fileSortOrder_), workspace_.hasLoadedFiles());
     refreshPixelData();
 }
 
@@ -52,6 +52,23 @@ void EditorController::openFolder() {
         return;
     }
     openPaths(DicomWorkspace::discoverFiles(*folder));
+}
+
+void EditorController::openDicomDirectory() {
+    const auto path = view_.chooseDicomDirectory();
+    if (!path) {
+        return;
+    }
+    const auto paths = DicomWorkspace::discoverDicomDirectory(*path);
+    if (!paths) {
+        view_.showError(paths.error().what());
+        return;
+    }
+    if (paths->empty()) {
+        view_.showError("DICOMDIR contains no referenced files.");
+        return;
+    }
+    openPaths(*paths);
 }
 
 void EditorController::openPaths(const std::vector<std::filesystem::path> &paths) {
@@ -154,6 +171,32 @@ void EditorController::deleteAttribute(const DicomNode *selected) {
         refreshView();
     } catch (const std::exception &error) {
         reportError(error, false);
+    }
+}
+
+void EditorController::batchEdit(const BatchEditTarget &target) {
+    const auto report = workspace_.batchEditReport(target);
+    if (report.documentCount == 0) {
+        view_.showError("No open datasets match selected group.");
+        return;
+    }
+    const auto input = view_.batchEditAttribute(report);
+    if (!input || !input->tag) {
+        return;
+    }
+    try {
+        const auto changed = workspace_.batchEdit(target, *input->tag, input->value, validationEnabled_);
+        refreshView();
+        view_.setStatus(std::format("Batch edit applied to {} dataset(s). Save modified files individually.", changed));
+    } catch (const std::exception &error) {
+        reportError(error, true);
+    }
+}
+
+void EditorController::setFileSortOrder(FileSortOrder order) {
+    if (fileSortOrder_ != order) {
+        fileSortOrder_ = order;
+        view_.presentOpenFiles(workspace_.files(fileSortOrder_), workspace_.hasLoadedFiles());
     }
 }
 

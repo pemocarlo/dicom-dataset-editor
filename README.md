@@ -12,8 +12,9 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
 
 - Open one or many DICOM files at once.
 - Recursively scan a folder and keep every valid DICOM file open.
-- Recognize and skip DICOMDIR media directories instead of opening them as datasets.
-- Browse open files in a patient/study/series hierarchy and switch files without losing edits.
+- Open DICOMDIR media directories by following their referenced file records.
+- Browse open files in a patient/study/series hierarchy, sorted by Instance Number by default, and switch files without losing edits.
+- Batch-edit patient- or study-level attributes after reviewing consistency across matching datasets.
 - Browse recursive dataset tree, including sequence items.
 - Toggle an aspect-fitted pixel data preview with separate file and frame navigation and a draggable split, either below or beside the
   dataset.
@@ -26,13 +27,19 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
 - `File > Open Files...` (`Ctrl+O`) accepts multiple selections.
 - `File > Open Folder...` (`Ctrl+Shift+O`) scans the selected folder and its subfolders. Files that DCMTK cannot parse are skipped and
   summarized after the scan.
+- `File > Open DICOMDIR...` opens only files referenced by the selected DICOMDIR. Selecting a DICOMDIR as an ordinary dataset does not add
+  the directory object to the workspace.
 - Select a leaf in the left sidebar to activate that dataset. The hierarchy uses Patient, Study, and Series DICOM attributes, with stable
   identifiers shown where available.
+- File leaves show filenames only. Right-click a file for its full path and hierarchy details. Right-click a patient or study to review
+  consistency and batch-edit supported attributes across that group.
+- Files are ordered numerically by DICOM Instance Number, with missing numbers last. Toggle `View > Sort Files by Filename` for lexical
+  filename order.
 - The open-files panel stays hidden until a dataset is loaded. Toggle it with `View > Open Files Panel` and drag its right edge to resize it.
 - `View > Previous File` (`Ctrl+Page Up`) and `View > Next File` (`Ctrl+Page Down`) navigate the open workspace. The same controls are
   available in the pixel preview beside the independent frame controls.
-- An asterisk marks an open file with unsaved changes. Switching files keeps those changes in memory; closing prompts for each modified
-  dataset.
+- Bold text and an asterisk mark an open file with unsaved changes. Switching files and batch edits keep changes in memory; save affected
+  datasets normally, or resolve each modified dataset when closing.
 
 ## Quick Build
 

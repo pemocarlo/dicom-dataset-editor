@@ -1,8 +1,12 @@
 #pragma once
 
 #include "dicom_editor/DicomDocument.hpp"
+#include "dicom_editor/DicomError.hpp"
+
+#include <dcmtk/dcmdata/dctagkey.h>
 
 #include <cstddef>
+#include <expected>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -32,15 +36,40 @@ struct OpenFilesResult {
     std::vector<FileOpenFailure> failures;
 };
 
+enum class FileSortOrder { InstanceNumber, Filename };
+
+enum class BatchEditLevel { Patient, Study };
+
+struct BatchEditTarget {
+    BatchEditLevel level{};
+    std::string id;
+    std::string label;
+};
+
+struct BatchAttributeState {
+    DcmTagKey tag;
+    std::string name;
+    std::vector<std::string> values;
+};
+
+struct BatchEditReport {
+    BatchEditTarget target;
+    std::size_t documentCount{};
+    std::vector<BatchAttributeState> attributes;
+};
+
 /// Owns open DICOM datasets and active-file navigation.
 class DicomWorkspace {
   public:
     DicomWorkspace();
 
-    /// Adds valid datasets, ignores duplicates, and skips DICOMDIR files.
+    /// Adds valid image datasets and reports DICOMDIR inputs separately.
     [[nodiscard]] OpenFilesResult open(const std::vector<std::filesystem::path> &paths);
     /// Returns recursively discovered regular files in stable path order.
     [[nodiscard]] static std::vector<std::filesystem::path> discoverFiles(const std::filesystem::path &folder);
+    /// Resolves files referenced by a DICOMDIR without scanning unrelated files.
+    [[nodiscard]] static std::expected<std::vector<std::filesystem::path>, DicomError>
+    discoverDicomDirectory(const std::filesystem::path &path);
 
     /// Returns active document.
     [[nodiscard]] DicomDocument &active();
@@ -61,7 +90,12 @@ class DicomWorkspace {
     /// Activates next document when available.
     [[nodiscard]] bool activateNext();
     /// Projects workspace state for file-tree views.
-    [[nodiscard]] std::vector<OpenDicomFile> files() const;
+    [[nodiscard]] std::vector<OpenDicomFile> files(FileSortOrder order = FileSortOrder::InstanceNumber) const;
+    /// Builds consistency information for one patient or study group.
+    [[nodiscard]] BatchEditReport batchEditReport(const BatchEditTarget &target) const;
+    /// Applies one root attribute to every document in a patient or study group.
+    [[nodiscard]] std::size_t batchEdit(const BatchEditTarget &target, const DcmTagKey &tag, const std::string &value,
+                                        bool validate = true);
 
   private:
     std::vector<DicomDocument> documents_;

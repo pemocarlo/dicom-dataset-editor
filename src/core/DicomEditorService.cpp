@@ -3,6 +3,7 @@
 #include "dicom_editor/DicomDocument.hpp"
 #include "dicom_editor/DicomError.hpp"
 
+#include <dcmtk/dcmdata/dcdatset.h>
 #include <dcmtk/dcmdata/dcelem.h>
 #include <dcmtk/dcmdata/dcitem.h>
 #include <dcmtk/dcmdata/dctag.h>
@@ -48,6 +49,15 @@ void DicomEditorService::editValue(DicomDocument &document, const EditRequest &r
         validateValue(element.getTag(), request.value);
     }
     requireGood(element.putString(request.value.c_str()), std::format("Edit element {}", request.path.toString()));
+    document.markDirty();
+}
+
+void DicomEditorService::setAttribute(DicomDocument &document, const DcmTagKey &tag, const std::string &value, bool validate) {
+    const DcmTag dictionaryTag(tag);
+    if (validate) {
+        validateValue(dictionaryTag, value);
+    }
+    requireGood(document.dataset().putAndInsertString(tag, value.c_str(), true), "Set root attribute");
     document.markDirty();
 }
 

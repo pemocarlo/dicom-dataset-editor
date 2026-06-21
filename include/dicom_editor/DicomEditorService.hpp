@@ -37,6 +37,8 @@ class DicomEditorService {
   public:
     /// Replaces an existing element value.
     static void editValue(DicomDocument &document, const EditRequest &request);
+    /// Inserts or replaces a root-dataset attribute.
+    static void setAttribute(DicomDocument &document, const DcmTagKey &tag, const std::string &value, bool validate = true);
     /// Inserts a new attribute into a dataset item.
     static void addAttribute(DicomDocument &document, const AddAttributeRequest &request);
     /// Removes a scalar attribute.

@@ -47,6 +47,8 @@ class EditorView {
     [[nodiscard]] virtual std::vector<std::filesystem::path> chooseOpenFiles() = 0;
     /// Prompts for a folder to scan recursively.
     [[nodiscard]] virtual std::optional<std::filesystem::path> chooseOpenFolder() = 0;
+    /// Prompts for a DICOMDIR media directory file.
+    [[nodiscard]] virtual std::optional<std::filesystem::path> chooseDicomDirectory() = 0;
     /// Prompts for a file to save.
     [[nodiscard]] virtual std::optional<std::filesystem::path> chooseSaveFile() = 0;
     /// Resolves unsaved changes.
@@ -57,6 +59,8 @@ class EditorView {
     [[nodiscard]] virtual std::optional<AttributeInput> editAttribute(const std::string &title, const std::string &value) = 0;
     /// Collects the fields for a new attribute.
     [[nodiscard]] virtual std::optional<AttributeInput> addAttribute() = 0;
+    /// Reviews consistency and collects one scoped batch edit.
+    [[nodiscard]] virtual std::optional<AttributeInput> batchEditAttribute(const BatchEditReport &report) = 0;
     /// Shows an error message.
     virtual void showError(const std::string &message) = 0;
     /// Updates the document tree and window title.
@@ -81,6 +85,8 @@ class EditorController {
     void openDocument();
     /// Recursively opens all valid DICOM files from a chosen folder.
     void openFolder();
+    /// Opens only datasets referenced by a selected DICOMDIR.
+    void openDicomDirectory();
     /// Makes an open file active.
     void activateDocument(std::size_t index);
     /// Moves to the previous open file.
@@ -97,6 +103,10 @@ class EditorController {
     void addAttribute(const DicomNode *selected);
     /// Deletes the selected attribute.
     void deleteAttribute(const DicomNode *selected);
+    /// Reviews then edits one patient or study group.
+    void batchEdit(const BatchEditTarget &target);
+    /// Changes file-leaf ordering.
+    void setFileSortOrder(FileSortOrder order);
     /// Enables or disables value validation.
     void setValidationEnabled(bool enabled);
     /// Shows or hides pixel data.
@@ -123,6 +133,7 @@ class EditorController {
     EditorView &view_;
     DicomWorkspace workspace_;
     bool validationEnabled_{true};
+    FileSortOrder fileSortOrder_{FileSortOrder::InstanceNumber};
     bool pixelDataVisible_{};
     unsigned long pixelFrame_{};
     unsigned long pixelFrameCount_{};

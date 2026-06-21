@@ -7,7 +7,10 @@
 #include "dicom_editor/AttributeInput.hpp"
 #include "dicom_editor/DicomDocument.hpp"
 #include "dicom_editor/DicomNode.hpp"
+#include "dicom_editor/DicomWorkspace.hpp"
 #include "dicom_editor/EditorController.hpp"
+
+#include <dcmtk/dcmdata/dctagkey.h>
 
 #include <FL/Enumerations.H>
 #include <FL/Fl.H>
@@ -23,6 +26,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <format>
 #include <functional>
 #include <optional>
 #include <string>
@@ -42,6 +46,7 @@ constexpr int EditorPanelMinWidth = 400;
 enum class MenuAction : std::uint8_t {
     OpenFiles,
     OpenFolder,
+    OpenDicomDirectory,
     Save,
     SaveAs,
     Exit,
@@ -52,12 +57,14 @@ enum class MenuAction : std::uint8_t {
     PixelDataPreview,
     PixelDataPreviewVertical,
     OpenFilesPanel,
+    SortFilesByFilename,
     PreviousFile,
     NextFile,
 };
 
 MenuAction openFilesAction = MenuAction::OpenFiles;
 MenuAction openFolderAction = MenuAction::OpenFolder;
+MenuAction openDicomDirectoryAction = MenuAction::OpenDicomDirectory;
 MenuAction saveAction = MenuAction::Save;
 MenuAction saveAsAction = MenuAction::SaveAs;
 MenuAction exitAction = MenuAction::Exit;
@@ -68,6 +75,7 @@ MenuAction validateValuesAction = MenuAction::ValidateValues;
 MenuAction pixelDataPreviewAction = MenuAction::PixelDataPreview;
 MenuAction pixelDataPreviewVerticalAction = MenuAction::PixelDataPreviewVertical;
 MenuAction openFilesPanelAction = MenuAction::OpenFilesPanel;
+MenuAction sortFilesByFilenameAction = MenuAction::SortFilesByFilename;
 MenuAction previousFileAction = MenuAction::PreviousFile;
 MenuAction nextFileAction = MenuAction::NextFile;
 
@@ -177,8 +185,8 @@ class FileTreeSplitter final : public Fl_Widget {
     int dragOffset_{};
 };
 
-std::optional<std::filesystem::path> chooseFile(Fl_Native_File_Chooser::Type type, const char *title) {
-    Fl_Native_File_Chooser chooser(type);
+std::optional<std::filesystem::path> chooseSaveFile(const char *title) {
+    Fl_Native_File_Chooser chooser(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
     chooser.title(title);
     chooser.filter("DICOM files\t*.dcm\nAll files\t*");
     if (chooser.show() != 0) {
@@ -211,6 +219,7 @@ EditorWindow::EditorWindow() : Fl_Double_Window(1180, 760, "DICOM Dataset Editor
     menu_ = new Fl_Menu_Bar(0, 0, w(), MenuHeight);
     menu_->add("&File/&Open Files...", FL_CTRL + 'o', menuCallback, &openFilesAction);
     menu_->add("&File/Open &Folder...", FL_CTRL + FL_SHIFT + 'o', menuCallback, &openFolderAction);
+    menu_->add("&File/Open &DICOMDIR...", 0, menuCallback, &openDicomDirectoryAction);
     menu_->add("&File/&Save", FL_CTRL + 's', menuCallback, &saveAction);
     menu_->add("&File/Save &As...", FL_CTRL + FL_SHIFT + 's', menuCallback, &saveAsAction);
     menu_->add("&File/E&xit", 0, menuCallback, &exitAction);
@@ -221,11 +230,13 @@ EditorWindow::EditorWindow() : Fl_Double_Window(1180, 760, "DICOM Dataset Editor
     menu_->add("&View/&Pixel Data Preview", 0, menuCallback, &pixelDataPreviewAction, FL_MENU_TOGGLE);
     menu_->add("&View/Pixel Data Preview on &Right", 0, menuCallback, &pixelDataPreviewVerticalAction, FL_MENU_TOGGLE);
     menu_->add("&View/&Open Files Panel", 0, menuCallback, &openFilesPanelAction, FL_MENU_TOGGLE);
+    menu_->add("&View/Sort Files by &Filename", 0, menuCallback, &sortFilesByFilenameAction, FL_MENU_TOGGLE);
     menu_->add("&View/&Previous File", FL_CTRL + FL_Page_Up, menuCallback, &previousFileAction);
     menu_->add("&View/&Next File", FL_CTRL + FL_Page_Down, menuCallback, &nextFileAction);
 
     fileTreePanel_ = new FileTreePanel(0, MenuHeight, fileTreePanelExtent_, h() - MenuHeight - StatusHeight);
     fileTreePanel_->setActivationHandler([this](std::size_t index) { controller_.activateDocument(index); });
+    fileTreePanel_->setBatchEditHandler([this](const dicom_editor::BatchEditTarget &target) { controller_.batchEdit(target); });
     fileTreePanel_->hide();
 
     fileTreeSplitter_ = new FileTreeSplitter(0, MenuHeight, FileTreeSplitterWidth, h() - MenuHeight - StatusHeight, *this);
@@ -278,11 +289,17 @@ std::vector<std::filesystem::path> EditorWindow::chooseOpenFiles() {
 }
 
 std::optional<std::filesystem::path> EditorWindow::chooseOpenFolder() {
-    return chooseFile(Fl_Native_File_Chooser::BROWSE_DIRECTORY, "Open Folder of DICOM Files");
+    Fl_Native_File_Chooser chooser(Fl_Native_File_Chooser::BROWSE_DIRECTORY);
+    chooser.title("Open Folder of DICOM Files");
+    return chooser.show() == 0 ? std::optional<std::filesystem::path>{chooser.filename()} : std::nullopt;
 }
 
-std::optional<std::filesystem::path> EditorWindow::chooseSaveFile() {
-    return chooseFile(Fl_Native_File_Chooser::BROWSE_SAVE_FILE, "Save DICOM File");
+std::optional<std::filesystem::path> EditorWindow::chooseSaveFile() { return ::chooseSaveFile("Save DICOM File"); }
+
+std::optional<std::filesystem::path> EditorWindow::chooseDicomDirectory() {
+    Fl_Native_File_Chooser chooser(Fl_Native_File_Chooser::BROWSE_FILE);
+    chooser.title("Open DICOMDIR");
+    return chooser.show() == 0 ? std::optional<std::filesystem::path>{chooser.filename()} : std::nullopt;
 }
 
 dicom_editor::SaveChangesChoice EditorWindow::confirmSaveChanges() {
@@ -304,6 +321,24 @@ std::optional<dicom_editor::AttributeInput> EditorWindow::editAttribute(const st
 }
 
 std::optional<dicom_editor::AttributeInput> EditorWindow::addAttribute() { return AttributeDialog::add(); }
+
+std::optional<dicom_editor::AttributeInput> EditorWindow::batchEditAttribute(const dicom_editor::BatchEditReport &report) {
+    std::string summary =
+        std::format("{} dataset(s) in {} '{}'.\n\n", report.documentCount,
+                    report.target.level == dicom_editor::BatchEditLevel::Patient ? "patient" : "study", report.target.label);
+    for (const auto &attribute : report.attributes) {
+        summary += std::format("{} ({:04x},{:04x}): ", attribute.name, attribute.tag.getGroup(), attribute.tag.getElement());
+        for (std::size_t index = 0; index < attribute.values.size(); ++index) {
+            summary += (index == 0 ? "" : " | ") + attribute.values[index];
+        }
+        summary += attribute.values.size() <= 1 ? " [consistent]\n" : " [DIFFERS]\n";
+    }
+    summary += "\nContinue to choose one listed level attribute and replacement value?";
+    if (fl_choice("%s", "Cancel", "Continue", nullptr, summary.c_str()) != 1) {
+        return std::nullopt;
+    }
+    return AttributeDialog::batch(report);
+}
 
 void EditorWindow::showError(const std::string &message) { fl_alert("%s", message.c_str()); }
 
@@ -452,6 +487,9 @@ void EditorWindow::menuCallback(Fl_Widget *widget, void *data) {
     case MenuAction::OpenFolder:
         window->controller_.openFolder();
         break;
+    case MenuAction::OpenDicomDirectory:
+        window->controller_.openDicomDirectory();
+        break;
     case MenuAction::Save:
         window->controller_.saveDocument();
         break;
@@ -481,6 +519,10 @@ void EditorWindow::menuCallback(Fl_Widget *widget, void *data) {
         break;
     case MenuAction::OpenFilesPanel:
         window->setFileTreeVisible(window->menu_->mvalue()->value() != 0);
+        break;
+    case MenuAction::SortFilesByFilename:
+        window->controller_.setFileSortOrder(window->menu_->mvalue()->value() != 0 ? dicom_editor::FileSortOrder::Filename
+                                                                                   : dicom_editor::FileSortOrder::InstanceNumber);
         break;
     case MenuAction::PreviousFile:
         window->controller_.showPreviousDocument();
