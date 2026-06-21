@@ -56,6 +56,7 @@ enum class MenuAction : std::uint8_t {
     Add,
     Delete,
     ValidateValues,
+    LoadDataDictionary,
     PixelDataPreview,
     PixelDataPreviewVertical,
     OpenFilesPanel,
@@ -76,6 +77,7 @@ MenuAction editAction = MenuAction::Edit;
 MenuAction addAction = MenuAction::Add;
 MenuAction deleteAction = MenuAction::Delete;
 MenuAction validateValuesAction = MenuAction::ValidateValues;
+MenuAction loadDataDictionaryAction = MenuAction::LoadDataDictionary;
 MenuAction pixelDataPreviewAction = MenuAction::PixelDataPreview;
 MenuAction pixelDataPreviewVerticalAction = MenuAction::PixelDataPreviewVertical;
 MenuAction openFilesPanelAction = MenuAction::OpenFilesPanel;
@@ -233,6 +235,7 @@ EditorWindow::EditorWindow() : Fl_Double_Window(1180, 760, "DICOM Dataset Editor
     menu_->add("&Edit/&Add Attribute...", FL_CTRL + 'n', menuCallback, &addAction);
     menu_->add("&Edit/&Delete Attribute", FL_Delete, menuCallback, &deleteAction);
     menu_->add("&Settings/&Validate DICOM Values", 0, menuCallback, &validateValuesAction, FL_MENU_TOGGLE | FL_MENU_VALUE);
+    menu_->add("&Settings/&Load Data Dictionary...", 0, menuCallback, &loadDataDictionaryAction);
     menu_->add("&View/&Pixel Data Preview", 0, menuCallback, &pixelDataPreviewAction, FL_MENU_TOGGLE);
     menu_->add("&View/Pixel Data Preview on &Right", 0, menuCallback, &pixelDataPreviewVerticalAction, FL_MENU_TOGGLE);
     menu_->add("&View/&Open Files Panel", 0, menuCallback, &openFilesPanelAction, FL_MENU_TOGGLE);
@@ -306,6 +309,13 @@ std::optional<std::filesystem::path> EditorWindow::chooseSaveFile() { return ::c
 std::optional<std::filesystem::path> EditorWindow::chooseDicomDirectory() {
     Fl_Native_File_Chooser chooser(Fl_Native_File_Chooser::BROWSE_FILE);
     chooser.title("Open DICOMDIR");
+    return chooser.show() == 0 ? std::optional<std::filesystem::path>{chooser.filename()} : std::nullopt;
+}
+
+std::optional<std::filesystem::path> EditorWindow::chooseDataDictionary() {
+    Fl_Native_File_Chooser chooser(Fl_Native_File_Chooser::BROWSE_FILE);
+    chooser.title("Load DCMTK Data Dictionary");
+    chooser.filter("DCMTK dictionaries\t*.dic\nAll files\t*");
     return chooser.show() == 0 ? std::optional<std::filesystem::path>{chooser.filename()} : std::nullopt;
 }
 
@@ -539,6 +549,9 @@ void EditorWindow::menuCallback(Fl_Widget *widget, void *data) {
         break;
     case MenuAction::ValidateValues:
         window->controller_.setValidationEnabled(window->menu_->mvalue()->value() != 0);
+        break;
+    case MenuAction::LoadDataDictionary:
+        window->controller_.loadDataDictionary();
         break;
     case MenuAction::PixelDataPreview:
         window->controller_.setPixelDataVisible(window->menu_->mvalue()->value() != 0);

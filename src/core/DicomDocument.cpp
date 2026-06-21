@@ -1,8 +1,8 @@
 #include "dicom_editor/core/DicomDocument.hpp"
 
+#include "dicom_editor/core/DicomDictionary.hpp"
 #include "dicom_editor/core/DicomError.hpp"
 #include "dicom_editor/core/DicomPath.hpp"
-#include "dicom_editor/RuntimePaths.hpp"
 
 #include <dcmtk/dcmdata/dcdatset.h>
 #include <dcmtk/dcmdata/dcdeftag.h>
@@ -30,7 +30,6 @@
 #include <algorithm>
 #include <charconv>
 #include <cstdio>
-#include <cstdlib>
 #include <expected>
 #include <format>
 #include <iterator>
@@ -121,30 +120,6 @@ void requireGood(const OFCondition &condition, const std::string &action) {
 
 std::expected<void, DicomError> makeUnexpected(std::string action, const OFCondition &condition) {
     return std::unexpected(DicomError(std::format("{}: {}", action, conditionMessage(condition))));
-}
-
-void setDictionaryPath(const std::filesystem::path &path) {
-#ifdef _WIN32
-    _putenv_s("DCMDICTPATH", path.string().c_str());
-#else
-    setenv("DCMDICTPATH", path.string().c_str(), 1);
-#endif
-}
-
-void ensureDictionaryPath() {
-    const auto installedPath = installedDataPath("dcmtk/dicom.dic");
-    const char *current = std::getenv("DCMDICTPATH");
-    if ((current == nullptr || !std::filesystem::exists(current)) && std::filesystem::exists(installedPath)) {
-        setDictionaryPath(installedPath);
-        return;
-    }
-
-#ifdef DICOM_EDITOR_DCMTK_DICT_FILE
-    const auto configuredPath = std::filesystem::path(DICOM_EDITOR_DCMTK_DICT_FILE);
-    if ((current == nullptr || !std::filesystem::exists(current)) && std::filesystem::exists(configuredPath)) {
-        setDictionaryPath(configuredPath);
-    }
-#endif
 }
 
 std::string tagToString(const DcmTagKey &key) { return std::format("({:04x},{:04x})", key.getGroup(), key.getElement()); }
@@ -292,7 +267,7 @@ const DcmItem &resolveItem(const DcmItem &root, const DicomPath &path) { return 
 } // namespace
 
 DicomDocument::DicomDocument() {
-    ensureDictionaryPath();
+    ensureEmbeddedDicomDictionary();
     createEmpty();
 }
 

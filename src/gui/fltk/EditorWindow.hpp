@@ -36,6 +36,7 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     [[nodiscard]] std::vector<std::filesystem::path> chooseOpenFiles() override;
     [[nodiscard]] std::optional<std::filesystem::path> chooseOpenFolder() override;
     [[nodiscard]] std::optional<std::filesystem::path> chooseDicomDirectory() override;
+    [[nodiscard]] std::optional<std::filesystem::path> chooseDataDictionary() override;
     [[nodiscard]] std::optional<std::filesystem::path> chooseSaveFile() override;
     [[nodiscard]] dicom_editor::SaveChangesChoice confirmSaveChanges() override;
     [[nodiscard]] dicom_editor::SaveChangesChoice confirmWorkspaceChanges(std::size_t dirtyCount) override;
