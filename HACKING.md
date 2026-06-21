@@ -174,12 +174,13 @@ the official LLVM installer and point the editor at its `bin` directory.
 ## Code Layout
 
 - `DicomDocument`: DICOM file ownership, load/save, dirty state, recursive node listing, and patient/study/series metadata.
-- `DicomWorkspace`: document ownership, recursive file discovery, duplicate handling, DICOMDIR exclusion, and active-file navigation.
+- `DicomWorkspace`: document ownership, recursive discovery, DICOMDIR reference resolution, sorting, scoped batch edits, duplicate handling,
+  and active-file navigation.
 - `EditorController`: UI-independent use-case orchestration, editing workflows, preview state, and action state.
-- `FileTreePanel`: collapsible patient/study/series/file workspace navigation.
+- `FileTreePanel`: collapsible workspace presentation, context menus, and typed activation/batch-edit event forwarding.
 - `PixelDataPanel`: optional scaled pixel preview with separate file/frame navigation and a resizable split view below or beside the dataset.
 - `DicomPath`: stable path through sequence items and optional element tag.
-- `DicomEditorService`: add/edit/delete operations.
+- `DicomEditorService`: validated add/edit/delete/upsert operations.
 - `DatasetViewModel`: filtering and row presentation.
 - `EditorWindow`: FLTK menus, dialogs, and app-level event wiring.
 - `DatasetPanel`: FLTK dataset table, focus, and keyboard navigation.

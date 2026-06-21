@@ -10,6 +10,8 @@
 
 #include <dcmtk/dcmdata/dcdatset.h>
 #include <dcmtk/dcmdata/dcdeftag.h>
+#include <dcmtk/dcmdata/dcdicdir.h>
+#include <dcmtk/dcmdata/dcdirrec.h>
 #include <dcmtk/dcmdata/dcelem.h>
 #include <dcmtk/dcmdata/dcitem.h>
 #include <dcmtk/dcmdata/dcsequen.h>
@@ -17,6 +19,7 @@
 #include <dcmtk/dcmdata/dcuid.h>
 #include <dcmtk/dcmdata/dcxfer.h>
 #include <dcmtk/ofstd/ofcond.h>
+#include <dcmtk/ofstd/offile.h>
 #include <dcmtk/ofstd/ofstring.h>
 #include <ofstd/oftypes.h>
 
@@ -25,9 +28,11 @@
 #include <exception>
 #include <expected>
 #include <filesystem>
+#include <format>
 #include <optional>
 #include <print>
 #include <ranges>
+#include <source_location>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -53,11 +58,13 @@ class ControllerView final : public dicom_editor::EditorView {
 
     std::vector<std::filesystem::path> chooseOpenFiles() override { return chosenFiles; }
     std::optional<std::filesystem::path> chooseOpenFolder() override { return std::nullopt; }
+    std::optional<std::filesystem::path> chooseDicomDirectory() override { return std::nullopt; }
     std::optional<std::filesystem::path> chooseSaveFile() override { return std::nullopt; }
     dicom_editor::SaveChangesChoice confirmSaveChanges() override { return dicom_editor::SaveChangesChoice::Discard; }
     bool confirmDelete() override { return false; }
     std::optional<dicom_editor::AttributeInput> editAttribute(const std::string &, const std::string &) override { return std::nullopt; }
     std::optional<dicom_editor::AttributeInput> addAttribute() override { return std::nullopt; }
+    std::optional<dicom_editor::AttributeInput> batchEditAttribute(const dicom_editor::BatchEditReport &) override { return std::nullopt; }
     void showError(const std::string &message) override { error = message; }
     void presentDocument(std::vector<dicom_editor::DicomNode>, const std::string &, const std::string &) override {}
     void presentOpenFiles(const std::vector<dicom_editor::OpenDicomFile> &files, bool) override { openFiles = files; }
@@ -65,9 +72,9 @@ class ControllerView final : public dicom_editor::EditorView {
     void setStatus(const std::string &) override {}
 };
 
-void require(bool condition) {
+void require(bool condition, const std::source_location location = std::source_location::current()) {
     if (!condition) {
-        throw std::runtime_error("test requirement failed");
+        throw std::runtime_error(std::format("test requirement failed at {}:{}", location.file_name(), location.line()));
     }
 }
 
@@ -342,6 +349,92 @@ void dicomDirectoryIsRecognizedAndSkipped() {
     std::filesystem::remove(path);
 }
 
+void workspaceSortsByInstanceOrFilename() {
+    const auto directory = std::filesystem::temp_directory_path();
+    const auto firstPath = directory / "z-last-name.dcm";
+    const auto secondPath = directory / "a-first-name.dcm";
+    DicomDocument first;
+    seedDataset(first);
+    first.dataset().putAndInsertString(DCM_InstanceNumber, "2");
+    require(first.saveAs(firstPath).has_value());
+    DicomDocument second;
+    seedDataset(second);
+    second.dataset().putAndInsertString(DCM_InstanceNumber, "10");
+    require(second.saveAs(secondPath).has_value());
+
+    DicomWorkspace workspace;
+    require(workspace.open({secondPath, firstPath}).opened == 2);
+    const auto byInstance = workspace.files();
+    require(byInstance[0].path == firstPath);
+    const auto byFilename = workspace.files(dicom_editor::FileSortOrder::Filename);
+    require(byFilename[0].path == secondPath);
+
+    std::filesystem::remove(firstPath);
+    std::filesystem::remove(secondPath);
+}
+
+void batchEditReportsDifferencesAndUpdatesScope() {
+    const auto directory = std::filesystem::temp_directory_path();
+    const auto firstPath = directory / "dicom_editor_batch_first.dcm";
+    const auto secondPath = directory / "dicom_editor_batch_second.dcm";
+    DicomDocument first;
+    seedDataset(first);
+    first.dataset().putAndInsertString(DCM_PatientID, "BATCH-PATIENT");
+    require(first.saveAs(firstPath).has_value());
+    DicomDocument second;
+    seedDataset(second);
+    second.dataset().putAndInsertString(DCM_PatientID, "BATCH-PATIENT");
+    second.dataset().putAndInsertString(DCM_PatientName, "Different^Patient");
+    require(second.saveAs(secondPath).has_value());
+
+    DicomWorkspace workspace;
+    require(workspace.open({firstPath, secondPath}).opened == 2);
+    const dicom_editor::BatchEditTarget target{
+        .level = dicom_editor::BatchEditLevel::Patient, .id = "BATCH-PATIENT", .label = "Before^Patient"};
+    const auto report = workspace.batchEditReport(target);
+    require(report.documentCount == 2);
+    require(report.attributes.front().values.size() == 2);
+    require(workspace.batchEdit(target, DCM_PatientName, "Unified^Patient") == 2);
+    require(workspace.at(0).attributeValue(DCM_PatientName) == "Unified^Patient");
+    require(workspace.at(1).attributeValue(DCM_PatientName) == "Unified^Patient");
+    require(workspace.at(0).dirty() && workspace.at(1).dirty());
+
+    std::filesystem::remove(firstPath);
+    std::filesystem::remove(secondPath);
+}
+
+void dicomDirectoryResolvesReferencedFiles() {
+    const auto directory = std::filesystem::temp_directory_path() / "dicom_editor_dicomdir_test";
+    const auto imagePath = directory / "IMG0001";
+    const auto dicomdirPath = directory / "DICOMDIR";
+    std::filesystem::create_directories(directory);
+    DicomDocument image;
+    seedDataset(image);
+    require(image.saveAs(imagePath).has_value());
+    {
+        DcmDicomDir dicomdir(dicomdirPath.string().c_str(), "EDITOR_TEST");
+        auto *patient = new DcmDirectoryRecord(ERT_Patient, nullptr, OFFilename());
+        auto *study = new DcmDirectoryRecord(ERT_Study, nullptr, OFFilename());
+        auto *series = new DcmDirectoryRecord(ERT_Series, nullptr, OFFilename());
+        auto *imageRecord = new DcmDirectoryRecord(ERT_Image, "IMG0001", imagePath.string().c_str());
+        require(patient->error().good() && study->error().good() && series->error().good() && imageRecord->error().good());
+        require(series->insertSub(imageRecord).good());
+        require(study->insertSub(series).good());
+        require(patient->insertSub(study).good());
+        require(dicomdir.getRootRecord().insertSub(patient).good());
+        require(dicomdir.write().good());
+    }
+
+    const auto referenced = DicomWorkspace::discoverDicomDirectory(dicomdirPath);
+    require(referenced.has_value());
+    require(referenced->size() == 1);
+    require(referenced->front() == imagePath);
+    DicomWorkspace workspace;
+    require(workspace.open(*referenced).opened == 1);
+
+    std::filesystem::remove_all(directory);
+}
+
 } // namespace
 
 int main() {
@@ -360,6 +453,9 @@ int main() {
         sharedTagParserValidatesHex();
         controllerOpensAndNavigatesMultipleFiles();
         dicomDirectoryIsRecognizedAndSkipped();
+        workspaceSortsByInstanceOrFilename();
+        batchEditReportsDifferencesAndUpdatesScope();
+        dicomDirectoryResolvesReferencedFiles();
 
         std::println("All DICOM editor tests passed");
         return 0;
