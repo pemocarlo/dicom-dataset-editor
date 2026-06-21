@@ -3,6 +3,7 @@
 #include "EmbeddedDictionary.hpp"
 
 #include <dcmtk/dcmdata/dcdict.h>
+#include <ofstd/oftypes.h>
 
 #include <atomic>
 #include <chrono>
@@ -22,7 +23,11 @@ namespace dicom_editor {
 namespace {
 
 std::mutex sourceMutex;
-std::string activeSource = "embedded DCMTK dictionary";
+
+std::string &activeSource() {
+    static std::string source = "embedded DCMTK dictionary";
+    return source;
+}
 
 class DictionaryWriteLock final {
   public:
@@ -85,7 +90,7 @@ std::expected<DicomDictionaryInfo, DicomError> replaceDictionary(const std::file
 
     {
         const std::scoped_lock lock(sourceMutex);
-        activeSource = source;
+        activeSource() = source;
     }
     return DicomDictionaryInfo{.source = std::move(source), .entryCount = entryCount};
 }
@@ -121,7 +126,7 @@ std::expected<DicomDictionaryInfo, DicomError> loadDicomDictionary(const std::fi
 
 std::string dicomDictionarySource() {
     const std::scoped_lock lock(sourceMutex);
-    return activeSource;
+    return activeSource();
 }
 
 } // namespace dicom_editor

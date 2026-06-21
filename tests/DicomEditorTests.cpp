@@ -1,13 +1,13 @@
+#include "dicom_editor/application/EditorController.hpp"
 #include "dicom_editor/core/AttributeInput.hpp"
 #include "dicom_editor/core/DatasetViewModel.hpp"
-#include "dicom_editor/core/DicomDocument.hpp"
 #include "dicom_editor/core/DicomDictionary.hpp"
+#include "dicom_editor/core/DicomDocument.hpp"
 #include "dicom_editor/core/DicomEditorService.hpp"
 #include "dicom_editor/core/DicomError.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomPath.hpp"
 #include "dicom_editor/core/DicomWorkspace.hpp"
-#include "dicom_editor/application/EditorController.hpp"
 
 #include <dcmtk/dcmdata/dcdatset.h>
 #include <dcmtk/dcmdata/dcdeftag.h>

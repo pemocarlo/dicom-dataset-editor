@@ -85,6 +85,7 @@ target_sources(dicom_editor_core
         FILES
             ${DICOM_EDITOR_PUBLIC_HEADERS}
 )
+target_include_directories(dicom_editor_core PRIVATE src/core)
 target_link_libraries(dicom_editor_core PUBLIC dcmtk::dcmtk)
 
 add_library(dicom_editor_application STATIC)
