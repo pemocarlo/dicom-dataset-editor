@@ -1,7 +1,7 @@
 #pragma once
 
-#include "dicom_editor/DicomDocument.hpp"
-#include "dicom_editor/DicomError.hpp"
+#include "dicom_editor/core/DicomDocument.hpp"
+#include "dicom_editor/core/DicomError.hpp"
 
 #include <dcmtk/dcmdata/dctagkey.h>
 

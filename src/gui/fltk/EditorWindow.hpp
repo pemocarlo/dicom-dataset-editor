@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dicom_editor/EditorController.hpp"
+#include "dicom_editor/application/EditorController.hpp"
 
 #include <FL/Fl_Double_Window.H>
 

@@ -1,7 +1,7 @@
-#include "dicom_editor/DicomDocument.hpp"
+#include "dicom_editor/core/DicomDocument.hpp"
 
-#include "dicom_editor/DicomError.hpp"
-#include "dicom_editor/DicomPath.hpp"
+#include "dicom_editor/core/DicomError.hpp"
+#include "dicom_editor/core/DicomPath.hpp"
 #include "dicom_editor/RuntimePaths.hpp"
 
 #include <dcmtk/dcmdata/dcdatset.h>

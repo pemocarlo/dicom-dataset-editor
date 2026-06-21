@@ -33,15 +33,14 @@ if(UNIX AND NOT APPLE)
 endif()
 
 set(DICOM_EDITOR_PUBLIC_HEADERS
-    include/dicom_editor/AttributeInput.hpp
-    include/dicom_editor/DatasetViewModel.hpp
-    include/dicom_editor/DicomDocument.hpp
-    include/dicom_editor/DicomEditorService.hpp
-    include/dicom_editor/DicomError.hpp
-    include/dicom_editor/DicomNode.hpp
-    include/dicom_editor/DicomPath.hpp
-    include/dicom_editor/DicomWorkspace.hpp
-    include/dicom_editor/EditorController.hpp
+    include/dicom_editor/core/AttributeInput.hpp
+    include/dicom_editor/core/DatasetViewModel.hpp
+    include/dicom_editor/core/DicomDocument.hpp
+    include/dicom_editor/core/DicomEditorService.hpp
+    include/dicom_editor/core/DicomError.hpp
+    include/dicom_editor/core/DicomNode.hpp
+    include/dicom_editor/core/DicomPath.hpp
+    include/dicom_editor/core/DicomWorkspace.hpp
     include/dicom_editor/RuntimePaths.hpp
 )
 set(DICOM_EDITOR_CORE_SOURCES
@@ -52,7 +51,6 @@ set(DICOM_EDITOR_CORE_SOURCES
     src/core/DicomNode.cpp
     src/core/DicomPath.cpp
     src/core/DicomWorkspace.cpp
-    src/core/EditorController.cpp
 )
 
 set(DICOM_EDITOR_DCMTK_DICT_FILE "" CACHE FILEPATH "Path to DCMTK's dicom.dic")
@@ -81,33 +79,54 @@ target_compile_definitions(dicom_editor_core
         DICOM_EDITOR_INSTALL_DATADIR="../share/dicom-dataset-editor"
 )
 
-set(DICOM_EDITOR_UI_HEADERS
-    src/ui/AttributeDialog.hpp
-    src/ui/DatasetPanel.hpp
-    src/ui/EditorWindow.hpp
-    src/ui/FileTreePanel.hpp
-    src/ui/PixelDataPanel.hpp
+add_library(dicom_editor_application STATIC)
+add_library(DicomDatasetEditor::application ALIAS dicom_editor_application)
+target_sources(dicom_editor_application
+    PRIVATE
+        src/application/EditorController.cpp
+    PUBLIC
+        FILE_SET HEADERS
+        BASE_DIRS include
+        FILES
+            include/dicom_editor/application/EditorController.hpp
 )
-set(DICOM_EDITOR_UI_SOURCES
-    src/ui/App.cpp
-    src/ui/AttributeDialog.cpp
-    src/ui/DatasetPanel.cpp
-    src/ui/EditorWindow.cpp
-    src/ui/FileTreePanel.cpp
-    src/ui/PixelDataPanel.cpp
+target_link_libraries(dicom_editor_application PUBLIC DicomDatasetEditor::core)
+
+set(DICOM_EDITOR_FLTK_HEADERS
+    src/gui/fltk/AttributeDialog.hpp
+    src/gui/fltk/DatasetPanel.hpp
+    src/gui/fltk/EditorWindow.hpp
+    src/gui/fltk/FileTreePanel.hpp
+    src/gui/fltk/PixelDataPanel.hpp
 )
-set(DICOM_EDITOR_UI_LIBRARIES fltk::fltk)
-if(TARGET PkgConfig::DICOM_EDITOR_FLTK_WAYLAND)
-    list(APPEND DICOM_EDITOR_UI_LIBRARIES PkgConfig::DICOM_EDITOR_FLTK_WAYLAND)
-endif()
+set(DICOM_EDITOR_FLTK_SOURCES
+    src/gui/fltk/AttributeDialog.cpp
+    src/gui/fltk/DatasetPanel.cpp
+    src/gui/fltk/EditorWindow.cpp
+    src/gui/fltk/FileTreePanel.cpp
+    src/gui/fltk/PixelDataPanel.cpp
+)
+add_library(dicom_editor_fltk STATIC)
+add_library(DicomDatasetEditor::fltk ALIAS dicom_editor_fltk)
+target_sources(dicom_editor_fltk
+    PRIVATE
+        ${DICOM_EDITOR_FLTK_HEADERS}
+        ${DICOM_EDITOR_FLTK_SOURCES}
+)
+target_link_libraries(dicom_editor_fltk
+    PUBLIC
+        DicomDatasetEditor::application
+        fltk::fltk
+    PRIVATE
+        $<$<TARGET_EXISTS:PkgConfig::DICOM_EDITOR_FLTK_WAYLAND>:PkgConfig::DICOM_EDITOR_FLTK_WAYLAND>
+)
 
 add_executable(dicom-dataset-editor WIN32)
 target_sources(dicom-dataset-editor
     PRIVATE
-        ${DICOM_EDITOR_UI_HEADERS}
-        ${DICOM_EDITOR_UI_SOURCES}
+        src/gui/fltk/App.cpp
 )
-target_link_libraries(dicom-dataset-editor PRIVATE dicom_editor_core ${DICOM_EDITOR_UI_LIBRARIES})
+target_link_libraries(dicom-dataset-editor PRIVATE DicomDatasetEditor::fltk)
 
 install(TARGETS dicom-dataset-editor)
 install(
@@ -120,7 +139,7 @@ if(BUILD_TESTING)
     set(DICOM_EDITOR_TEST_SOURCES tests/DicomEditorTests.cpp)
     add_executable(dicom_editor_tests)
     target_sources(dicom_editor_tests PRIVATE ${DICOM_EDITOR_TEST_SOURCES})
-    target_link_libraries(dicom_editor_tests PRIVATE dicom_editor_core)
+    target_link_libraries(dicom_editor_tests PRIVATE DicomDatasetEditor::application)
     add_test(NAME dicom_editor_tests COMMAND dicom_editor_tests)
 endif()
 

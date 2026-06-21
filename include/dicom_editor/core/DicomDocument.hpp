@@ -1,7 +1,7 @@
 #pragma once
 
-#include "dicom_editor/DicomError.hpp"
-#include "dicom_editor/DicomNode.hpp"
+#include "dicom_editor/core/DicomError.hpp"
+#include "dicom_editor/core/DicomNode.hpp"
 
 #include <dcmtk/dcmdata/dcfilefo.h>
 

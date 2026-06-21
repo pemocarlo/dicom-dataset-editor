@@ -1,7 +1,7 @@
 #include "DatasetPanel.hpp"
 
-#include "dicom_editor/DatasetViewModel.hpp"
-#include "dicom_editor/DicomNode.hpp"
+#include "dicom_editor/core/DatasetViewModel.hpp"
+#include "dicom_editor/core/DicomNode.hpp"
 
 #include <FL/Enumerations.H>
 #include <FL/Fl.H>

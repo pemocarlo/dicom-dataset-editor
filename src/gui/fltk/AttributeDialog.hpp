@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dicom_editor/AttributeInput.hpp"
+#include "dicom_editor/core/AttributeInput.hpp"
 
 #include <optional>
 #include <string>

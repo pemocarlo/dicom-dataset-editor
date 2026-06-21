@@ -1,4 +1,4 @@
-#include "dicom_editor/DicomPath.hpp"
+#include "dicom_editor/core/DicomPath.hpp"
 
 #include <dcmtk/dcmdata/dctagkey.h>
 

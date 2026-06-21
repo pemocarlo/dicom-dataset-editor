@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dicom_editor/DicomPath.hpp"
+#include "dicom_editor/core/DicomPath.hpp"
 
 #include <string>
 

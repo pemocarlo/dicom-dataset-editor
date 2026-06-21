@@ -1,7 +1,7 @@
 #include "AttributeDialog.hpp"
 
-#include "dicom_editor/AttributeInput.hpp"
-#include "dicom_editor/DicomWorkspace.hpp"
+#include "dicom_editor/core/AttributeInput.hpp"
+#include "dicom_editor/core/DicomWorkspace.hpp"
 
 #include <dcmtk/dcmdata/dctagkey.h>
 

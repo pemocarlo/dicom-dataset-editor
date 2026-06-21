@@ -1,8 +1,8 @@
-#include "dicom_editor/DicomWorkspace.hpp"
+#include "dicom_editor/core/DicomWorkspace.hpp"
 
-#include "dicom_editor/DicomDocument.hpp"
-#include "dicom_editor/DicomEditorService.hpp"
-#include "dicom_editor/DicomError.hpp"
+#include "dicom_editor/core/DicomDocument.hpp"
+#include "dicom_editor/core/DicomEditorService.hpp"
+#include "dicom_editor/core/DicomError.hpp"
 
 #include <dcmtk/dcmdata/dcdeftag.h>
 #include <dcmtk/dcmdata/dcdicdir.h>
