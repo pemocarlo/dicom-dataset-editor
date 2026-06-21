@@ -86,9 +86,9 @@ class DicomWorkspace {
     /// Activates document when index valid and different.
     [[nodiscard]] bool activate(std::size_t index);
     /// Activates previous document when available.
-    [[nodiscard]] bool activatePrevious();
+    [[nodiscard]] bool activatePrevious(FileSortOrder order = FileSortOrder::InstanceNumber);
     /// Activates next document when available.
-    [[nodiscard]] bool activateNext();
+    [[nodiscard]] bool activateNext(FileSortOrder order = FileSortOrder::InstanceNumber);
     /// Projects workspace state for file-tree views.
     [[nodiscard]] std::vector<OpenDicomFile> files(FileSortOrder order = FileSortOrder::InstanceNumber) const;
     /// Builds consistency information for one patient or study group.

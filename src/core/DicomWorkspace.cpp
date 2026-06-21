@@ -174,9 +174,17 @@ bool DicomWorkspace::activate(std::size_t index) {
     return true;
 }
 
-bool DicomWorkspace::activatePrevious() { return activeIndex_ > 0 && activate(activeIndex_ - 1); }
+bool DicomWorkspace::activatePrevious(FileSortOrder order) {
+    const auto ordered = files(order);
+    const auto current = std::ranges::find_if(ordered, [](const OpenDicomFile &file) { return file.active; });
+    return current != ordered.end() && current != ordered.begin() && activate(std::prev(current)->index);
+}
 
-bool DicomWorkspace::activateNext() { return activeIndex_ + 1 < documents_.size() && activate(activeIndex_ + 1); }
+bool DicomWorkspace::activateNext(FileSortOrder order) {
+    const auto ordered = files(order);
+    const auto current = std::ranges::find_if(ordered, [](const OpenDicomFile &file) { return file.active; });
+    return current != ordered.end() && std::next(current) != ordered.end() && activate(std::next(current)->index);
+}
 
 std::vector<OpenDicomFile> DicomWorkspace::files(FileSortOrder order) const {
     std::vector<OpenDicomFile> result;

@@ -13,7 +13,9 @@
 #include <expected>
 #include <filesystem>
 #include <format>
+#include <iterator>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <utility>
 #include <vector>
@@ -104,14 +106,14 @@ void EditorController::activateDocument(std::size_t index) {
 }
 
 void EditorController::showPreviousDocument() {
-    if (workspace_.activatePrevious()) {
+    if (workspace_.activatePrevious(fileSortOrder_)) {
         pixelFrame_ = 0;
         refreshView();
     }
 }
 
 void EditorController::showNextDocument() {
-    if (workspace_.activateNext()) {
+    if (workspace_.activateNext(fileSortOrder_)) {
         pixelFrame_ = 0;
         refreshView();
     }
@@ -240,8 +242,10 @@ void EditorController::refreshPixelData() {
     pixelFrame_ = preview.frameIndex;
     pixelFrameCount_ = preview.frameCount;
     preview.sourceName = document().hasFilePath() ? document().filePath().filename().string() : "Untitled";
-    preview.sourceIndex = workspace_.activeIndex();
-    preview.sourceCount = workspace_.size();
+    const auto ordered = workspace_.files(fileSortOrder_);
+    const auto active = std::ranges::find_if(ordered, [](const OpenDicomFile &file) { return file.active; });
+    preview.sourceIndex = static_cast<std::size_t>(std::distance(ordered.begin(), active));
+    preview.sourceCount = ordered.size();
     view_.presentPixelData(std::move(preview));
 }
 
