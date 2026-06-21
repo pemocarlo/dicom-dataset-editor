@@ -164,6 +164,14 @@ bool DicomWorkspace::hasLoadedFiles() const {
     return std::ranges::any_of(documents_, [](const DicomDocument &document) { return document.hasFilePath(); });
 }
 
+bool DicomWorkspace::hasDirtyDocuments() const {
+    return std::ranges::any_of(documents_, [](const DicomDocument &document) { return document.dirty(); });
+}
+
+std::size_t DicomWorkspace::dirtyDocumentCount() const {
+    return static_cast<std::size_t>(std::ranges::count_if(documents_, [](const DicomDocument &document) { return document.dirty(); }));
+}
+
 std::size_t DicomWorkspace::activeIndex() const { return activeIndex_; }
 
 bool DicomWorkspace::activate(std::size_t index) {
@@ -184,6 +192,12 @@ bool DicomWorkspace::activateNext(FileSortOrder order) {
     const auto ordered = files(order);
     const auto current = std::ranges::find_if(ordered, [](const OpenDicomFile &file) { return file.active; });
     return current != ordered.end() && std::next(current) != ordered.end() && activate(std::next(current)->index);
+}
+
+void DicomWorkspace::clear() {
+    documents_.clear();
+    documents_.emplace_back();
+    activeIndex_ = 0;
 }
 
 std::vector<OpenDicomFile> DicomWorkspace::files(FileSortOrder order) const {

@@ -49,6 +49,8 @@ enum class MenuAction : std::uint8_t {
     OpenDicomDirectory,
     Save,
     SaveAs,
+    SaveAll,
+    ClearWorkspace,
     Exit,
     Edit,
     Add,
@@ -67,6 +69,8 @@ MenuAction openFolderAction = MenuAction::OpenFolder;
 MenuAction openDicomDirectoryAction = MenuAction::OpenDicomDirectory;
 MenuAction saveAction = MenuAction::Save;
 MenuAction saveAsAction = MenuAction::SaveAs;
+MenuAction saveAllAction = MenuAction::SaveAll;
+MenuAction clearWorkspaceAction = MenuAction::ClearWorkspace;
 MenuAction exitAction = MenuAction::Exit;
 MenuAction editAction = MenuAction::Edit;
 MenuAction addAction = MenuAction::Add;
@@ -222,6 +226,8 @@ EditorWindow::EditorWindow() : Fl_Double_Window(1180, 760, "DICOM Dataset Editor
     menu_->add("&File/Open &DICOMDIR...", 0, menuCallback, &openDicomDirectoryAction);
     menu_->add("&File/&Save", FL_CTRL + 's', menuCallback, &saveAction);
     menu_->add("&File/Save &As...", FL_CTRL + FL_SHIFT + 's', menuCallback, &saveAsAction);
+    menu_->add("&File/Save A&ll", FL_CTRL + FL_ALT + 's', menuCallback, &saveAllAction);
+    menu_->add("&File/&Clear Workspace", FL_CTRL + 'w', menuCallback, &clearWorkspaceAction);
     menu_->add("&File/E&xit", 0, menuCallback, &exitAction);
     menu_->add("&Edit/&Edit Value...", FL_Enter, menuCallback, &editAction);
     menu_->add("&Edit/&Add Attribute...", FL_CTRL + 'n', menuCallback, &addAction);
@@ -354,8 +360,10 @@ void EditorWindow::presentOpenFiles(const std::vector<dicom_editor::OpenDicomFil
     fileTreePanel_->setFiles(files);
     if (hasLoadedFiles && !workspaceHadFiles_) {
         setFileTreeVisible(true);
+    } else if (!hasLoadedFiles && workspaceHadFiles_) {
+        setFileTreeVisible(false);
     }
-    workspaceHadFiles_ = workspaceHadFiles_ || hasLoadedFiles;
+    workspaceHadFiles_ = hasLoadedFiles;
 }
 
 void EditorWindow::presentPixelData(std::optional<dicom_editor::PixelDataPreview> preview) {
@@ -469,6 +477,8 @@ void EditorWindow::updateActions() {
     setMenuActive(*menu_, "&Edit/&Edit Value...", actions.editEnabled);
     setMenuActive(*menu_, "&Edit/&Delete Attribute", actions.deleteEnabled);
     setMenuActive(*menu_, "&File/&Save", actions.saveEnabled);
+    setMenuActive(*menu_, "&File/Save A&ll", actions.saveAllEnabled);
+    setMenuActive(*menu_, "&File/&Clear Workspace", actions.clearWorkspaceEnabled);
 }
 
 void EditorWindow::exit() {
@@ -496,6 +506,12 @@ void EditorWindow::menuCallback(Fl_Widget *widget, void *data) {
         break;
     case MenuAction::SaveAs:
         window->controller_.saveDocumentAs();
+        break;
+    case MenuAction::SaveAll:
+        window->controller_.saveAllDocuments();
+        break;
+    case MenuAction::ClearWorkspace:
+        window->controller_.clearWorkspace();
         break;
     case MenuAction::Exit:
         window->exit();
