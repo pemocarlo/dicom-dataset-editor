@@ -8,6 +8,7 @@ Read this first if you are an agent working in this repo.
 - [BUILDING.md](BUILDING.md) for build and install flow.
 - [HACKING.md](HACKING.md) for developer workflow and tooling.
 - [CONTRIBUTING.md](CONTRIBUTING.md) for contribution rules.
+- [ARCHITECTURE.md](ARCHITECTURE.md) for layers, ownership, and dependency rules.
 
 ## Rules
 
@@ -27,6 +28,7 @@ Read this first if you are an agent working in this repo.
 ## Current Architecture
 
 - The application uses FLTK and DCMTK with C++23.
+- Targets split into core domain, application controller, FLTK adapter, and thin executable composition root.
 - `DicomWorkspace` owns documents, discovery/loading policy, DICOMDIR resolution, shared file ordering/navigation, dirty queries, reset, and
   batch scopes.
 - `EditorController` orchestrates use cases through the abstract `EditorView`; keep FLTK logic out of core.

@@ -31,7 +31,8 @@ conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-release
 ```
 
 That command generates `build/Release/generators/CMakePresets.json` and the Conan toolchain.
-It also passes the DCMTK dictionary location required by the application to CMake.
+It also passes DCMTK dictionary location to CMake. Dictionary is embedded during
+build; installed application does not depend on Conan cache or separate data file.
 Pinned build tools declared by the recipe are installed in Conan's build context and
 recorded by the lockfile. Activate the generated Conan build environment before
 running CMake to select the pinned CMake. The Conan toolchain adds pinned build
@@ -79,9 +80,10 @@ Expected layout:
 
 - `<your-install-prefix>/bin/dicom-dataset-editor`
 - `<your-install-prefix>/bin/dicom-dataset-editor.exe` on Windows
-- `<your-install-prefix>/share/dicom-dataset-editor/dcmtk/dicom.dic`
 
-The executable locates installed runtime data relative to itself, so the complete install prefix can be moved. CMake does not bundle dependency libraries; provide them through the system, Conan, or a platform-specific deployment step.
+Dictionary is compiled into executable, so install has no runtime data directory.
+CMake does not bundle dependency libraries; provide them through system, Conan,
+or platform-specific deployment step.
 The Windows executable uses the GUI subsystem and does not open a separate console window.
 
 ## Conan Package
