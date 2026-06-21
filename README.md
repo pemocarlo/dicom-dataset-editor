@@ -7,6 +7,7 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
 - Build and install: [BUILDING.md](BUILDING.md)
 - Developer workflow and tooling: [HACKING.md](HACKING.md)
 - Contribution flow: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Architecture and code boundaries: [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ## What It Does
 
@@ -21,6 +22,8 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
 - Edit scalar values inline by double-clicking the `Value` column.
 - Optionally validate DICOM values and highlight invalid values in red.
 - Add, delete, save, and reload datasets.
+- Carry DCMTK data dictionary inside executable and optionally load updated
+  DCMTK-format dictionary for current session.
 
 ## File Navigation
 
