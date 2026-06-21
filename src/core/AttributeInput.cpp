@@ -1,4 +1,4 @@
-#include "dicom_editor/AttributeInput.hpp"
+#include "dicom_editor/core/AttributeInput.hpp"
 
 #include <dcmtk/dcmdata/dctagkey.h>
 #include <dcmtk/ofstd/oftypes.h>

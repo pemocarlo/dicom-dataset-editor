@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dicom_editor/DatasetViewModel.hpp"
+#include "dicom_editor/core/DatasetViewModel.hpp"
 
 #include <FL/Fl_Group.H>
 

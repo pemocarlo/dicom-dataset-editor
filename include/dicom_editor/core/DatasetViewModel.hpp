@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dicom_editor/DicomNode.hpp"
+#include "dicom_editor/core/DicomNode.hpp"
 
 #include <cstddef>
 #include <span>
