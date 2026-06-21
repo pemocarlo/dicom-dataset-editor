@@ -37,6 +37,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 using dicom_editor::AddAttributeRequest;
@@ -54,22 +55,35 @@ class ControllerView final : public dicom_editor::EditorView {
   public:
     std::vector<std::filesystem::path> chosenFiles;
     std::vector<dicom_editor::OpenDicomFile> openFiles;
+    std::optional<dicom_editor::PixelDataPreview> pixelPreview;
+    std::optional<dicom_editor::AttributeInput> batchInput;
+    dicom_editor::SaveChangesChoice workspaceChoice{dicom_editor::SaveChangesChoice::Discard};
+    std::size_t workspaceConfirmations{};
+    bool hasLoadedFiles{};
     std::string error;
+    std::string status;
 
     std::vector<std::filesystem::path> chooseOpenFiles() override { return chosenFiles; }
     std::optional<std::filesystem::path> chooseOpenFolder() override { return std::nullopt; }
     std::optional<std::filesystem::path> chooseDicomDirectory() override { return std::nullopt; }
     std::optional<std::filesystem::path> chooseSaveFile() override { return std::nullopt; }
     dicom_editor::SaveChangesChoice confirmSaveChanges() override { return dicom_editor::SaveChangesChoice::Discard; }
+    dicom_editor::SaveChangesChoice confirmWorkspaceChanges(std::size_t) override {
+        ++workspaceConfirmations;
+        return workspaceChoice;
+    }
     bool confirmDelete() override { return false; }
     std::optional<dicom_editor::AttributeInput> editAttribute(const std::string &, const std::string &) override { return std::nullopt; }
     std::optional<dicom_editor::AttributeInput> addAttribute() override { return std::nullopt; }
-    std::optional<dicom_editor::AttributeInput> batchEditAttribute(const dicom_editor::BatchEditReport &) override { return std::nullopt; }
+    std::optional<dicom_editor::AttributeInput> batchEditAttribute(const dicom_editor::BatchEditReport &) override { return batchInput; }
     void showError(const std::string &message) override { error = message; }
     void presentDocument(std::vector<dicom_editor::DicomNode>, const std::string &, const std::string &) override {}
-    void presentOpenFiles(const std::vector<dicom_editor::OpenDicomFile> &files, bool) override { openFiles = files; }
-    void presentPixelData(std::optional<dicom_editor::PixelDataPreview>) override {}
-    void setStatus(const std::string &) override {}
+    void presentOpenFiles(const std::vector<dicom_editor::OpenDicomFile> &files, bool loaded) override {
+        openFiles = files;
+        hasLoadedFiles = loaded;
+    }
+    void presentPixelData(std::optional<dicom_editor::PixelDataPreview> preview) override { pixelPreview = std::move(preview); }
+    void setStatus(const std::string &value) override { status = value; }
 };
 
 void require(bool condition, const std::source_location location = std::source_location::current()) {
@@ -298,13 +312,15 @@ void controllerOpensAndNavigatesMultipleFiles() {
     first.dataset().putAndInsertString(DCM_PatientID, "PATIENT-1");
     first.dataset().putAndInsertString(DCM_StudyDescription, "Workspace study");
     first.dataset().putAndInsertString(DCM_SeriesDescription, "Series A");
+    first.dataset().putAndInsertString(DCM_InstanceNumber, "10");
     require(first.saveAs(firstPath).has_value());
 
     DicomDocument second;
     seedDataset(second);
     second.dataset().putAndInsertString(DCM_PatientID, "PATIENT-1");
     second.dataset().putAndInsertString(DCM_StudyDescription, "Workspace study");
-    second.dataset().putAndInsertString(DCM_SeriesDescription, "Series B");
+    second.dataset().putAndInsertString(DCM_SeriesDescription, "Series A");
+    second.dataset().putAndInsertString(DCM_InstanceNumber, "2");
     require(second.saveAs(secondPath).has_value());
 
     ControllerView view;
@@ -313,14 +329,18 @@ void controllerOpensAndNavigatesMultipleFiles() {
     controller.openDocument();
     require(view.error.empty());
     require(view.openFiles.size() == 2);
-    require(view.openFiles[1].active);
+    require(view.openFiles[0].active);
     require(view.openFiles[0].hierarchy.patientId == "PATIENT-1");
     require(view.openFiles[0].hierarchy.studyLabel == "Workspace study");
 
-    controller.showPreviousDocument();
-    require(view.openFiles[0].active);
+    controller.setPixelDataVisible(true);
+    require(view.pixelPreview && view.pixelPreview->sourceIndex == 0);
     controller.showNextDocument();
     require(view.openFiles[1].active);
+    require(view.pixelPreview && view.pixelPreview->sourceIndex == 1);
+    controller.showPreviousDocument();
+    require(view.openFiles[0].active);
+    require(view.pixelPreview && view.pixelPreview->sourceIndex == 0);
 
     std::filesystem::remove(firstPath);
     std::filesystem::remove(secondPath);
@@ -368,6 +388,10 @@ void workspaceSortsByInstanceOrFilename() {
     require(byInstance[0].path == firstPath);
     const auto byFilename = workspace.files(dicom_editor::FileSortOrder::Filename);
     require(byFilename[0].path == secondPath);
+    require(workspace.activateNext());
+    require(workspace.active().filePath() == secondPath);
+    require(workspace.activatePrevious());
+    require(workspace.active().filePath() == firstPath);
 
     std::filesystem::remove(firstPath);
     std::filesystem::remove(secondPath);
@@ -398,6 +422,47 @@ void batchEditReportsDifferencesAndUpdatesScope() {
     require(workspace.at(0).attributeValue(DCM_PatientName) == "Unified^Patient");
     require(workspace.at(1).attributeValue(DCM_PatientName) == "Unified^Patient");
     require(workspace.at(0).dirty() && workspace.at(1).dirty());
+
+    std::filesystem::remove(firstPath);
+    std::filesystem::remove(secondPath);
+}
+
+void controllerSavesAllAndClearsWorkspace() {
+    const auto directory = std::filesystem::temp_directory_path();
+    const auto firstPath = directory / "dicom_editor_save_all_first.dcm";
+    const auto secondPath = directory / "dicom_editor_save_all_second.dcm";
+    DicomDocument first;
+    seedDataset(first);
+    first.dataset().putAndInsertString(DCM_PatientID, "SAVE-ALL");
+    require(first.saveAs(firstPath).has_value());
+    DicomDocument second;
+    seedDataset(second);
+    second.dataset().putAndInsertString(DCM_PatientID, "SAVE-ALL");
+    require(second.saveAs(secondPath).has_value());
+
+    ControllerView view;
+    view.chosenFiles = {firstPath, secondPath};
+    view.batchInput = dicom_editor::AttributeInput{.tag = DCM_PatientName, .value = "Saved^Together"};
+    EditorController controller(view);
+    controller.openDocument();
+    controller.batchEdit({.level = dicom_editor::BatchEditLevel::Patient, .id = "SAVE-ALL", .label = "Before^Patient"});
+    require(controller.actionState(nullptr).saveAllEnabled);
+    require(controller.confirmClose());
+    require(view.workspaceConfirmations == 1);
+    require(controller.saveAllDocuments());
+    require(!controller.actionState(nullptr).saveAllEnabled);
+
+    DicomDocument reloadedFirst;
+    DicomDocument reloadedSecond;
+    require(reloadedFirst.load(firstPath).has_value());
+    require(reloadedSecond.load(secondPath).has_value());
+    require(reloadedFirst.attributeValue(DCM_PatientName) == "Saved^Together");
+    require(reloadedSecond.attributeValue(DCM_PatientName) == "Saved^Together");
+
+    controller.clearWorkspace();
+    require(!view.hasLoadedFiles);
+    require(view.openFiles.size() == 1);
+    require(view.status == "Workspace cleared.");
 
     std::filesystem::remove(firstPath);
     std::filesystem::remove(secondPath);
@@ -455,6 +520,7 @@ int main() {
         dicomDirectoryIsRecognizedAndSkipped();
         workspaceSortsByInstanceOrFilename();
         batchEditReportsDifferencesAndUpdatesScope();
+        controllerSavesAllAndClearsWorkspace();
         dicomDirectoryResolvesReferencedFiles();
 
         std::println("All DICOM editor tests passed");
