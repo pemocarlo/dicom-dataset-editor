@@ -280,6 +280,20 @@ void EditorController::refreshPixelData() {
 }
 
 bool EditorController::confirmClose() {
+    const std::size_t dirtyCount = workspace_.dirtyDocumentCount();
+    if (dirtyCount > 1) {
+        using enum SaveChangesChoice;
+        switch (view_.confirmWorkspaceChanges(dirtyCount)) {
+        case Cancel:
+            return false;
+        case Discard:
+            return true;
+        case Save:
+            return saveAllDocuments();
+        default:
+            std::unreachable();
+        }
+    }
     const std::size_t original = workspace_.activeIndex();
     for (std::size_t index = 0; index < workspace_.size(); ++index) {
         if (!workspace_.at(index).dirty()) {

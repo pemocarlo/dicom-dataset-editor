@@ -57,6 +57,8 @@ class EditorView {
     [[nodiscard]] virtual std::optional<std::filesystem::path> chooseSaveFile() = 0;
     /// Resolves unsaved changes.
     [[nodiscard]] virtual SaveChangesChoice confirmSaveChanges() = 0;
+    /// Resolves multiple unsaved datasets as one operation.
+    [[nodiscard]] virtual SaveChangesChoice confirmWorkspaceChanges(std::size_t dirtyCount) = 0;
     /// Confirms deletion of the current selection.
     [[nodiscard]] virtual bool confirmDelete() = 0;
     /// Collects a replacement value for an existing attribute.
