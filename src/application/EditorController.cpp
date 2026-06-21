@@ -1,6 +1,7 @@
 #include "dicom_editor/application/EditorController.hpp"
 
 #include "dicom_editor/core/DicomDocument.hpp"
+#include "dicom_editor/core/DicomDictionary.hpp"
 #include "dicom_editor/core/DicomEditorService.hpp"
 #include "dicom_editor/core/DicomError.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
@@ -71,6 +72,20 @@ void EditorController::openDicomDirectory() {
         return;
     }
     openPaths(*paths);
+}
+
+void EditorController::loadDataDictionary() {
+    const auto path = view_.chooseDataDictionary();
+    if (!path) {
+        return;
+    }
+    const auto result = loadDicomDictionary(*path);
+    if (!result) {
+        view_.showError(result.error().what());
+        return;
+    }
+    refreshView();
+    view_.setStatus(std::format("Loaded {} dictionary entries from {}", result->entryCount, result->source));
 }
 
 void EditorController::openPaths(const std::vector<std::filesystem::path> &paths) {

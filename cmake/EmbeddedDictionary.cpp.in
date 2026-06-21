@@ -1,0 +1,10 @@
+#include <string_view>
+
+namespace dicom_editor {
+
+std::string_view embeddedDicomDictionary() {
+    static constexpr char Dictionary[] = R"DICOMDICT(@DICOM_EDITOR_DICTIONARY_TEXT@)DICOMDICT";
+    return {Dictionary, sizeof(Dictionary) - 1};
+}
+
+} // namespace dicom_editor

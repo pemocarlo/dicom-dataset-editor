@@ -1,6 +1,7 @@
 #include "dicom_editor/core/AttributeInput.hpp"
 #include "dicom_editor/core/DatasetViewModel.hpp"
 #include "dicom_editor/core/DicomDocument.hpp"
+#include "dicom_editor/core/DicomDictionary.hpp"
 #include "dicom_editor/core/DicomEditorService.hpp"
 #include "dicom_editor/core/DicomError.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
@@ -15,6 +16,7 @@
 #include <dcmtk/dcmdata/dcelem.h>
 #include <dcmtk/dcmdata/dcitem.h>
 #include <dcmtk/dcmdata/dcsequen.h>
+#include <dcmtk/dcmdata/dctag.h>
 #include <dcmtk/dcmdata/dctagkey.h>
 #include <dcmtk/dcmdata/dcuid.h>
 #include <dcmtk/dcmdata/dcxfer.h>
@@ -29,6 +31,7 @@
 #include <expected>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <optional>
 #include <print>
 #include <ranges>
@@ -66,6 +69,7 @@ class ControllerView final : public dicom_editor::EditorView {
     std::vector<std::filesystem::path> chooseOpenFiles() override { return chosenFiles; }
     std::optional<std::filesystem::path> chooseOpenFolder() override { return std::nullopt; }
     std::optional<std::filesystem::path> chooseDicomDirectory() override { return std::nullopt; }
+    std::optional<std::filesystem::path> chooseDataDictionary() override { return std::nullopt; }
     std::optional<std::filesystem::path> chooseSaveFile() override { return std::nullopt; }
     dicom_editor::SaveChangesChoice confirmSaveChanges() override { return dicom_editor::SaveChangesChoice::Discard; }
     dicom_editor::SaveChangesChoice confirmWorkspaceChanges(std::size_t) override {
@@ -500,6 +504,34 @@ void dicomDirectoryResolvesReferencedFiles() {
     std::filesystem::remove_all(directory);
 }
 
+void dictionaryOverrideIsValidatedAndActivated() {
+    require(dicom_editor::dicomDictionarySource() == "embedded DCMTK dictionary");
+
+    const auto directory = std::filesystem::temp_directory_path();
+    const auto invalidPath = directory / "dicom_editor_invalid_dictionary.dic";
+    {
+        std::ofstream invalid(invalidPath);
+        invalid << "not a DCMTK dictionary\n";
+    }
+    require(!dicom_editor::loadDicomDictionary(invalidPath).has_value());
+    require(dicom_editor::dicomDictionarySource() == "embedded DCMTK dictionary");
+
+    const auto validPath = directory / "dicom_editor_override_dictionary.dic";
+    {
+        std::ofstream valid(validPath);
+        valid << "(7777,0010)\tLO\tEditorTestAttribute\t1\tTEST\n";
+    }
+    const auto loaded = dicom_editor::loadDicomDictionary(validPath);
+    require(loaded.has_value());
+    require(loaded->entryCount == 1);
+    require(loaded->source == validPath.string());
+    DcmTag customTag(DcmTagKey(0x7777, 0x0010));
+    require(std::string_view(customTag.getTagName()) == "EditorTestAttribute");
+
+    std::filesystem::remove(invalidPath);
+    std::filesystem::remove(validPath);
+}
+
 } // namespace
 
 int main() {
@@ -522,6 +554,7 @@ int main() {
         batchEditReportsDifferencesAndUpdatesScope();
         controllerSavesAllAndClearsWorkspace();
         dicomDirectoryResolvesReferencedFiles();
+        dictionaryOverrideIsValidatedAndActivated();
 
         std::println("All DICOM editor tests passed");
         return 0;

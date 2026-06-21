@@ -36,36 +36,49 @@ set(DICOM_EDITOR_PUBLIC_HEADERS
     include/dicom_editor/core/AttributeInput.hpp
     include/dicom_editor/core/DatasetViewModel.hpp
     include/dicom_editor/core/DicomDocument.hpp
+    include/dicom_editor/core/DicomDictionary.hpp
     include/dicom_editor/core/DicomEditorService.hpp
     include/dicom_editor/core/DicomError.hpp
     include/dicom_editor/core/DicomNode.hpp
     include/dicom_editor/core/DicomPath.hpp
     include/dicom_editor/core/DicomWorkspace.hpp
-    include/dicom_editor/RuntimePaths.hpp
 )
 set(DICOM_EDITOR_CORE_SOURCES
     src/core/AttributeInput.cpp
     src/core/DatasetViewModel.cpp
     src/core/DicomDocument.cpp
+    src/core/DicomDictionary.cpp
     src/core/DicomEditorService.cpp
     src/core/DicomNode.cpp
     src/core/DicomPath.cpp
     src/core/DicomWorkspace.cpp
 )
 
-set(DICOM_EDITOR_DCMTK_DICT_FILE "" CACHE FILEPATH "Path to DCMTK's dicom.dic")
+set(DICOM_EDITOR_DCMTK_DICT_FILE "" CACHE FILEPATH "DCMTK dicom.dic to embed in the application")
 if(NOT EXISTS "${DICOM_EDITOR_DCMTK_DICT_FILE}")
     message(FATAL_ERROR
         "DICOM_EDITOR_DCMTK_DICT_FILE must point to DCMTK's dicom.dic. "
         "Run the documented Conan install before configuring CMake."
     )
 endif()
+file(READ "${DICOM_EDITOR_DCMTK_DICT_FILE}" DICOM_EDITOR_DICTIONARY_TEXT)
+string(FIND "${DICOM_EDITOR_DICTIONARY_TEXT}" ")DICOMDICT\"" DICOM_EDITOR_DICTIONARY_DELIMITER)
+if(NOT DICOM_EDITOR_DICTIONARY_DELIMITER EQUAL -1)
+    message(FATAL_ERROR "DCMTK dictionary contains the reserved embedded-resource delimiter")
+endif()
+configure_file(
+    cmake/EmbeddedDictionary.cpp.in
+    generated/EmbeddedDictionary.cpp
+    @ONLY
+)
 
 add_library(dicom_editor_core STATIC)
 add_library(DicomDatasetEditor::core ALIAS dicom_editor_core)
 target_sources(dicom_editor_core
     PRIVATE
         ${DICOM_EDITOR_CORE_SOURCES}
+        src/core/EmbeddedDictionary.hpp
+        ${PROJECT_BINARY_DIR}/generated/EmbeddedDictionary.cpp
     PUBLIC
         FILE_SET HEADERS
         BASE_DIRS include
@@ -73,11 +86,6 @@ target_sources(dicom_editor_core
             ${DICOM_EDITOR_PUBLIC_HEADERS}
 )
 target_link_libraries(dicom_editor_core PUBLIC dcmtk::dcmtk)
-target_compile_definitions(dicom_editor_core
-    PRIVATE
-        DICOM_EDITOR_DCMTK_DICT_FILE="${DICOM_EDITOR_DCMTK_DICT_FILE}"
-        DICOM_EDITOR_INSTALL_DATADIR="../share/dicom-dataset-editor"
-)
 
 add_library(dicom_editor_application STATIC)
 add_library(DicomDatasetEditor::application ALIAS dicom_editor_application)
@@ -129,10 +137,6 @@ target_sources(dicom-dataset-editor
 target_link_libraries(dicom-dataset-editor PRIVATE DicomDatasetEditor::fltk)
 
 install(TARGETS dicom-dataset-editor)
-install(
-    FILES "${DICOM_EDITOR_DCMTK_DICT_FILE}"
-    DESTINATION share/dicom-dataset-editor/dcmtk
-)
 
 include(CTest)
 if(BUILD_TESTING)
