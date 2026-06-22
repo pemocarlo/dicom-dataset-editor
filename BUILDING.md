@@ -18,9 +18,11 @@ conan config install-pkg conanconfig.yml --lockfile=conan.lock --force
 
 Commit the updated `conan.lock` when its configuration package revision changes.
 
+Install the dependencies with the profile that matches your platform.
+
 On Linux:
 
-```bash
+```powershell
 conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release
 ```
 
@@ -42,20 +44,12 @@ In-source builds are not supported.
 
 ## Build And Test
 
-On Linux, use the generated single-config CMake presets:
-
-```bash
-cmake --preset conan-release
-cmake --build --preset conan-release
-ctest --preset conan-release
-```
-
-On Windows, use Conan to drive the Visual Studio configure, build, and tests.
-Conan names Visual Studio's generated configure preset `conan-default`, so it
-does not match the Linux-oriented checked-in presets.
+After the Conan install, use the checked-in portable CMake presets:
 
 ```powershell
-conan build . -pr:h=windows-msvc-release -pr:b=windows-msvc-release
+cmake --preset release
+cmake --build --preset release
+ctest --preset release
 ```
 
 Run the Conan install again after changing the recipe, lockfile, profiles, or dependencies.
@@ -66,10 +60,11 @@ CMake configuration is expected to use the generated Conan toolchain; configurin
 Install to any prefix with:
 
 ```bash
-cmake --install build/Release --prefix <your-install-prefix>
+cmake --install build/Release --prefix <your-install-prefix> --config Release
 ```
 
-Visual Studio builds require the configuration:
+The `--config Release` flag is harmless for single-config generators and required
+when the build tree uses a multi-config generator such as Visual Studio.
 
 ```powershell
 cmake --install build/Release --prefix build/install --config Release

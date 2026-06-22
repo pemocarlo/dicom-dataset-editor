@@ -1,4 +1,5 @@
 import os
+import shutil
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -53,7 +54,10 @@ class DicomDatasetEditorRecipe(ConanFile):
         )
         if not os.path.isfile(dict_file):
             raise ConanInvalidConfiguration(f"DCMTK dictionary not found: {dict_file}")
-        toolchain.cache_variables["DICOM_EDITOR_DCMTK_DICT_FILE"] = dict_file
+        embedded_dict_file = os.path.join(self.generators_folder, "dicom.dic")
+        os.makedirs(self.generators_folder, exist_ok=True)
+        shutil.copyfile(dict_file, embedded_dict_file)
+        toolchain.cache_variables["DICOM_EDITOR_DCMTK_DICT_FILE"] = embedded_dict_file
         toolchain.generate()
 
     def build(self):

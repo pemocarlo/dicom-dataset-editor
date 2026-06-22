@@ -10,14 +10,29 @@
     ],
     "configurePresets": [
         {
-            "name": "dev",
-            "displayName": "Developer mode",
-            "description": "Release build with tests, linting, formatting, and LSP compile commands",
-            "inherits": "conan-release",
-            "binaryDir": "${sourceDir}/build/Dev",
+            "name": "conan-base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build/Release",
             "toolchainFile": "${sourceDir}/build/Release/generators/conan_toolchain.cmake",
             "cacheVariables": {
                 "BUILD_TESTING": true,
+                "DICOM_EDITOR_DEVELOPER_MODE": false,
+                "CMAKE_BUILD_TYPE": "Release",
+                "DICOM_EDITOR_DCMTK_DICT_FILE": "${sourceDir}/build/Release/generators/dicom.dic"
+            }
+        },
+        {
+            "name": "release",
+            "displayName": "Release build",
+            "description": "Portable Release build with tests enabled",
+            "inherits": "conan-base"
+        },
+        {
+            "name": "dev",
+            "displayName": "Developer mode",
+            "description": "Release build with tests, linting, formatting, and LSP compile commands",
+            "inherits": "conan-base",
+            "cacheVariables": {
                 "DICOM_EDITOR_DEVELOPER_MODE": true,
                 "CMAKE_EXPORT_COMPILE_COMMANDS": true
             }
@@ -35,12 +50,19 @@
     ],
     "buildPresets": [
         {
+            "name": "release",
+            "configurePreset": "release",
+            "configuration": "Release"
+        },
+        {
             "name": "dev",
-            "configurePreset": "dev"
+            "configurePreset": "dev",
+            "configuration": "Release"
         },
         {
             "name": "format",
             "configurePreset": "dev",
+            "configuration": "Release",
             "targets": [
                 "format"
             ]
@@ -48,6 +70,7 @@
         {
             "name": "check-format",
             "configurePreset": "dev",
+            "configuration": "Release",
             "targets": [
                 "check-format"
             ]
@@ -55,6 +78,7 @@
         {
             "name": "lint",
             "configurePreset": "dev",
+            "configuration": "Release",
             "targets": [
                 "lint"
             ]
@@ -62,6 +86,7 @@
         {
             "name": "cppcheck",
             "configurePreset": "dev",
+            "configuration": "Release",
             "targets": [
                 "cppcheck"
             ]
@@ -69,11 +94,13 @@
         {
             "name": "iwyu",
             "configurePreset": "iwyu",
+            "configuration": "Release",
             "cleanFirst": true
         },
         {
             "name": "check-format-iwyu",
             "configurePreset": "iwyu",
+            "configuration": "Release",
             "targets": [
                 "check-format"
             ]
@@ -81,6 +108,7 @@
         {
             "name": "lint-iwyu",
             "configurePreset": "iwyu",
+            "configuration": "Release",
             "targets": [
                 "lint"
             ]
@@ -88,6 +116,7 @@
         {
             "name": "cppcheck-iwyu",
             "configurePreset": "iwyu",
+            "configuration": "Release",
             "targets": [
                 "cppcheck"
             ]
@@ -95,8 +124,17 @@
     ],
     "testPresets": [
         {
+            "name": "release",
+            "configurePreset": "release",
+            "configuration": "Release",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
             "name": "dev",
             "configurePreset": "dev",
+            "configuration": "Release",
             "output": {
                 "outputOnFailure": true
             }
@@ -104,6 +142,7 @@
         {
             "name": "iwyu",
             "configurePreset": "iwyu",
+            "configuration": "Release",
             "output": {
                 "outputOnFailure": true
             }

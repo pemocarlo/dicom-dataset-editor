@@ -46,7 +46,9 @@ void collectReferencedFiles(DcmDirectoryRecord &parent, const std::filesystem::p
         OFString referencedFileId;
         if (record->findAndGetOFStringArray(DCM_ReferencedFileID, referencedFileId).good() && !referencedFileId.empty()) {
             std::string relative = referencedFileId;
-            std::ranges::replace(relative, '\\', std::filesystem::path::preferred_separator);
+#ifndef _WIN32
+            std::ranges::replace(relative, '\\', '/');
+#endif
             const std::filesystem::path candidate(relative);
             const bool unsafe = candidate.is_absolute() || std::ranges::any_of(candidate, [](const auto &part) { return part == ".."; });
             if (!unsafe) {
