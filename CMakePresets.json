@@ -5,44 +5,86 @@
         "minor": 0,
         "patch": 0
     },
-    "include": [
-        "build/Release/generators/CMakePresets.json"
-    ],
     "configurePresets": [
         {
-            "name": "conan-base",
+            "name": "conan-debug-base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build/Debug",
+            "toolchainFile": "${sourceDir}/build/Debug/generators/conan_toolchain.cmake",
+            "cacheVariables": {
+                "BUILD_TESTING": true,
+                "CMAKE_BUILD_TYPE": "Debug",
+                "DICOM_EDITOR_DCMTK_DICT_FILE": "${sourceDir}/build/Debug/generators/dicom.dic"
+            }
+        },
+        {
+            "name": "conan-release-base",
             "hidden": true,
             "binaryDir": "${sourceDir}/build/Release",
             "toolchainFile": "${sourceDir}/build/Release/generators/conan_toolchain.cmake",
             "cacheVariables": {
-                "BUILD_TESTING": true,
-                "DICOM_EDITOR_DEVELOPER_MODE": false,
+                "BUILD_TESTING": false,
                 "CMAKE_BUILD_TYPE": "Release",
+                "DICOM_EDITOR_DEVELOPER_MODE": false,
                 "DICOM_EDITOR_DCMTK_DICT_FILE": "${sourceDir}/build/Release/generators/dicom.dic"
             }
         },
         {
-            "name": "release",
-            "displayName": "Release build",
-            "description": "Portable Release build with tests enabled",
-            "inherits": "conan-base"
+            "name": "conan-ninja-debug-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/Ninja-Debug",
+            "toolchainFile": "${sourceDir}/build/Ninja-Debug/generators/conan_toolchain.cmake",
+            "cacheVariables": {
+                "BUILD_TESTING": true,
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_SCAN_FOR_MODULES": false,
+                "DICOM_EDITOR_DCMTK_DICT_FILE": "${sourceDir}/build/Ninja-Debug/generators/dicom.dic"
+            }
         },
         {
             "name": "dev",
-            "displayName": "Developer mode",
-            "description": "Release build with tests, linting, formatting, and LSP compile commands",
-            "inherits": "conan-base",
+            "displayName": "Daily development",
+            "description": "Debug build with tests, strict warnings, and formatting",
+            "inherits": "conan-debug-base",
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": false,
+                "DICOM_EDITOR_DEVELOPER_MODE": true
+            }
+        },
+        {
+            "name": "dev-ninja",
+            "displayName": "Daily development with Ninja",
+            "description": "Debug development build with a compilation database on every platform",
+            "inherits": "conan-ninja-debug-base",
             "cacheVariables": {
                 "DICOM_EDITOR_DEVELOPER_MODE": true,
                 "CMAKE_EXPORT_COMPILE_COMMANDS": true
             }
         },
         {
+            "name": "production",
+            "displayName": "Production executable",
+            "description": "Optimized Release build used for the final executable",
+            "inherits": "conan-release-base"
+        },
+        {
+            "name": "quality",
+            "displayName": "Extended quality checks",
+            "description": "Ninja Debug build with clang-tidy and cppcheck targets",
+            "inherits": "dev-ninja",
+            "binaryDir": "${sourceDir}/build/Ninja-Debug-Quality",
+            "cacheVariables": {
+                "DICOM_EDITOR_ENABLE_CLANG_TIDY": true,
+                "DICOM_EDITOR_ENABLE_CPPCHECK": true
+            }
+        },
+        {
             "name": "iwyu",
-            "displayName": "Include-what-you-use",
-            "description": "Developer build with native CMake include-what-you-use integration",
-            "inherits": "dev",
-            "binaryDir": "${sourceDir}/build/IWYU",
+            "displayName": "All checks with IWYU",
+            "description": "Extended quality build with include-what-you-use enabled",
+            "inherits": "quality",
+            "binaryDir": "${sourceDir}/build/Ninja-Debug-IWYU",
             "cacheVariables": {
                 "DICOM_EDITOR_ENABLE_IWYU": true
             }
@@ -50,19 +92,24 @@
     ],
     "buildPresets": [
         {
-            "name": "release",
-            "configurePreset": "release",
+            "name": "dev",
+            "configurePreset": "dev",
+            "configuration": "Debug"
+        },
+        {
+            "name": "production",
+            "configurePreset": "production",
             "configuration": "Release"
         },
         {
-            "name": "dev",
-            "configurePreset": "dev",
-            "configuration": "Release"
+            "name": "dev-ninja",
+            "configurePreset": "dev-ninja",
+            "configuration": "Debug"
         },
         {
             "name": "format",
             "configurePreset": "dev",
-            "configuration": "Release",
+            "configuration": "Debug",
             "targets": [
                 "format"
             ]
@@ -70,23 +117,52 @@
         {
             "name": "check-format",
             "configurePreset": "dev",
-            "configuration": "Release",
+            "configuration": "Debug",
+            "targets": [
+                "check-format"
+            ]
+        },
+        {
+            "name": "format-ninja",
+            "configurePreset": "dev-ninja",
+            "configuration": "Debug",
+            "targets": [
+                "format"
+            ]
+        },
+        {
+            "name": "check-format-ninja",
+            "configurePreset": "dev-ninja",
+            "configuration": "Debug",
+            "targets": [
+                "check-format"
+            ]
+        },
+        {
+            "name": "quality",
+            "configurePreset": "quality",
+            "configuration": "Debug"
+        },
+        {
+            "name": "check-format-quality",
+            "configurePreset": "quality",
+            "configuration": "Debug",
             "targets": [
                 "check-format"
             ]
         },
         {
             "name": "lint",
-            "configurePreset": "dev",
-            "configuration": "Release",
+            "configurePreset": "quality",
+            "configuration": "Debug",
             "targets": [
                 "lint"
             ]
         },
         {
             "name": "cppcheck",
-            "configurePreset": "dev",
-            "configuration": "Release",
+            "configurePreset": "quality",
+            "configuration": "Debug",
             "targets": [
                 "cppcheck"
             ]
@@ -94,13 +170,13 @@
         {
             "name": "iwyu",
             "configurePreset": "iwyu",
-            "configuration": "Release",
+            "configuration": "Debug",
             "cleanFirst": true
         },
         {
             "name": "check-format-iwyu",
             "configurePreset": "iwyu",
-            "configuration": "Release",
+            "configuration": "Debug",
             "targets": [
                 "check-format"
             ]
@@ -108,7 +184,7 @@
         {
             "name": "lint-iwyu",
             "configurePreset": "iwyu",
-            "configuration": "Release",
+            "configuration": "Debug",
             "targets": [
                 "lint"
             ]
@@ -116,7 +192,7 @@
         {
             "name": "cppcheck-iwyu",
             "configurePreset": "iwyu",
-            "configuration": "Release",
+            "configuration": "Debug",
             "targets": [
                 "cppcheck"
             ]
@@ -124,17 +200,25 @@
     ],
     "testPresets": [
         {
-            "name": "release",
-            "configurePreset": "release",
-            "configuration": "Release",
+            "name": "dev",
+            "configurePreset": "dev",
+            "configuration": "Debug",
             "output": {
                 "outputOnFailure": true
             }
         },
         {
-            "name": "dev",
-            "configurePreset": "dev",
-            "configuration": "Release",
+            "name": "dev-ninja",
+            "configurePreset": "dev-ninja",
+            "configuration": "Debug",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "quality",
+            "configurePreset": "quality",
+            "configuration": "Debug",
             "output": {
                 "outputOnFailure": true
             }
@@ -142,7 +226,7 @@
         {
             "name": "iwyu",
             "configurePreset": "iwyu",
-            "configuration": "Release",
+            "configuration": "Debug",
             "output": {
                 "outputOnFailure": true
             }
@@ -151,8 +235,8 @@
     "workflowPresets": [
         {
             "name": "dev-check",
-            "displayName": "Developer verification",
-            "description": "Configure, build, check formatting, lint, and test",
+            "displayName": "Daily developer verification",
+            "description": "Configure and build Debug, check formatting, and run tests",
             "steps": [
                 {
                     "type": "configure",
@@ -167,6 +251,29 @@
                     "name": "check-format"
                 },
                 {
+                    "type": "test",
+                    "name": "dev"
+                }
+            ]
+        },
+        {
+            "name": "quality-checks",
+            "displayName": "Extended quality verification",
+            "description": "Run Debug build, formatting, clang-tidy, cppcheck, and tests",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "quality"
+                },
+                {
+                    "type": "build",
+                    "name": "quality"
+                },
+                {
+                    "type": "build",
+                    "name": "check-format-quality"
+                },
+                {
                     "type": "build",
                     "name": "lint"
                 },
@@ -176,14 +283,37 @@
                 },
                 {
                     "type": "test",
-                    "name": "dev"
+                    "name": "quality"
+                }
+            ]
+        },
+        {
+            "name": "dev-check-ninja",
+            "displayName": "Daily developer verification with Ninja",
+            "description": "Run the daily Debug workflow with a compilation database",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "dev-ninja"
+                },
+                {
+                    "type": "build",
+                    "name": "dev-ninja"
+                },
+                {
+                    "type": "build",
+                    "name": "check-format-ninja"
+                },
+                {
+                    "type": "test",
+                    "name": "dev-ninja"
                 }
             ]
         },
         {
             "name": "all-checks",
-            "displayName": "Developer verification with IWYU",
-            "description": "Run developer verification and a clean include-what-you-use build",
+            "displayName": "Full verification with IWYU",
+            "description": "Run a clean IWYU build plus every extended quality check",
             "steps": [
                 {
                     "type": "configure",
