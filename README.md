@@ -49,22 +49,25 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
 ## Quick Build
 
 Initialize the project-local Conan home and install its configuration package as
-documented in [BUILDING.md](BUILDING.md). Then use its profile for your platform.
+documented in [BUILDING.md](BUILDING.md). Build the final optimized executable
+with the Release Conan profile and the `production` CMake preset.
 
 Linux:
 
 ```bash
 conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release
-cmake --preset conan-release
-cmake --build --preset conan-release
-ctest --preset conan-release
+cmake --preset production
+cmake --build --preset production
 ```
 
 Windows:
 
 ```powershell
 conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release
-conan build . -pr:h=windows-msvc-release -pr:b=windows-msvc-release
+cmake --preset production
+cmake --build --preset production
 ```
 
-Use [BUILDING.md](BUILDING.md) for install and Conan package creation.
+`production` uses CMake's standard Release configuration. Daily development
+uses a separate Debug profile and the `dev` preset; see [HACKING.md](HACKING.md).
+Use [BUILDING.md](BUILDING.md) for installation and Conan package creation.

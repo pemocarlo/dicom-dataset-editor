@@ -88,16 +88,22 @@ target_sources(dicom_editor_core
 target_include_directories(dicom_editor_core PRIVATE src/core)
 target_link_libraries(dicom_editor_core PUBLIC dcmtk::dcmtk)
 
+set(DICOM_EDITOR_APPLICATION_HEADERS
+    include/dicom_editor/application/EditorController.hpp
+)
+set(DICOM_EDITOR_APPLICATION_SOURCES
+    src/application/EditorController.cpp
+)
 add_library(dicom_editor_application STATIC)
 add_library(DicomDatasetEditor::application ALIAS dicom_editor_application)
 target_sources(dicom_editor_application
     PRIVATE
-        src/application/EditorController.cpp
+        ${DICOM_EDITOR_APPLICATION_SOURCES}
     PUBLIC
         FILE_SET HEADERS
         BASE_DIRS include
         FILES
-            include/dicom_editor/application/EditorController.hpp
+            ${DICOM_EDITOR_APPLICATION_HEADERS}
 )
 target_link_libraries(dicom_editor_application PUBLIC DicomDatasetEditor::core)
 
@@ -130,10 +136,13 @@ target_link_libraries(dicom_editor_fltk
         $<$<TARGET_EXISTS:PkgConfig::DICOM_EDITOR_FLTK_WAYLAND>:PkgConfig::DICOM_EDITOR_FLTK_WAYLAND>
 )
 
+set(DICOM_EDITOR_APP_SOURCES
+    src/gui/fltk/App.cpp
+)
 add_executable(dicom-dataset-editor WIN32)
 target_sources(dicom-dataset-editor
     PRIVATE
-        src/gui/fltk/App.cpp
+        ${DICOM_EDITOR_APP_SOURCES}
 )
 target_link_libraries(dicom-dataset-editor PRIVATE DicomDatasetEditor::fltk)
 

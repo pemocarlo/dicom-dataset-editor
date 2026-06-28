@@ -2,9 +2,11 @@
 
 ## Before You Change Code
 
-- Run the documented Conan install with the profile set required by your platform. The checked-in examples use the Linux `linux-gcc-release` profiles from `dicom-dataset-editor-conf`.
-- Use `cmake --workflow --preset dev-check` before sending a change. It includes formatting, clang-tidy, cppcheck, and tests.
-- Use `cmake --workflow --preset all-checks` if you touched include sets or headers.
+- Install Debug host dependencies with the Release build profile for your platform: `linux-gcc-debug`/`linux-gcc-release` or `windows-msvc-debug`/`windows-msvc-release`.
+- Use `cmake --workflow --preset dev-check` during daily development. It builds Debug with strict warnings, checks formatting, and runs tests.
+- Install the platform's `*-debug-ninja` host profile before `dev-check-ninja`, `quality-checks`, or `all-checks`.
+- Run `cmake --workflow --preset quality-checks` before sending changes that warrant the slower clang-tidy and cppcheck pass.
+- Use `cmake --workflow --preset all-checks` if you touched headers or include sets.
 
 ## Style
 
@@ -16,10 +18,10 @@
 
 ## Verification
 
-- `cmake --build --preset release`
-- `ctest --preset release --output-on-failure`
 - `cmake --workflow --preset dev-check`
+- `cmake --workflow --preset quality-checks`
 - `cmake --workflow --preset all-checks`
+- `cmake --build --preset production` for final executable or install changes
 - `conan create . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release -c tools.build:skip_test=False` when changing CMake, Conan, or install behavior
 
 ## Pull Requests

@@ -7,6 +7,9 @@ elseif(NOT PROJECT_IS_TOP_LEVEL)
 endif()
 
 option(DICOM_EDITOR_ENABLE_STRICT_WARNINGS "Enable strict compiler warnings and treat them as errors" ON)
+option(DICOM_EDITOR_ENABLE_CLANG_FORMAT "Provide clang-format targets" ON)
+option(DICOM_EDITOR_ENABLE_CLANG_TIDY "Provide the clang-tidy target" OFF)
+option(DICOM_EDITOR_ENABLE_CPPCHECK "Provide the cppcheck target" OFF)
 option(DICOM_EDITOR_ENABLE_IWYU "Run include-what-you-use while compiling" OFF)
 
 function(dicom_editor_absolutize out_var)
@@ -15,11 +18,22 @@ function(dicom_editor_absolutize out_var)
     set(${out_var} "${paths}" PARENT_SCOPE)
 endfunction()
 
-find_program(DICOM_EDITOR_CLANG_FORMAT clang-format REQUIRED)
-find_program(DICOM_EDITOR_CLANG_TIDY clang-tidy REQUIRED)
-find_program(DICOM_EDITOR_CPPCHECK cppcheck REQUIRED)
+if(DICOM_EDITOR_ENABLE_CLANG_FORMAT)
+    find_program(DICOM_EDITOR_CLANG_FORMAT clang-format REQUIRED)
+endif()
+if(DICOM_EDITOR_ENABLE_CLANG_TIDY)
+    find_program(DICOM_EDITOR_CLANG_TIDY clang-tidy REQUIRED)
+endif()
+if(DICOM_EDITOR_ENABLE_CPPCHECK)
+    find_program(DICOM_EDITOR_CPPCHECK cppcheck REQUIRED)
+endif()
 
-set(DICOM_EDITOR_DEVELOPER_TARGETS dicom_editor_core dicom-dataset-editor)
+set(DICOM_EDITOR_DEVELOPER_TARGETS
+    dicom_editor_core
+    dicom_editor_application
+    dicom_editor_fltk
+    dicom-dataset-editor
+)
 if(BUILD_TESTING)
     list(APPEND DICOM_EDITOR_DEVELOPER_TARGETS dicom_editor_tests)
 endif()
@@ -31,9 +45,14 @@ endif()
 
 if(DICOM_EDITOR_ENABLE_IWYU)
     find_program(DICOM_EDITOR_IWYU_EXECUTABLE include-what-you-use REQUIRED)
+    if(MSVC)
+        set(DICOM_EDITOR_IWYU_DRIVER_ARGUMENT --driver-mode=cl)
+    else()
+        set(DICOM_EDITOR_IWYU_DRIVER_ARGUMENT -Wno-unknown-warning-option)
+    endif()
     set_property(TARGET ${DICOM_EDITOR_DEVELOPER_TARGETS}
         PROPERTY CXX_INCLUDE_WHAT_YOU_USE
-            "${DICOM_EDITOR_IWYU_EXECUTABLE};-Wno-unknown-warning-option;-Xiwyu;--error=1"
+            "${DICOM_EDITOR_IWYU_EXECUTABLE};${DICOM_EDITOR_IWYU_DRIVER_ARGUMENT};-Xiwyu;--error=1"
     )
 endif()
 
@@ -41,49 +60,60 @@ dicom_editor_absolutize(
     DICOM_EDITOR_FORMAT_FILES
     ${DICOM_EDITOR_PUBLIC_HEADERS}
     ${DICOM_EDITOR_CORE_SOURCES}
-    ${DICOM_EDITOR_UI_HEADERS}
-    ${DICOM_EDITOR_UI_SOURCES}
+    ${DICOM_EDITOR_APPLICATION_HEADERS}
+    ${DICOM_EDITOR_APPLICATION_SOURCES}
+    ${DICOM_EDITOR_FLTK_HEADERS}
+    ${DICOM_EDITOR_FLTK_SOURCES}
+    ${DICOM_EDITOR_APP_SOURCES}
     ${DICOM_EDITOR_TEST_SOURCES}
 )
 dicom_editor_absolutize(
     DICOM_EDITOR_LINT_FILES
     ${DICOM_EDITOR_CORE_SOURCES}
-    ${DICOM_EDITOR_UI_SOURCES}
+    ${DICOM_EDITOR_APPLICATION_SOURCES}
+    ${DICOM_EDITOR_FLTK_SOURCES}
+    ${DICOM_EDITOR_APP_SOURCES}
     ${DICOM_EDITOR_TEST_SOURCES}
 )
 
-add_custom_target(format
-    COMMAND ${DICOM_EDITOR_CLANG_FORMAT} -i ${DICOM_EDITOR_FORMAT_FILES}
-    COMMENT "Formatting C++ sources"
-    VERBATIM
-)
+if(DICOM_EDITOR_ENABLE_CLANG_FORMAT)
+    add_custom_target(format
+        COMMAND ${DICOM_EDITOR_CLANG_FORMAT} -i ${DICOM_EDITOR_FORMAT_FILES}
+        COMMENT "Formatting C++ sources"
+        VERBATIM
+    )
 
-add_custom_target(check-format
-    COMMAND ${DICOM_EDITOR_CLANG_FORMAT} --dry-run --Werror ${DICOM_EDITOR_FORMAT_FILES}
-    COMMENT "Checking C++ formatting"
-    VERBATIM
-)
+    add_custom_target(check-format
+        COMMAND ${DICOM_EDITOR_CLANG_FORMAT} --dry-run --Werror ${DICOM_EDITOR_FORMAT_FILES}
+        COMMENT "Checking C++ formatting"
+        VERBATIM
+    )
+endif()
 
-add_custom_target(lint
-    COMMAND ${DICOM_EDITOR_CLANG_TIDY}
-        --quiet
-        --warnings-as-errors=*
-        -p=${PROJECT_BINARY_DIR}
-        ${DICOM_EDITOR_LINT_FILES}
-    COMMENT "Linting C++ sources"
-    VERBATIM
-)
+if(DICOM_EDITOR_ENABLE_CLANG_TIDY)
+    add_custom_target(lint
+        COMMAND ${DICOM_EDITOR_CLANG_TIDY}
+            --quiet
+            --warnings-as-errors=*
+            -p=${PROJECT_BINARY_DIR}
+            ${DICOM_EDITOR_LINT_FILES}
+        COMMENT "Linting C++ sources"
+        VERBATIM
+    )
+endif()
 
-add_custom_target(cppcheck
-    COMMAND ${DICOM_EDITOR_CPPCHECK}
-        --project=${PROJECT_BINARY_DIR}/compile_commands.json
-        --enable=warning,style,performance,portability
-        --error-exitcode=1
-        --inline-suppr
-        --quiet
-    COMMENT "Running cppcheck"
-    VERBATIM
-)
+if(DICOM_EDITOR_ENABLE_CPPCHECK)
+    add_custom_target(cppcheck
+        COMMAND ${DICOM_EDITOR_CPPCHECK}
+            --project=${PROJECT_BINARY_DIR}/compile_commands.json
+            --enable=warning,style,performance,portability
+            --error-exitcode=1
+            --inline-suppr
+            --quiet
+        COMMENT "Running cppcheck"
+        VERBATIM
+    )
+endif()
 
 if(CMAKE_EXPORT_COMPILE_COMMANDS)
     if(CMAKE_GENERATOR MATCHES "Makefiles|Ninja")

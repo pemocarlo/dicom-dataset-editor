@@ -11,8 +11,5 @@
     "cmake.ctestArgs": [
         "--output-on-failure"
     ],
-    "C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json",
-    "clangd.arguments": [
-        "--compile-commands-dir=${workspaceFolder}"
-    ]
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
 }

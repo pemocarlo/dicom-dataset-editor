@@ -13,7 +13,10 @@ Read this first if you are an agent working in this repo.
 ## Rules
 
 - Always use `rtk` for shell commands.
-- Always build with `conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release`.
+- Use `linux-gcc-debug` as host and `linux-gcc-release` as build profile for daily development.
+- Use `linux-gcc-debug-ninja` as host for Ninja, quality, and IWYU presets.
+- Use both `linux-gcc-release` profiles for the `production` preset and packaging.
+- On Windows use equivalent `windows-msvc-*` profiles; keep Release as build context.
 - Do not remove user changes outside task scope.
 - Use `apply_patch` for manual edits.
 - Prefer `rg` over `grep`, `rg --files` over `find` when practical.
@@ -22,8 +25,9 @@ Read this first if you are an agent working in this repo.
 ## Verification
 
 - `cmake --workflow --preset dev-check`
+- `cmake --workflow --preset quality-checks` for extended static analysis
 - `cmake --workflow --preset all-checks` when headers or include sets change
-- `cmake --install build/Release --prefix "$HOME/tmp"` for relocatable install checks
+- `cmake --build --preset production` and `cmake --install build/Release --prefix "$HOME/tmp" --config Release` for relocatable install checks
 
 ## Current Architecture
 
