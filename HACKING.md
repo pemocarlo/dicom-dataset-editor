@@ -2,6 +2,10 @@
 
 Developer mode is opt-in. It enables strict warnings, `clang-format`, `clang-tidy`, `cppcheck`, IWYU, tests, and `compile_commands.json`.
 
+Conan commands use the ignored, project-local `conanhome` selected by `.conanrc`.
+Bootstrap its profiles and seed its package cache as described in
+[BUILDING.md](BUILDING.md) before running developer workflows offline.
+
 ## Developer Tools
 
 Conan installs pinned CMake and cppcheck versions as build requirements:
