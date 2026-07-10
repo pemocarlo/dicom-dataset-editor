@@ -42,6 +42,7 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     [[nodiscard]] dicom_editor::SaveChangesChoice confirmWorkspaceChanges(std::size_t dirtyCount) override;
     [[nodiscard]] bool confirmDelete() override;
     [[nodiscard]] std::optional<dicom_editor::AttributeInput> editAttribute(const std::string &title, const std::string &value) override;
+    void viewAttribute(const std::string &title, const std::string &value) override;
     [[nodiscard]] std::optional<dicom_editor::AttributeInput> addAttribute() override;
     [[nodiscard]] std::optional<dicom_editor::AttributeInput> batchEditAttribute(const dicom_editor::BatchEditReport &report) override;
     void showError(const std::string &message) override;

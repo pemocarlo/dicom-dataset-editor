@@ -13,6 +13,8 @@ class AttributeDialog final {
   public:
     /// Edits an attribute value.
     static std::optional<dicom_editor::AttributeInput> edit(const std::string &title, const std::string &currentValue);
+    /// Shows a copyable value without allowing changes.
+    static void view(const std::string &title, const std::string &value);
     /// Adds an attribute.
     static std::optional<dicom_editor::AttributeInput> add();
     /// Selects one allowed attribute and replacement value for a batch edit.

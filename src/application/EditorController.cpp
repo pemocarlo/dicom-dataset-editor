@@ -172,7 +172,14 @@ void EditorController::clearWorkspace() {
 }
 
 void EditorController::editSelected(const DicomNode *selected) {
-    if (selected == nullptr || !selected->editable) {
+    if (selected == nullptr) {
+        return;
+    }
+    if (!selected->readOnlyValue.empty()) {
+        view_.viewAttribute(std::format("View {}", selected->keyword), selected->readOnlyValue);
+        return;
+    }
+    if (!selected->editable) {
         return;
     }
     const auto result = view_.editAttribute(std::format("Edit {}", selected->keyword), selected->value);

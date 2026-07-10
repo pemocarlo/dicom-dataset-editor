@@ -209,7 +209,7 @@ void DatasetPanel::setEditRequestedHandler(std::function<void()> handler) { edit
 
 void DatasetPanel::editSelectedValue() {
     const auto *selected = selectedNode();
-    if (selected != nullptr && selected->editable && editRequested_) {
+    if (selected != nullptr && (selected->editable || !selected->readOnlyValue.empty()) && editRequested_) {
         editRequested_();
     }
 }

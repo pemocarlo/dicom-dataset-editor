@@ -14,6 +14,7 @@
 #include <dcmtk/dcmdata/dcsequen.h>
 #include <dcmtk/dcmdata/dctag.h>
 #include <dcmtk/dcmdata/dctagkey.h>
+#include <dcmtk/dcmdata/dctypes.h>
 #include <dcmtk/dcmdata/dcuid.h>
 #include <dcmtk/dcmdata/dcvr.h>
 #include <dcmtk/dcmdata/dcxfer.h>
@@ -36,11 +37,19 @@
 #include <limits>
 #include <optional>
 #include <print>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#endif
 
 namespace dicom_editor {
 
@@ -71,7 +80,18 @@ void ensureDecodersRegistered() {
     static_cast<void>(registry);
 }
 
-void logPixelPreview(std::string_view message) { std::println(stderr, "[pixel-preview] {}", message); }
+void logPixelPreview(std::string_view message) noexcept {
+    try {
+#ifdef _WIN32
+        const auto line = std::format("[pixel-preview] {}\n", message);
+        OutputDebugStringA(line.c_str());
+#else
+        std::println(stderr, "[pixel-preview] {}", message);
+#endif
+    } catch (...) {
+        // Diagnostics must never make pixel preview fail.
+    }
+}
 
 std::string transferSyntaxName(E_TransferSyntax syntax) {
     const DcmXfer transferSyntax(syntax);
@@ -161,6 +181,15 @@ std::string valuePreviewFor(const std::string &value) {
     return preview;
 }
 
+std::string readOnlyValueFor(DcmElement &element) {
+    if (!isPixelData(element.getTag().getXTag())) {
+        return {};
+    }
+    std::ostringstream output;
+    element.print(output, DCMTypes::PF_shortenLongTagValues);
+    return output.str();
+}
+
 std::string datasetString(DcmDataset &dataset, const DcmTagKey &tag) {
     OFString value;
     return dataset.findAndGetOFString(tag, value).good() ? std::string{value} : std::string{};
@@ -203,6 +232,7 @@ void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &par
             .depth = depth,
             .editable = editable,
             .invalidValue = validateValues && editable && element->checkValue("1-n").bad(),
+            .readOnlyValue = readOnlyValueFor(*element),
         };
         nodes.push_back(std::move(node));
 
