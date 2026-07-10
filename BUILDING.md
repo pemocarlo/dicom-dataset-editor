@@ -20,10 +20,13 @@ this project requires Conan 2.28 or newer.
 ## Install Or Update The Conan Configuration
 
 No custom Conan remote hosts the configuration package yet. Its recipe and
-package are handled locally from the sibling repository.
+package are handled locally from an up-to-date sibling repository.
 
-On Linux, create the configuration package, disable remotes for `install-pkg`,
-and install the revision already pinned by `conan.lock`:
+Create the configuration package with the bootstrap profile for the current
+platform, disable remotes for `install-pkg`, and install the revision already
+pinned by `conan.lock`.
+
+On Linux:
 
 ```bash
 conan create ../dicom-dataset-editor-conf -pr:h=../dicom-dataset-editor-conf/profiles/linux-gcc-release -pr:b=../dicom-dataset-editor-conf/profiles/linux-gcc-release
@@ -31,7 +34,15 @@ conan remote disable "*"
 conan config install-pkg conanconfig.yml --lockfile=conan.lock --force -s os=Linux
 ```
 
-Use the Windows profile paths and `-s os=Windows` when bootstrapping on Windows.
+On Windows, run the equivalent commands from an x64 Native Tools Command
+Prompt:
+
+```batch
+conan create ..\dicom-dataset-editor-conf -pr:h=..\dicom-dataset-editor-conf\profiles\windows-msvc-release -pr:b=..\dicom-dataset-editor-conf\profiles\windows-msvc-release
+conan remote disable "*"
+conan config install-pkg conanconfig.yml --lockfile=conan.lock --force -s os=Windows
+```
+
 Explicit profile paths avoid depending on profiles that have not been installed
 into a fresh project home yet. The package installs Release, Debug, and optional
 Ninja Debug profiles for both Linux/GCC and Windows/MSVC.
@@ -42,6 +53,17 @@ then update the lock before running `config install-pkg`:
 ```bash
 conan lock upgrade-config . --no-remote --lockfile=conan.lock --lockfile-out=conan.lock --update-config-requires=dicom-dataset-editor-conf/0.2.0 -pr:h=../dicom-dataset-editor-conf/profiles/linux-gcc-release -pr:b=../dicom-dataset-editor-conf/profiles/linux-gcc-release
 ```
+
+On Windows, use the same command with the bootstrap profile paths from the
+Windows block above:
+
+```batch
+conan lock upgrade-config . --no-remote --lockfile=conan.lock --lockfile-out=conan.lock --update-config-requires=dicom-dataset-editor-conf/0.2.0 -pr:h=..\dicom-dataset-editor-conf\profiles\windows-msvc-release -pr:b=..\dicom-dataset-editor-conf\profiles\windows-msvc-release
+```
+
+If `config install-pkg` cannot find the package after `conan create` succeeds,
+the lock likely pins another recipe revision. Run the matching
+`lock upgrade-config` command above and retry the install.
 
 Commit `conan.lock` when the configuration recipe revision changes. Do not run
 the upgrade merely to initialize a fresh home: recreating identical local recipe
