@@ -231,7 +231,7 @@ EditorWindow::EditorWindow() : Fl_Double_Window(1180, 760, "DICOM Dataset Editor
     menu_->add("&File/Save A&ll", FL_CTRL + FL_ALT + 's', menuCallback, &saveAllAction);
     menu_->add("&File/&Clear Workspace", FL_CTRL + 'w', menuCallback, &clearWorkspaceAction);
     menu_->add("&File/E&xit", 0, menuCallback, &exitAction);
-    menu_->add("&Edit/&Edit Value...", FL_Enter, menuCallback, &editAction);
+    menu_->add("&Edit/Edit or &View Value...", FL_Enter, menuCallback, &editAction);
     menu_->add("&Edit/&Add Attribute...", FL_CTRL + 'n', menuCallback, &addAction);
     menu_->add("&Edit/&Delete Attribute", FL_Delete, menuCallback, &deleteAction);
     menu_->add("&Settings/&Validate DICOM Values", 0, menuCallback, &validateValuesAction, FL_MENU_TOGGLE | FL_MENU_VALUE);
@@ -498,7 +498,7 @@ void EditorWindow::layoutContent() {
 
 void EditorWindow::updateActions() {
     const auto actions = controller_.actionState(datasetPanel_->selectedNode());
-    setMenuActive(*menu_, "&Edit/&Edit Value...", actions.editEnabled);
+    setMenuActive(*menu_, "&Edit/Edit or &View Value...", actions.editEnabled);
     setMenuActive(*menu_, "&Edit/&Delete Attribute", actions.deleteEnabled);
     setMenuActive(*menu_, "&File/&Save", actions.saveEnabled);
     setMenuActive(*menu_, "&File/Save A&ll", actions.saveAllEnabled);

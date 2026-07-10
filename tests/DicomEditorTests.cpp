@@ -253,7 +253,7 @@ void pixelDataIsNotDisplayedOrEditable() {
     const auto nodes = document.nodes();
     const auto node = std::ranges::find_if(nodes, [](const auto &entry) { return entry.keyword == "PixelData"; });
     require(node != nodes.end());
-    require(node->value == "[Pixel Data not displayed]");
+    require(node->value == "[Double-click to view Pixel Data]");
     require(node->valuePreview.empty());
     require(!node->editable);
 }

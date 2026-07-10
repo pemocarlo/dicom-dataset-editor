@@ -160,8 +160,9 @@ class DatasetTable final : public Fl_Table_Row {
         if (node == nullptr) {
             return;
         }
-        const std::array<std::string, ColumnCount> values{dicom_editor::DatasetViewModel::attributeLabel(*node), node->tag, node->vr,
-                                                          node->vm, node->value};
+        const std::array<std::string, ColumnCount> values{
+            dicom_editor::DatasetViewModel::attributeLabel(*node), node->tag, node->vr, node->vm,
+            node->valuePreview.empty() ? node->value : node->valuePreview};
 
         fl_push_clip(x, y, width, height);
         const bool selected = row_selected(row) != 0;
@@ -194,8 +195,13 @@ DatasetPanel::DatasetPanel(int x, int y, int width, int height) : Fl_Group(x, y,
 }
 
 void DatasetPanel::setNodes(std::vector<dicom_editor::DicomNode> nodes) {
+    const auto *selected = selectedNode();
+    const std::string selectedPath = selected == nullptr ? std::string{} : selected->path.toString();
     model_.setNodes(std::move(nodes));
-    rebuild();
+    model_.setFilter(filter_->value());
+    table_->setModel(&model_);
+    restoreSelection(selectedPath);
+    selectionChanged();
 }
 
 const dicom_editor::DicomNode *DatasetPanel::selectedNode() const {
@@ -227,9 +233,26 @@ void DatasetPanel::resize(int x, int y, int width, int height) {
 }
 
 void DatasetPanel::rebuild() {
+    const auto *selected = selectedNode();
+    const std::string selectedPath = selected == nullptr ? std::string{} : selected->path.toString();
     model_.setFilter(filter_->value());
     table_->setModel(&model_);
+    restoreSelection(selectedPath);
     selectionChanged();
+}
+
+void DatasetPanel::restoreSelection(const std::string &path) {
+    if (path.empty()) {
+        return;
+    }
+    for (int row = 0; row < table_->rows(); ++row) {
+        const auto *node = model_.nodeAt(static_cast<std::size_t>(row));
+        if (node != nullptr && node->path.toString() == path) {
+            table_->select_row(row);
+            table_->move_cursor(row, 0);
+            return;
+        }
+    }
 }
 
 void DatasetPanel::selectionChanged() {
