@@ -1,5 +1,7 @@
 #include "DatasetPanel.hpp"
 
+#include "dicom_editor/core/DicomPath.hpp"
+
 #include "dicom_editor/core/DatasetViewModel.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
 
@@ -160,9 +162,8 @@ class DatasetTable final : public Fl_Table_Row {
         if (node == nullptr) {
             return;
         }
-        const std::array<std::string, ColumnCount> values{
-            dicom_editor::DatasetViewModel::attributeLabel(*node), node->tag, node->vr, node->vm,
-            node->valuePreview.empty() ? node->value : node->valuePreview};
+        const std::array<std::string, ColumnCount> values{dicom_editor::DatasetViewModel::attributeLabel(*node), node->tag, node->vr,
+                                                          node->vm, node->valuePreview.empty() ? node->value : node->valuePreview};
 
         fl_push_clip(x, y, width, height);
         const bool selected = row_selected(row) != 0;
