@@ -44,4 +44,5 @@ class FileTreePanel final : public Fl_Group {
     std::function<void(const dicom_editor::BatchEditTarget &)> batchEditHandler_;
     std::optional<std::size_t> activeFileIndex_;
     std::optional<std::size_t> pendingActivationIndex_;
+    bool activatingFromTree_{};
 };
