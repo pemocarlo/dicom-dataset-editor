@@ -91,6 +91,7 @@ DicomWorkspace::DicomWorkspace() { documents_.emplace_back(); }
 
 OpenFilesResult DicomWorkspace::open(const std::vector<std::filesystem::path> &paths) {
     OpenFilesResult summary;
+    std::vector<std::size_t> openedIndices;
     for (const auto &path : paths) {
         const auto normalized = normalizedPath(path);
         const auto duplicate = std::ranges::find_if(documents_, [&normalized](const DicomDocument &candidate) {
@@ -118,7 +119,17 @@ OpenFilesResult DicomWorkspace::open(const std::vector<std::filesystem::path> &p
         }
         documents_.push_back(std::move(loaded));
         activeIndex_ = documents_.size() - 1;
+        openedIndices.push_back(activeIndex_);
         ++summary.opened;
+    }
+    if (!openedIndices.empty()) {
+        const auto ordered = files(FileSortOrder::InstanceNumber);
+        const auto firstOpened = std::ranges::find_if(ordered, [&openedIndices](const OpenDicomFile &file) {
+            return std::ranges::find(openedIndices, file.index) != openedIndices.end();
+        });
+        if (firstOpened != ordered.end()) {
+            activeIndex_ = firstOpened->index;
+        }
     }
     return summary;
 }

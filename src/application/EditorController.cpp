@@ -33,9 +33,12 @@ void EditorController::refreshView() {
     const auto &active = document();
     const std::string name = active.hasFilePath() ? active.filePath().filename().string() : "Untitled";
     const std::string title = std::format("DICOM Dataset Editor - {}{}", name, active.dirty() ? "*" : "");
-    const std::string status = active.hasFilePath() ? std::format("File {} of {} | {}", workspace_.activeIndex() + 1, workspace_.size(),
-                                                                  active.filePath().string())
-                                                    : "New dataset";
+    const auto ordered = workspace_.files(fileSortOrder_);
+    const auto activeFile = std::ranges::find_if(ordered, [](const OpenDicomFile &file) { return file.active; });
+    const auto visibleIndex = static_cast<std::size_t>(std::distance(ordered.begin(), activeFile));
+    const std::string status = active.hasFilePath()
+                                   ? std::format("File {} of {} | {}", visibleIndex + 1, ordered.size(), active.filePath().string())
+                                   : "New dataset";
     view_.presentDocument(active.nodes(validationEnabled_), title, status);
     view_.presentOpenFiles(workspace_.files(fileSortOrder_), workspace_.hasLoadedFiles());
     refreshPixelData();

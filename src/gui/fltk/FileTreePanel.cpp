@@ -52,6 +52,19 @@ std::string fileLabel(const dicom_editor::OpenDicomFile &file) {
     return result;
 }
 
+class SmoothTree final : public Fl_Tree {
+  public:
+    SmoothTree(int x, int y, int width, int height) : Fl_Tree(x, y, width, height) {}
+
+    int handle(int event) override {
+        if (event == FL_MOUSEWHEEL && Fl::event_dy() != 0) {
+            vposition(std::max(0, vposition() + Fl::event_dy() * 32));
+            return 1;
+        }
+        return Fl_Tree::handle(event);
+    }
+};
+
 } // namespace
 
 struct FileTreePanel::TreeItemData {
@@ -69,7 +82,7 @@ FileTreePanel::FileTreePanel(int x, int y, int width, int height) : Fl_Group(x, 
     heading_->labelfont(FL_HELVETICA_BOLD);
     heading_->labelsize(13);
     heading_->labelcolor(fl_rgb_color(58, 78, 94));
-    tree_ = new Fl_Tree(x + Padding, y + HeaderHeight, width - 2 * Padding, height - HeaderHeight - Padding);
+    tree_ = new SmoothTree(x + Padding, y + HeaderHeight, width - 2 * Padding, height - HeaderHeight - Padding);
     tree_->box(FL_BORDER_BOX);
     tree_->color(FL_WHITE);
     tree_->selection_color(fl_rgb_color(207, 228, 245));
@@ -163,10 +176,17 @@ void FileTreePanel::setFiles(const std::vector<dicom_editor::OpenDicomFile> &fil
     for (const auto &path : closedPaths) {
         tree_->close(path.c_str(), 0);
     }
+    if (activeItem != nullptr) {
+        for (auto *parent = activeItem->parent(); parent != nullptr; parent = parent->parent()) {
+            tree_->open(parent, 0);
+        }
+    }
     tree_->recalc_tree();
     tree_->vposition(previousScroll);
-    if (activeItem != nullptr && tree_->displayed(activeItem) == 0) {
-        tree_->show_item(activeItem);
+    const bool activeOutsideViewport =
+        activeItem != nullptr && (activeItem->y() + activeItem->h() <= tree_->y() || activeItem->y() >= tree_->y() + tree_->h());
+    if (activeOutsideViewport) {
+        tree_->show_item_middle(activeItem);
     }
     tree_->redraw();
 }
