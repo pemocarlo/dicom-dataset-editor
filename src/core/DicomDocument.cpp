@@ -308,6 +308,7 @@ DicomDocument::DicomDocument() {
 void DicomDocument::createEmpty() {
     file_ = std::make_unique<DcmFileFormat>();
     filePath_.clear();
+    hierarchyCache_.reset();
     dirty_ = false;
 }
 
@@ -319,6 +320,7 @@ std::expected<void, DicomError> DicomDocument::load(const std::filesystem::path 
     }
     file_ = std::move(loaded);
     filePath_ = path;
+    hierarchyCache_.reset();
     dirty_ = false;
     return {};
 }
@@ -384,6 +386,7 @@ std::expected<void, DicomError> DicomDocument::save() {
         }
     }
     file_ = std::move(loaded);
+    hierarchyCache_.reset();
     dirty_ = false;
     return {};
 }
@@ -398,7 +401,10 @@ std::expected<void, DicomError> DicomDocument::saveAs(const std::filesystem::pat
     return result;
 }
 
-DcmDataset &DicomDocument::dataset() { return *file_->getDataset(); }
+DcmDataset &DicomDocument::dataset() {
+    hierarchyCache_.reset();
+    return *file_->getDataset();
+}
 
 const DcmDataset &DicomDocument::dataset() const { return *file_->getDataset(); }
 
@@ -544,6 +550,9 @@ PixelDataPreview DicomDocument::renderPixelData(unsigned long frameIndex) const 
 }
 
 DicomHierarchy DicomDocument::hierarchy() const {
+    if (hierarchyCache_) {
+        return *hierarchyCache_;
+    }
     auto &mutableDataset = const_cast<DcmDataset &>(dataset());
     DicomHierarchy result;
     result.patientId = datasetString(mutableDataset, DCM_PatientID);
@@ -560,6 +569,7 @@ DicomHierarchy DicomDocument::hierarchy() const {
             result.instanceNumber = number;
         }
     }
+    hierarchyCache_ = result;
     return result;
 }
 
@@ -586,7 +596,10 @@ bool DicomDocument::hasFilePath() const { return !filePath_.empty(); }
 
 bool DicomDocument::dirty() const { return dirty_; }
 
-void DicomDocument::markDirty() { dirty_ = true; }
+void DicomDocument::markDirty() {
+    hierarchyCache_.reset();
+    dirty_ = true;
+}
 
 void DicomDocument::clearDirty() { dirty_ = false; }
 

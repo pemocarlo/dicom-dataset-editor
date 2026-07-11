@@ -477,6 +477,18 @@ void batchEditReportsDifferencesAndUpdatesScope() {
     std::filesystem::remove(secondPath);
 }
 
+void hierarchyCacheInvalidatesAfterMutation() {
+    DicomDocument document;
+    seedDataset(document);
+    require(document.hierarchy().patientLabel == "Before^Patient");
+
+    document.dataset().putAndInsertString(DCM_PatientName, "Direct^Mutation");
+    require(document.hierarchy().patientLabel == "Direct^Mutation");
+
+    DicomEditorService::setAttribute(document, DCM_PatientName, "Service^Mutation", true);
+    require(document.hierarchy().patientLabel == "Service^Mutation");
+}
+
 void controllerSavesAllAndClearsWorkspace() {
     const auto directory = std::filesystem::temp_directory_path();
     const auto firstPath = directory / "dicom_editor_save_all_first.dcm";
@@ -613,6 +625,7 @@ int main() {
         dicomDirectoryIsRecognizedAndSkipped();
         workspaceSortsByInstanceOrFilename();
         batchEditReportsDifferencesAndUpdatesScope();
+        hierarchyCacheInvalidatesAfterMutation();
         controllerSavesAllAndClearsWorkspace();
         dicomDirectoryResolvesReferencedFiles();
         dictionaryOverrideIsValidatedAndActivated();

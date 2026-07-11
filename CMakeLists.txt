@@ -9,6 +9,7 @@ project(
 )
 
 option(DICOM_EDITOR_DEVELOPER_MODE "Enable developer tooling targets" OFF)
+option(DICOM_EDITOR_BUILD_BENCHMARKS "Build synthetic performance benchmarks" OFF)
 
 find_package(DCMTK CONFIG REQUIRED)
 find_package(fltk CONFIG REQUIRED)
@@ -162,6 +163,12 @@ if(BUILD_TESTING)
     target_include_directories(dicom_editor_gui_smoke_test PRIVATE src/gui/fltk)
     target_link_libraries(dicom_editor_gui_smoke_test PRIVATE DicomDatasetEditor::fltk)
     add_test(NAME dicom_editor_gui_smoke_test COMMAND dicom_editor_gui_smoke_test)
+endif()
+
+if(DICOM_EDITOR_BUILD_BENCHMARKS)
+    add_executable(dicom_editor_benchmarks)
+    target_sources(dicom_editor_benchmarks PRIVATE benchmarks/DicomEditorBenchmarks.cpp)
+    target_link_libraries(dicom_editor_benchmarks PRIVATE DicomDatasetEditor::core)
 endif()
 
 if(DICOM_EDITOR_DEVELOPER_MODE)
