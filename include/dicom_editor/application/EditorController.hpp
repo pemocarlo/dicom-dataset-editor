@@ -6,7 +6,9 @@
 #include <cstddef>
 #include <exception>
 #include <filesystem>
+#include <functional>
 #include <optional>
+#include <stop_token>
 #include <string>
 #include <vector>
 
@@ -41,6 +43,26 @@ struct ActionState {
     bool deleteEnabled{};
 };
 
+struct SaveAllProgress {
+    std::size_t completed{};
+    std::size_t total{};
+    std::filesystem::path currentPath;
+};
+
+struct SaveFailure {
+    std::filesystem::path path;
+    std::string error;
+};
+
+struct SaveAllReport {
+    std::size_t saved{};
+    std::vector<SaveFailure> failures;
+    bool cancelled{};
+};
+
+using SaveAllProgressCallback = std::function<void(const SaveAllProgress &)>;
+using SaveAllTask = std::function<SaveAllReport(std::stop_token, const SaveAllProgressCallback &)>;
+
 /// View interface used by the controller.
 class EditorView {
   public:
@@ -71,6 +93,8 @@ class EditorView {
     [[nodiscard]] virtual std::optional<AttributeInput> addAttribute() = 0;
     /// Reviews consistency and collects one scoped batch edit.
     [[nodiscard]] virtual std::optional<AttributeInput> batchEditAttribute(const BatchEditReport &report) = 0;
+    /// Runs a cancellable modal save job and returns its final report.
+    [[nodiscard]] virtual SaveAllReport runSaveAllJob(SaveAllTask task) = 0;
     /// Shows an error message.
     virtual void showError(const std::string &message) = 0;
     /// Updates the document tree and window title.
@@ -140,6 +164,8 @@ class EditorController {
     [[nodiscard]] bool confirmDiscardChanges();
     bool saveTo(const std::optional<std::filesystem::path> &path);
     void editValue(const DicomPath &path, const std::string &value);
+    void refreshDocument();
+    void refreshOpenFiles();
     void refreshPixelData();
     void reportError(const std::exception &error, bool refreshAfter);
     void openPaths(const std::vector<std::filesystem::path> &paths);

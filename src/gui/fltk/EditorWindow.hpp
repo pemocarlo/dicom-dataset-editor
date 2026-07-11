@@ -49,6 +49,7 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     void viewAttribute(const std::string &title, const std::string &value) override;
     [[nodiscard]] std::optional<dicom_editor::AttributeInput> addAttribute() override;
     [[nodiscard]] std::optional<dicom_editor::AttributeInput> batchEditAttribute(const dicom_editor::BatchEditReport &report) override;
+    [[nodiscard]] dicom_editor::SaveAllReport runSaveAllJob(dicom_editor::SaveAllTask task) override;
     void showError(const std::string &message) override;
     void presentDocument(std::vector<dicom_editor::DicomNode> nodes, const std::string &title, const std::string &status) override;
     void presentOpenFiles(const std::vector<dicom_editor::OpenDicomFile> &files, bool hasLoadedFiles) override;

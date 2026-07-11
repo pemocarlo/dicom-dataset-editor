@@ -29,6 +29,7 @@
 #include <ofstd/oftypes.h>
 
 #include <algorithm>
+#include <atomic>
 #include <charconv>
 #include <cstdio>
 #include <expected>
@@ -326,17 +327,75 @@ std::expected<void, DicomError> DicomDocument::save() {
     if (filePath_.empty()) {
         return std::unexpected(DicomError("Cannot save without a file path"));
     }
-    const auto result = file_->saveFile(filePath_.string().c_str(), EXS_LittleEndianExplicit);
+    static std::atomic_uint64_t sequence{};
+    const auto suffix = std::format(".dicom-editor-{}", sequence.fetch_add(1, std::memory_order_relaxed));
+    auto temporary = filePath_;
+    temporary += suffix + ".tmp";
+    auto backup = filePath_;
+    backup += suffix + ".bak";
+
+    const auto originalSyntax = file_->getDataset()->getOriginalXfer();
+    const auto syntax = originalSyntax == EXS_Unknown ? EXS_LittleEndianExplicit : originalSyntax;
+    const auto result = file_->saveFile(temporary.string().c_str(), syntax);
     if (result.bad()) {
+        std::error_code ignored;
+        std::filesystem::remove(temporary, ignored);
         return makeUnexpected("Save DICOM file", result);
     }
+
+    std::error_code error;
+    const bool targetExisted = std::filesystem::exists(filePath_, error);
+    if (error) {
+        std::filesystem::remove(temporary, error);
+        return std::unexpected(DicomError("Inspect DICOM save target: " + error.message()));
+    }
+    if (targetExisted) {
+        std::filesystem::rename(filePath_, backup, error);
+        if (error) {
+            std::filesystem::remove(temporary, error);
+            return std::unexpected(DicomError("Back up original DICOM file: " + error.message()));
+        }
+    }
+    std::filesystem::rename(temporary, filePath_, error);
+    if (error) {
+        std::error_code ignored;
+        if (targetExisted) {
+            std::filesystem::rename(backup, filePath_, ignored);
+        }
+        std::filesystem::remove(temporary, ignored);
+        return std::unexpected(DicomError("Replace original DICOM file: " + error.message()));
+    }
+
+    auto loaded = std::make_unique<DcmFileFormat>();
+    const auto reload = loaded->loadFile(filePath_.string().c_str());
+    if (reload.bad()) {
+        std::error_code ignored;
+        std::filesystem::remove(filePath_, ignored);
+        if (targetExisted) {
+            std::filesystem::rename(backup, filePath_, ignored);
+        }
+        std::filesystem::remove(temporary, ignored);
+        return makeUnexpected("Reload saved DICOM file", reload);
+    }
+    if (targetExisted) {
+        std::filesystem::remove(backup, error);
+        if (error) {
+            return std::unexpected(DicomError("Remove DICOM backup file: " + error.message()));
+        }
+    }
+    file_ = std::move(loaded);
     dirty_ = false;
     return {};
 }
 
 std::expected<void, DicomError> DicomDocument::saveAs(const std::filesystem::path &path) {
+    const auto previousPath = filePath_;
     filePath_ = path;
-    return save();
+    const auto result = save();
+    if (!result) {
+        filePath_ = previousPath;
+    }
+    return result;
 }
 
 DcmDataset &DicomDocument::dataset() { return *file_->getDataset(); }
