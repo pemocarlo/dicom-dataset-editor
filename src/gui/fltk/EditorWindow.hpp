@@ -10,7 +10,9 @@
 class DatasetPanel;
 class FileTreePanel;
 class Fl_Box;
+class Fl_Button;
 class Fl_Menu_Bar;
+class Fl_Toggle_Button;
 class Fl_Widget;
 class PixelDataPanel;
 
@@ -31,6 +33,8 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     void setPixelDataPreviewVertical(bool vertical);
     /// Returns `true` when the preview pane is on the right.
     [[nodiscard]] bool pixelDataPreviewVertical() const;
+    /// Dispatches menu and toolbar actions.
+    static void menuCallback(Fl_Widget *widget, void *data);
 
   private:
     [[nodiscard]] std::vector<std::filesystem::path> chooseOpenFiles() override;
@@ -52,13 +56,23 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     void setStatus(const std::string &status) override;
     void updateActions();
     void layoutContent();
+    void setUiZoom(int size);
     void exit();
     void resize(int x, int y, int width, int height) override;
 
-    static void menuCallback(Fl_Widget *widget, void *data);
     static void closeCallback(Fl_Widget *widget, void *data);
 
     Fl_Menu_Bar *menu_{};
+    Fl_Box *toolbar_{};
+    Fl_Button *openButton_{};
+    Fl_Button *folderButton_{};
+    Fl_Button *saveButton_{};
+    Fl_Button *addButton_{};
+    Fl_Button *editButton_{};
+    Fl_Button *deleteButton_{};
+    Fl_Button *previousFileButton_{};
+    Fl_Button *nextFileButton_{};
+    Fl_Toggle_Button *pixelPreviewButton_{};
     FileTreePanel *fileTreePanel_{};
     Fl_Widget *fileTreeSplitter_{};
     DatasetPanel *datasetPanel_{};
@@ -66,9 +80,10 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     PixelDataPanel *pixelDataPanel_{};
     Fl_Box *status_{};
     dicom_editor::EditorController controller_;
-    int pixelDataPanelExtent_{280};
-    int fileTreePanelExtent_{280};
-    bool pixelDataPreviewVertical_{false};
+    int pixelDataPanelExtent_{400};
+    int fileTreePanelExtent_{300};
+    bool pixelDataPreviewVertical_{true};
     bool fileTreeVisible_{};
     bool workspaceHadFiles_{};
+    int uiFontSize_{14};
 };

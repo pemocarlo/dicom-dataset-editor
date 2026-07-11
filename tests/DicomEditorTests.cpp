@@ -300,6 +300,24 @@ void sharedUiModelFiltersAndFormats() {
     require(model.visibleIndices().empty());
 }
 
+void sharedUiModelCollapsesSequences() {
+    DicomDocument document;
+    seedDataset(document);
+    dicom_editor::DatasetViewModel model;
+    model.setNodes(document.nodes());
+    const auto sequence = std::ranges::find_if(model.nodes(), [](const auto &node) {
+        return node.kind == dicom_editor::DicomNodeKind::Sequence && node.keyword == "ReferencedStudySequence";
+    });
+    require(sequence != model.nodes().end());
+    const auto expandedCount = model.visibleIndices().size();
+
+    model.toggleSequence(sequence->path);
+    require(model.sequenceCollapsed(sequence->path));
+    require(model.visibleIndices().size() < expandedCount);
+    model.setFilter("ReferencedSOPInstanceUID");
+    require(!model.visibleIndices().empty());
+}
+
 void sharedTagParserValidatesHex() {
     const auto tag = dicom_editor::parseTagKey("0010", "0010");
     require(tag && *tag == DCM_PatientName);
@@ -548,6 +566,7 @@ int main() {
         pixelDataIsNotDisplayedOrEditable();
         pixelDataRendersForPreview();
         sharedUiModelFiltersAndFormats();
+        sharedUiModelCollapsesSequences();
         sharedTagParserValidatesHex();
         controllerOpensAndNavigatesMultipleFiles();
         dicomDirectoryIsRecognizedAndSkipped();

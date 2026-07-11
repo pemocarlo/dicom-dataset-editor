@@ -29,6 +29,7 @@ class PixelDataPanel final : public Fl_Group {
     void setPreviousFileHandler(std::function<void()> handler);
     /// Sets the callback for the next-file button.
     void setNextFileHandler(std::function<void()> handler);
+    void setFontSize(int size);
     /// Repositions child widgets after resize.
     void resize(int x, int y, int width, int height) override;
 

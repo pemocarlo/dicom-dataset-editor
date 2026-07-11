@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -40,6 +41,18 @@ std::span<const DicomNode> DatasetViewModel::nodes() const { return nodes_; }
 
 std::span<const std::size_t> DatasetViewModel::visibleIndices() const { return visibleIndices_; }
 
+void DatasetViewModel::toggleSequence(const DicomPath &path) {
+    const auto key = path.toString();
+    if (const auto found = collapsedSequences_.find(key); found != collapsedSequences_.end()) {
+        collapsedSequences_.erase(found);
+    } else {
+        collapsedSequences_.insert(key);
+    }
+    rebuild();
+}
+
+bool DatasetViewModel::sequenceCollapsed(const DicomPath &path) const { return collapsedSequences_.contains(path.toString()); }
+
 std::string DatasetViewModel::attributeLabel(const DicomNode &node) {
     std::string label(static_cast<std::size_t>(node.depth) * 2, ' ');
     label += node.keyword.empty() ? node.tag : node.keyword;
@@ -64,11 +77,21 @@ std::string_view DatasetViewModel::kindLabel(DicomNodeKind kind) {
 
 void DatasetViewModel::rebuild() {
     visibleIndices_.clear();
+    std::optional<unsigned int> collapsedDepth;
     for (std::size_t index = 0; index < nodes_.size(); ++index) {
         const auto &node = nodes_[index];
+        if (filter_.empty() && collapsedDepth && node.depth > *collapsedDepth) {
+            continue;
+        }
+        if (collapsedDepth && node.depth <= *collapsedDepth) {
+            collapsedDepth.reset();
+        }
         const std::string searchable = node.tag + " " + node.keyword + " " + node.vr + " " + node.valuePreview + " " + node.path.toString();
         if (filter_.empty() || containsCaseInsensitive(searchable, filter_)) {
             visibleIndices_.push_back(index);
+        }
+        if (filter_.empty() && node.kind == DicomNodeKind::Sequence && sequenceCollapsed(node.path)) {
+            collapsedDepth = node.depth;
         }
     }
 }

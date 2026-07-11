@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <format>
+#include <initializer_list>
 #include <memory>
 #include <string>
 #include <utility>
@@ -18,9 +19,9 @@
 
 namespace {
 
-constexpr int HeaderHeight = 68;
-constexpr int ButtonWidth = 64;
-constexpr int Padding = 8;
+constexpr int HeaderHeight = 78;
+constexpr int ButtonWidth = 76;
+constexpr int Padding = 10;
 
 } // namespace
 
@@ -46,11 +47,13 @@ class PixelCanvas final : public Fl_Widget {
         fl_push_clip(x(), y(), w(), h());
         fl_color(fl_rgb_color(27, 31, 36));
         fl_rectf(x(), y(), w(), h());
+        fl_color(fl_rgb_color(52, 60, 68));
+        fl_rect(x(), y(), w(), h());
 
         if (source_ == nullptr) {
             const std::string message = preview_.message.empty() ? "No pixel data to display." : preview_.message;
             fl_color(fl_rgb_color(205, 211, 218));
-            fl_font(FL_HELVETICA, 14);
+            fl_font(FL_HELVETICA, FL_NORMAL_SIZE);
             fl_draw(message.c_str(), x() + 24, y() + 24, w() - 48, h() - 48, FL_ALIGN_CENTER | FL_ALIGN_WRAP);
             fl_pop_clip();
             return;
@@ -78,10 +81,12 @@ class PixelCanvas final : public Fl_Widget {
 };
 
 PixelDataPanel::PixelDataPanel(int x, int y, int width, int height) : Fl_Group(x, y, width, height) {
-    box(FL_THIN_UP_BOX);
+    box(FL_FLAT_BOX);
+    color(fl_rgb_color(238, 243, 247));
     title_ = new Fl_Box(0, 0, 1, 1, "Pixel Data");
     title_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
     title_->labelfont(FL_HELVETICA_BOLD);
+    title_->labelcolor(fl_rgb_color(42, 62, 78));
     previousFile_ = new Fl_Button(0, 0, 1, 1, "< File");
     previousFile_->callback(previousFileCallback, this);
     nextFile_ = new Fl_Button(0, 0, 1, 1, "File >");
@@ -90,6 +95,13 @@ PixelDataPanel::PixelDataPanel(int x, int y, int width, int height) : Fl_Group(x
     previous_->callback(previousCallback, this);
     next_ = new Fl_Button(0, 0, 1, 1, "Frame >");
     next_->callback(nextCallback, this);
+    for (auto *button : {previousFile_, nextFile_, previous_, next_}) {
+        button->box(FL_FLAT_BOX);
+        button->color(fl_rgb_color(218, 228, 236));
+        button->selection_color(fl_rgb_color(190, 216, 239));
+        button->labelcolor(fl_rgb_color(31, 55, 74));
+        button->labelfont(FL_HELVETICA_BOLD);
+    }
     canvas_ = new PixelCanvas(0, 0, 1, 1);
     resizable(canvas_);
     end();
@@ -128,6 +140,14 @@ void PixelDataPanel::setNextHandler(std::function<void()> handler) { nextHandler
 void PixelDataPanel::setPreviousFileHandler(std::function<void()> handler) { previousFileHandler_ = std::move(handler); }
 
 void PixelDataPanel::setNextFileHandler(std::function<void()> handler) { nextFileHandler_ = std::move(handler); }
+
+void PixelDataPanel::setFontSize(int size) {
+    title_->labelsize(size);
+    for (auto *button : {previousFile_, nextFile_, previous_, next_}) {
+        button->labelsize(size);
+    }
+    redraw();
+}
 
 void PixelDataPanel::resize(int x, int y, int width, int height) {
     Fl_Group::resize(x, y, width, height);

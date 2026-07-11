@@ -5,6 +5,7 @@
 
 #include <FL/Enumerations.H>
 #include <FL/Fl.H>
+#include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Button.H>
 #include <FL/Fl_Tree.H>
 #include <FL/Fl_Tree_Item.H>
@@ -12,17 +13,20 @@
 #include <FL/fl_ask.H>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <format>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 
 namespace {
 
-constexpr int Padding = 6;
+constexpr int Padding = 10;
+constexpr int HeaderHeight = 34;
 
 std::string safeTreeLabel(std::string value) {
     std::ranges::replace(value, '/', '_');
@@ -58,8 +62,19 @@ struct FileTreePanel::TreeItemData {
 };
 
 FileTreePanel::FileTreePanel(int x, int y, int width, int height) : Fl_Group(x, y, width, height) {
-    box(FL_THIN_UP_BOX);
-    tree_ = new Fl_Tree(x + Padding, y + Padding, width - 2 * Padding, height - 2 * Padding);
+    box(FL_FLAT_BOX);
+    color(fl_rgb_color(238, 243, 247));
+    heading_ = new Fl_Box(x + Padding, y + Padding, width - 2 * Padding, HeaderHeight - Padding, "OPEN DATASETS");
+    heading_->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+    heading_->labelfont(FL_HELVETICA_BOLD);
+    heading_->labelsize(13);
+    heading_->labelcolor(fl_rgb_color(58, 78, 94));
+    tree_ = new Fl_Tree(x + Padding, y + HeaderHeight, width - 2 * Padding, height - HeaderHeight - Padding);
+    tree_->box(FL_BORDER_BOX);
+    tree_->color(FL_WHITE);
+    tree_->selection_color(fl_rgb_color(207, 228, 245));
+    tree_->item_labelsize(14);
+    tree_->item_draw_mode(FL_TREE_ITEM_DRAW_LABEL_AND_WIDGET);
     tree_->showroot(0);
     tree_->selectmode(FL_TREE_SELECT_SINGLE);
     tree_->callback(treeCallback, this);
@@ -70,6 +85,15 @@ FileTreePanel::FileTreePanel(int x, int y, int width, int height) : Fl_Group(x, 
 FileTreePanel::~FileTreePanel() = default;
 
 void FileTreePanel::setFiles(const std::vector<dicom_editor::OpenDicomFile> &files) {
+    const int previousScroll = tree_->vposition();
+    std::set<std::string> closedPaths;
+    std::array<char, 4096> pathBuffer{};
+    for (auto *item = tree_->first(); item != nullptr; item = tree_->next(item)) {
+        if (item->has_children() != 0 && item->is_close() != 0 &&
+            tree_->item_pathname(pathBuffer.data(), static_cast<int>(pathBuffer.size()), item) == 0) {
+            closedPaths.emplace(pathBuffer.data());
+        }
+    }
     tree_->clear();
     itemData_.clear();
     itemData_.reserve(files.size() * 3);
@@ -79,6 +103,7 @@ void FileTreePanel::setFiles(const std::vector<dicom_editor::OpenDicomFile> &fil
     std::string previousPatientPath;
     std::string previousStudyPath;
     std::string previousSeriesPath;
+    Fl_Tree_Item *activeItem = nullptr;
     for (const auto &file : files) {
         const auto &hierarchy = file.hierarchy;
         const std::string patientPath = groupLabel(hierarchy.patientLabel, hierarchy.patientId);
@@ -131,9 +156,17 @@ void FileTreePanel::setFiles(const std::vector<dicom_editor::OpenDicomFile> &fil
             }
             if (file.active) {
                 tree_->select(item, 0);
-                tree_->show_item(item);
+                activeItem = item;
             }
         }
+    }
+    for (const auto &path : closedPaths) {
+        tree_->close(path.c_str(), 0);
+    }
+    tree_->recalc_tree();
+    tree_->vposition(previousScroll);
+    if (activeItem != nullptr && tree_->displayed(activeItem) == 0) {
+        tree_->show_item(activeItem);
     }
     tree_->redraw();
 }
@@ -142,6 +175,12 @@ void FileTreePanel::setActivationHandler(std::function<void(std::size_t)> handle
 
 void FileTreePanel::setBatchEditHandler(std::function<void(const dicom_editor::BatchEditTarget &)> handler) {
     batchEditHandler_ = std::move(handler);
+}
+
+void FileTreePanel::setFontSize(int size) {
+    heading_->labelsize(std::max(12, size - 1));
+    tree_->item_labelsize(size);
+    tree_->redraw();
 }
 
 int FileTreePanel::handle(int event) {
@@ -171,7 +210,8 @@ int FileTreePanel::handle(int event) {
 
 void FileTreePanel::resize(int x, int y, int width, int height) {
     Fl_Group::resize(x, y, width, height);
-    tree_->resize(x + Padding, y + Padding, width - 2 * Padding, height - 2 * Padding);
+    heading_->resize(x + Padding, y + Padding, width - 2 * Padding, HeaderHeight - Padding);
+    tree_->resize(x + Padding, y + HeaderHeight, width - 2 * Padding, height - HeaderHeight - Padding);
 }
 
 void FileTreePanel::treeCallback(Fl_Widget *, void *data) {
