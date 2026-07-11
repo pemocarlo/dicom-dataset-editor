@@ -342,7 +342,25 @@ EditorWindow::EditorWindow() : Fl_Double_Window(1280, 820, "DICOM Dataset Editor
 }
 
 int EditorWindow::handle(int event) {
-    if ((event == FL_KEYDOWN || event == FL_SHORTCUT) && Fl::event_key() == FL_Escape) {
+    if (event == FL_KEYDOWN || event == FL_SHORTCUT) {
+        const int key = Fl::event_key();
+        if (Fl::event_state(FL_CTRL) != 0) {
+            if (key == '+' || key == '=' || key == FL_KP + '+') {
+                setUiZoom(uiFontSize_ + 1);
+                return 1;
+            }
+            if (key == '-' || key == FL_KP + '-') {
+                setUiZoom(uiFontSize_ - 1);
+                return 1;
+            }
+            if (key == '0' || key == FL_KP + '0') {
+                setUiZoom(14);
+                return 1;
+            }
+        }
+        if (key != FL_Escape) {
+            return Fl_Double_Window::handle(event);
+        }
         datasetPanel_->focusRows();
         return 1;
     }

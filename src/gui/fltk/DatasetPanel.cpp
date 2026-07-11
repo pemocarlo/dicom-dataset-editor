@@ -117,7 +117,7 @@ class DatasetTable final : public Fl_Table_Row {
 
     int handle(int event) override {
         if (event == FL_MOUSEWHEEL && Fl::event_dy() != 0) {
-            restoreFirstVisibleRow(row_position() + Fl::event_dy() * 2);
+            restoreFirstVisibleRow(row_position() + Fl::event_dy() * 4);
             return 1;
         }
         if (event == FL_KEYDOWN) {

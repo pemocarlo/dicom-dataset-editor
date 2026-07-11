@@ -52,19 +52,6 @@ std::string fileLabel(const dicom_editor::OpenDicomFile &file) {
     return result;
 }
 
-class SmoothTree final : public Fl_Tree {
-  public:
-    SmoothTree(int x, int y, int width, int height) : Fl_Tree(x, y, width, height) {}
-
-    int handle(int event) override {
-        if (event == FL_MOUSEWHEEL && Fl::event_dy() != 0) {
-            vposition(std::max(0, vposition() + Fl::event_dy() * 32));
-            return 1;
-        }
-        return Fl_Tree::handle(event);
-    }
-};
-
 } // namespace
 
 struct FileTreePanel::TreeItemData {
@@ -82,7 +69,7 @@ FileTreePanel::FileTreePanel(int x, int y, int width, int height) : Fl_Group(x, 
     heading_->labelfont(FL_HELVETICA_BOLD);
     heading_->labelsize(13);
     heading_->labelcolor(fl_rgb_color(58, 78, 94));
-    tree_ = new SmoothTree(x + Padding, y + HeaderHeight, width - 2 * Padding, height - HeaderHeight - Padding);
+    tree_ = new Fl_Tree(x + Padding, y + HeaderHeight, width - 2 * Padding, height - HeaderHeight - Padding);
     tree_->box(FL_BORDER_BOX);
     tree_->color(FL_WHITE);
     tree_->selection_color(fl_rgb_color(207, 228, 245));
@@ -95,7 +82,10 @@ FileTreePanel::FileTreePanel(int x, int y, int width, int height) : Fl_Group(x, 
     end();
 }
 
-FileTreePanel::~FileTreePanel() = default;
+FileTreePanel::~FileTreePanel() {
+    Fl::remove_timeout(centerActiveCallback, this);
+    Fl::remove_timeout(activatePendingCallback, this);
+}
 
 void FileTreePanel::setFiles(const std::vector<dicom_editor::OpenDicomFile> &files) {
     const int previousScroll = tree_->vposition();
@@ -117,6 +107,7 @@ void FileTreePanel::setFiles(const std::vector<dicom_editor::OpenDicomFile> &fil
     std::string previousStudyPath;
     std::string previousSeriesPath;
     Fl_Tree_Item *activeItem = nullptr;
+    std::optional<std::size_t> newActiveFileIndex;
     for (const auto &file : files) {
         const auto &hierarchy = file.hierarchy;
         const std::string patientPath = groupLabel(hierarchy.patientLabel, hierarchy.patientId);
@@ -170,6 +161,7 @@ void FileTreePanel::setFiles(const std::vector<dicom_editor::OpenDicomFile> &fil
             if (file.active) {
                 tree_->select(item, 0);
                 activeItem = item;
+                newActiveFileIndex = file.index;
             }
         }
     }
@@ -183,10 +175,11 @@ void FileTreePanel::setFiles(const std::vector<dicom_editor::OpenDicomFile> &fil
     }
     tree_->recalc_tree();
     tree_->vposition(previousScroll);
-    const bool activeOutsideViewport =
-        activeItem != nullptr && (activeItem->y() + activeItem->h() <= tree_->y() || activeItem->y() >= tree_->y() + tree_->h());
-    if (activeOutsideViewport) {
-        tree_->show_item_middle(activeItem);
+    const bool activeFileChanged = newActiveFileIndex != activeFileIndex_;
+    activeFileIndex_ = newActiveFileIndex;
+    if (activeItem != nullptr && activeFileChanged) {
+        Fl::remove_timeout(centerActiveCallback, this);
+        Fl::add_timeout(0.0, centerActiveCallback, this);
     }
     tree_->redraw();
 }
@@ -239,6 +232,34 @@ void FileTreePanel::treeCallback(Fl_Widget *, void *data) {
     auto *item = panel.tree_->callback_item();
     auto *itemData = item == nullptr ? nullptr : static_cast<TreeItemData *>(item->user_data());
     if (itemData != nullptr && itemData->kind == TreeItemData::Kind::File && panel.activationHandler_) {
-        panel.activationHandler_(itemData->fileIndex);
+        panel.pendingActivationIndex_ = itemData->fileIndex;
+        Fl::remove_timeout(activatePendingCallback, &panel);
+        Fl::add_timeout(0.0, activatePendingCallback, &panel);
+    }
+}
+
+void FileTreePanel::activatePendingCallback(void *data) {
+    auto &panel = *static_cast<FileTreePanel *>(data);
+    if (!panel.pendingActivationIndex_ || !panel.activationHandler_) {
+        return;
+    }
+    const std::size_t index = *panel.pendingActivationIndex_;
+    panel.pendingActivationIndex_.reset();
+    panel.activationHandler_(index);
+}
+
+void FileTreePanel::centerActiveCallback(void *data) {
+    auto &panel = *static_cast<FileTreePanel *>(data);
+    if (!panel.activeFileIndex_) {
+        return;
+    }
+    for (auto *item = panel.tree_->first(); item != nullptr; item = panel.tree_->next(item)) {
+        auto *itemData = static_cast<TreeItemData *>(item->user_data());
+        if (itemData != nullptr && itemData->kind == TreeItemData::Kind::File && itemData->fileIndex == *panel.activeFileIndex_) {
+            panel.tree_->recalc_tree();
+            panel.tree_->show_item_middle(item);
+            panel.tree_->redraw();
+            return;
+        }
     }
 }
