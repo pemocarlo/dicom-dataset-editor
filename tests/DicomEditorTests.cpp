@@ -99,14 +99,14 @@ class ControllerView final : public dicom_editor::EditorView {
         });
     }
     void showError(const std::string &message) override { error = message; }
-    void presentDocument(std::vector<dicom_editor::DicomNode>, const std::string &, const std::string &value) override {
+    void presentDocument(dicom_editor::DocumentPresentation presentation) override {
         ++documentPresentations;
-        documentStatus = value;
+        documentStatus = std::move(presentation.status);
     }
-    void presentOpenFiles(const std::vector<dicom_editor::OpenDicomFile> &files, bool loaded) override {
+    void presentOpenFiles(dicom_editor::OpenFilesPresentation presentation) override {
         ++openFilesPresentations;
-        openFiles = files;
-        hasLoadedFiles = loaded;
+        openFiles = std::move(presentation.files);
+        hasLoadedFiles = presentation.hasLoadedFiles;
     }
     void presentPixelData(std::optional<dicom_editor::PixelDataPreview> preview) override {
         ++pixelPresentations;

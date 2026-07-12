@@ -46,10 +46,12 @@ void EditorController::refreshDocument() {
     const std::string status = active.hasFilePath()
                                    ? std::format("File {} of {} | {}", visibleIndex + 1, ordered.size(), active.filePath().string())
                                    : "New dataset";
-    view_.presentDocument(active.nodes(validationEnabled_), title, status);
+    view_.presentDocument({.nodes = active.nodes(validationEnabled_), .title = title, .status = status});
 }
 
-void EditorController::refreshOpenFiles() { view_.presentOpenFiles(workspace_.files(fileSortOrder_), workspace_.hasLoadedFiles()); }
+void EditorController::refreshOpenFiles() {
+    view_.presentOpenFiles({.files = workspace_.files(fileSortOrder_), .hasLoadedFiles = workspace_.hasLoadedFiles()});
+}
 
 void EditorController::openDocument() {
     const auto paths = view_.chooseOpenFiles();
@@ -283,7 +285,7 @@ void EditorController::batchEdit(const BatchEditTarget &target) {
 void EditorController::setFileSortOrder(FileSortOrder order) {
     if (fileSortOrder_ != order) {
         fileSortOrder_ = order;
-        view_.presentOpenFiles(workspace_.files(fileSortOrder_), workspace_.hasLoadedFiles());
+        refreshOpenFiles();
     }
 }
 

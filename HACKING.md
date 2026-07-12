@@ -289,6 +289,12 @@ the official LLVM installer and point the editor at its `bin` directory.
 
 ## Code Layout
 
+When learning the code, start with `EditorController.hpp`: its `EditorView`
+port lists every user interaction and presentation update without FLTK details.
+Then trace a use case through `EditorController.cpp` into core. Read
+`EditorWindow.cpp` for widget wiring and layout, and `EditorWindowDialogs.cpp`
+only for native choosers, prompts, and the asynchronous Save All adapter.
+
 - See [ARCHITECTURE.md](ARCHITECTURE.md) for dependency boundaries, state
   ownership, request flow, and extension rules.
 - `DicomDocument`: DICOM file ownership, load/save, dirty state, recursive node listing, and patient/study/series metadata.
