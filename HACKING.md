@@ -18,6 +18,9 @@ add pinned Ninja:
 - `cppcheck/2.20.0`
 - `ninja/1.13.2`
 
+Catch2 `3.15.1` is a conditional Conan `test_requires` dependency in the host
+context. It is present only when `tools.build:skip_test` is false.
+
 All three have x86-64 ConanCenter binaries for Linux and Windows.
 
 Install Debug host dependencies before the default developer workflow. Build
@@ -168,6 +171,22 @@ cmake --build --preset cppcheck
 cmake --preset iwyu
 cmake --build --preset iwyu
 ```
+
+## Tests
+
+Tests use Catch2 v3 and remain driven by CTest. CMake discovers test cases just
+before execution, so each named Catch2 case appears separately in CTest without
+running target binaries during compilation. Run all tests or select a label:
+
+```bash
+ctest --preset dev
+ctest --preset dev -L unit
+ctest --preset dev -L gui
+```
+
+Use short behavior-focused test names and tags. Link new test executables to
+`Catch2::Catch2WithMain`, then register them with `catch_discover_tests()` using
+`DISCOVERY_MODE PRE_TEST`; do not add another hand-written test `main()`.
 
 ## Runtime Analysis
 

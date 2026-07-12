@@ -101,7 +101,7 @@ in Release.
 For the final optimized Linux executable:
 
 ```bash
-conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release
+conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release -c tools.build:skip_test=True
 ```
 
 For daily Linux development with assertions and debug information:
@@ -114,7 +114,7 @@ Windows uses the equivalent host profiles while retaining the Release build
 profile. Run these from an x64 Native Tools Command Prompt:
 
 ```batch
-conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release
+conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release -c tools.build:skip_test=True
 conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-debug -pr:b=windows-msvc-release
 ```
 
@@ -154,6 +154,11 @@ location to CMake; the build embeds it, so the installed application does not
 depend on the Conan cache or a separate data file. Pinned CMake and cppcheck,
 plus Ninja when selected, are installed in Conan's Release build context and
 recorded by the lockfile.
+
+Catch2 is a host-context `test_requires` dependency. Test-enabled Debug,
+quality, sanitizer, and `conan create` builds receive it automatically. Release
+installs use `tools.build:skip_test=True`, which disables `BUILD_TESTING` and
+omits Catch2 from the dependency graph.
 
 In-source builds are not supported.
 
