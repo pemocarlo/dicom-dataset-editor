@@ -41,6 +41,9 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
 - The open-files panel stays hidden until a dataset is loaded. Toggle it with `View > Open Files Panel` and drag its right edge to resize it.
 - `View > Previous File` (`Ctrl+Page Up`) and `View > Next File` (`Ctrl+Page Down`) navigate the open workspace. The same controls are
   available in the pixel preview beside the independent frame controls.
+- `View > Show Pixel Preview` (`Ctrl+P`) opens an adaptively sized preview pane. Use its controls for fit-to-pane, 1:1, and incremental
+  zoom; use the mouse wheel to zoom around the pointer, drag to pan, or double-click to fit. Placement commands move the pane right or
+  below without ambiguous checked layout options, and each placement remembers its own size.
 - Bold text and an asterisk mark an open file with unsaved changes. Switching files and batch edits keep changes in memory; save affected
   datasets normally, or use `File > Save All` (`Ctrl+Alt+S`). Batch value entry starts with existing value for small corrections.
 - `File > Clear Workspace` (`Ctrl+W`) resolves unsaved changes then returns to one empty dataset. Closing with multiple dirty datasets
