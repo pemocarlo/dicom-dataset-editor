@@ -51,7 +51,8 @@ conan config install-pkg conanconfig.yml --lockfile=conan.lock --force -s os=Win
 
 Explicit profile paths avoid depending on profiles that have not been installed
 into a fresh project home yet. The package installs Release, Debug, and optional
-Ninja Debug profiles for both Linux/GCC and Windows/MSVC.
+Ninja Debug profiles for both Linux/GCC and Windows/MSVC, plus Linux/GCC ASan
+and TSan profiles.
 
 After changing the configuration recipe or its exported files, create it again,
 then update the lock before running `config install-pkg`:
@@ -128,6 +129,22 @@ conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-debug-ninj
 # Windows x64 Native Tools Command Prompt
 conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-debug-ninja -pr:b=windows-msvc-release
 ```
+
+Linux sanitizer builds use dedicated Ninja profiles. The sanitizer is a Conan
+compiler setting, so sanitized dependencies have distinct package IDs and are
+rebuilt as needed instead of being mixed with ordinary Debug binaries:
+
+```bash
+conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-asan-ninja -pr:b=linux-gcc-release
+conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-tsan-ninja -pr:b=linux-gcc-release
+```
+
+The first install enables AddressSanitizer and UndefinedBehaviorSanitizer; the
+second enables ThreadSanitizer and UndefinedBehaviorSanitizer. They generate
+independent toolchains under `build/Ninja-Debug-ASan/generators` and
+`build/Ninja-Debug-TSan/generators`. Expect the first install for each profile
+to build dependency binaries from source. See [HACKING.md](HACKING.md#runtime-analysis)
+for the one-command test workflows.
 
 Release, default Debug, and Ninja Debug installs generate toolchains under
 `build/Release/generators`, `build/Debug/generators`, and

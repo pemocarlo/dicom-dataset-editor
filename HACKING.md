@@ -3,7 +3,7 @@
 Daily developer mode is a Debug build with assertions, tests, strict compiler
 warnings, and `clang-format`. It uses the platform's default generator: Unix
 Makefiles on Linux and Visual Studio on Windows. Ninja remains available for a
-compilation database and the slower clang-tidy, cppcheck, and IWYU checks.
+compilation database and the slower static and runtime analysis checks.
 
 Conan commands use the ignored, project-local `conanhome` selected by `.conanrc`.
 Bootstrap its profiles and seed its package cache as described in
@@ -48,6 +48,9 @@ The checked-in presets separate build intent and tool cost:
 - `production` is the optimized Release configuration used for the final executable.
 - `quality` adds clang-tidy and cppcheck in a separate Ninja Debug build tree.
 - `iwyu` adds include-what-you-use to the extended checks in another clean build tree.
+- `asan` uses the Conan ASan+UBSan dependency graph in its own Ninja Debug tree.
+- `tsan` uses the Conan TSan+UBSan dependency graph in its own Ninja Debug tree.
+- `valgrind` runs CTest MemCheck against a separate, unsanitized Ninja Debug tree.
 
 Conan adds CMake and cppcheck to the generated build environment; Ninja profiles
 also add Ninja. Use the script matching the installed profile before running a
@@ -74,6 +77,9 @@ workflow:
 - `dev-check-ninja`: the above plus Ninja.
 - `quality-checks`: the above plus `clang-tidy` and cppcheck.
 - `all-checks`: the above plus `include-what-you-use`.
+- `sanitize-checks`: Linux GCC, Ninja, and the Conan ASan profile.
+- `thread-checks`: Linux GCC, Ninja, and the Conan TSan profile.
+- `valgrind-checks`: Linux, Ninja, and a system `valgrind` executable.
 
 Use this tested LLVM/IWYU pairing on both platforms:
 
@@ -162,6 +168,77 @@ cmake --build --preset cppcheck
 cmake --preset iwyu
 cmake --build --preset iwyu
 ```
+
+## Runtime Analysis
+
+Runtime analyzers only inspect code paths exercised by tests. Add or extend a
+test when fixing a reported defect so the same path remains covered.
+
+These workflows are currently Linux-only:
+
+| Workflow | Finds | Typical use |
+| --- | --- | --- |
+| `sanitize-checks` | invalid memory access, leaks, and undefined behavior | default runtime safety check |
+| `thread-checks` | data races and undefined behavior | concurrency changes or suspected races |
+| `valgrind-checks` | invalid memory access and leaks | independent confirmation and allocator-level detail |
+
+### Sanitizers with Conan
+
+Sanitizers are modeled as the custom Conan setting `compiler.sanitizer` in the
+installed configuration package. The profiles also supply compiler/linker flags
+and runtime environment variables. This gives every sanitizer configuration a
+separate package ID and instruments dependencies that Conan builds from source.
+No sanitizer flags live in `CMakeLists.txt`.
+
+Install both profiles once, or repeat after dependency, recipe, lockfile, or
+profile changes:
+
+```bash
+conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-asan-ninja -pr:b=linux-gcc-release
+conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-tsan-ninja -pr:b=linux-gcc-release
+```
+
+Activate both the build environment and the profile's runtime environment, then
+run the wanted workflow:
+
+```bash
+# ASan + LeakSanitizer + UBSan
+source build/Ninja-Debug-ASan/generators/conanbuild.sh
+source build/Ninja-Debug-ASan/generators/conanrun.sh
+cmake --workflow --preset sanitize-checks
+
+# TSan + UBSan
+source build/Ninja-Debug-TSan/generators/conanbuild.sh
+source build/Ninja-Debug-TSan/generators/conanrun.sh
+cmake --workflow --preset thread-checks
+```
+
+ASan and TSan are intentionally separate because their instrumentation is
+incompatible. LeakSanitizer is enabled through ASan on Linux. MemorySanitizer is
+not provided: it requires Clang plus an entirely instrumented C++ runtime and
+dependency stack, while this project's supported Linux profile uses GCC.
+
+### Valgrind
+
+Install Valgrind and the C library's debug symbols with the system package
+manager. Valgrind needs the dynamic loader symbols before it can start MemCheck;
+the package is normally `libc6-dbg` on Debian/Ubuntu and `glibc-debuginfo` on
+Fedora, RHEL, and openSUSE. Then activate the ordinary Ninja Debug build
+environment and run:
+
+```bash
+source build/Ninja-Debug/generators/conanbuild.sh
+cmake --workflow --preset valgrind-checks
+```
+
+The `valgrind` build target delegates to CTest's MemCheck step, so every test
+registered with `add_test()` is checked automatically. Definite and indirect
+leaks fail the workflow; possible leaks are reported for inspection. Valgrind
+uses an unsanitized build because running one instrumentation runtime inside
+another produces noisy, misleading results.
+
+Sanitizer and Valgrind builds are diagnostic artifacts only. Do not install or
+ship them; use the `production` preset for deliverables.
 
 ## Performance Benchmark
 

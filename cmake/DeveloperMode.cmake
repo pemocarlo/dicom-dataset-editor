@@ -117,6 +117,21 @@ if(DICOM_EDITOR_ENABLE_CPPCHECK)
     )
 endif()
 
+if(DICOM_EDITOR_ENABLE_VALGRIND)
+    add_custom_target(valgrind
+        COMMAND ${CMAKE_CTEST_COMMAND}
+            --test-dir "${PROJECT_BINARY_DIR}"
+            --build-config $<CONFIG>
+            --test-action memcheck
+            --output-on-failure
+            --no-tests=error
+        DEPENDS dicom_editor_tests dicom_editor_gui_smoke_test
+        COMMENT "Running tests with Valgrind through CTest MemCheck"
+        USES_TERMINAL
+        VERBATIM
+    )
+endif()
+
 if(CMAKE_EXPORT_COMPILE_COMMANDS)
     if(CMAKE_GENERATOR MATCHES "Makefiles|Ninja")
         file(CREATE_LINK
