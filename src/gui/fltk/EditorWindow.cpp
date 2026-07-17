@@ -1,16 +1,12 @@
 #include "EditorWindow.hpp"
 
-#include "AttributeDialog.hpp"
 #include "DatasetPanel.hpp"
 #include "FileTreePanel.hpp"
 #include "PixelDataPanel.hpp"
 #include "dicom_editor/application/EditorController.hpp"
-#include "dicom_editor/core/AttributeInput.hpp"
 #include "dicom_editor/core/DicomDocument.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomWorkspace.hpp"
-
-#include <dcmtk/dcmdata/dctagkey.h>
 
 #include <FL/Enumerations.H>
 #include <FL/Fl.H>
@@ -18,28 +14,19 @@
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Menu_Bar.H>
 #include <FL/Fl_Menu_Item.H>
-#include <FL/Fl_Native_File_Chooser.H>
-#include <FL/Fl_Progress.H>
 #include <FL/Fl_Toggle_Button.H>
 #include <FL/Fl_Widget.H>
-#include <FL/Fl_Window.H>
-#include <FL/fl_ask.H>
 #include <FL/fl_draw.H>
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
-#include <format>
 #include <functional>
 #include <initializer_list>
 #include <iterator>
-#include <mutex>
 #include <optional>
 #include <ranges>
-#include <stop_token>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -209,16 +196,6 @@ class FileTreeSplitter final : public Fl_Widget {
     int dragOffset_{};
 };
 
-std::optional<std::filesystem::path> chooseSaveFile(const char *title) {
-    Fl_Native_File_Chooser chooser(Fl_Native_File_Chooser::BROWSE_SAVE_FILE);
-    chooser.title(title);
-    chooser.filter("DICOM files\t*.dcm\nAll files\t*");
-    if (chooser.show() != 0) {
-        return std::nullopt;
-    }
-    return chooser.filename();
-}
-
 void setMenuActive(Fl_Menu_Bar &menu, const char *path, bool active) {
     const int index = menu.find_index(path);
     if (index < 0) {
@@ -372,177 +349,24 @@ int EditorWindow::handle(int event) {
     return Fl_Double_Window::handle(event);
 }
 
-std::vector<std::filesystem::path> EditorWindow::chooseOpenFiles() {
-    Fl_Native_File_Chooser chooser(Fl_Native_File_Chooser::BROWSE_MULTI_FILE);
-    chooser.title("Open DICOM Files");
-    chooser.filter("DICOM files\t*.dcm");
-    if (chooser.show() != 0) {
-        return {};
-    }
-    std::vector<std::filesystem::path> result;
-    result.reserve(static_cast<std::size_t>(chooser.count()));
-    for (int index = 0; index < chooser.count(); ++index) {
-        result.emplace_back(chooser.filename(index));
-    }
-    return result;
-}
-
-std::optional<std::filesystem::path> EditorWindow::chooseOpenFolder() {
-    Fl_Native_File_Chooser chooser(Fl_Native_File_Chooser::BROWSE_DIRECTORY);
-    chooser.title("Open Folder of DICOM Files");
-    return chooser.show() == 0 ? std::optional<std::filesystem::path>{chooser.filename()} : std::nullopt;
-}
-
-std::optional<std::filesystem::path> EditorWindow::chooseSaveFile() { return ::chooseSaveFile("Save DICOM File"); }
-
-std::optional<std::filesystem::path> EditorWindow::chooseDicomDirectory() {
-    Fl_Native_File_Chooser chooser(Fl_Native_File_Chooser::BROWSE_FILE);
-    chooser.title("Open DICOMDIR");
-    return chooser.show() == 0 ? std::optional<std::filesystem::path>{chooser.filename()} : std::nullopt;
-}
-
-std::optional<std::filesystem::path> EditorWindow::chooseDataDictionary() {
-    Fl_Native_File_Chooser chooser(Fl_Native_File_Chooser::BROWSE_FILE);
-    chooser.title("Load DCMTK Data Dictionary");
-    chooser.filter("DCMTK dictionaries\t*.dic\nAll files\t*");
-    return chooser.show() == 0 ? std::optional<std::filesystem::path>{chooser.filename()} : std::nullopt;
-}
-
-dicom_editor::SaveChangesChoice EditorWindow::confirmSaveChanges() {
-    const int answer = fl_choice("Save changes before continuing?", "Cancel", "Don't Save", "Save");
-    switch (answer) {
-    case 1:
-        return dicom_editor::SaveChangesChoice::Discard;
-    case 2:
-        return dicom_editor::SaveChangesChoice::Save;
-    default:
-        return dicom_editor::SaveChangesChoice::Cancel;
-    }
-}
-
-dicom_editor::SaveChangesChoice EditorWindow::confirmWorkspaceChanges(std::size_t dirtyCount) {
-    const int answer = fl_choice("%zu datasets have unsaved changes.", "Cancel", "Discard All", "Save All", dirtyCount);
-    switch (answer) {
-    case 1:
-        return dicom_editor::SaveChangesChoice::Discard;
-    case 2:
-        return dicom_editor::SaveChangesChoice::Save;
-    default:
-        return dicom_editor::SaveChangesChoice::Cancel;
-    }
-}
-
-bool EditorWindow::confirmDelete() { return fl_choice("Delete selected attribute?", "Cancel", "Delete", nullptr) == 1; }
-
-std::optional<dicom_editor::AttributeInput> EditorWindow::editAttribute(const std::string &title, const std::string &value) {
-    return AttributeDialog::edit(title, value);
-}
-
-void EditorWindow::viewAttribute(const std::string &title, const std::string &value) { AttributeDialog::view(title, value); }
-
-std::optional<dicom_editor::AttributeInput> EditorWindow::addAttribute() { return AttributeDialog::add(); }
-
-std::optional<dicom_editor::AttributeInput> EditorWindow::batchEditAttribute(const dicom_editor::BatchEditReport &report) {
-    std::string summary =
-        std::format("{} dataset(s) in {} '{}'.\n\n", report.documentCount,
-                    report.target.level == dicom_editor::BatchEditLevel::Patient ? "patient" : "study", report.target.label);
-    for (const auto &attribute : report.attributes) {
-        summary += std::format("{} ({:04x},{:04x}): ", attribute.name, attribute.tag.getGroup(), attribute.tag.getElement());
-        for (std::size_t index = 0; index < attribute.values.size(); ++index) {
-            summary += (index == 0 ? "" : " | ") + attribute.values[index];
-        }
-        summary += attribute.values.size() <= 1 ? " [consistent]\n" : " [DIFFERS]\n";
-    }
-    summary += "\nContinue to choose one listed level attribute and replacement value?";
-    if (fl_choice("%s", "Cancel", "Continue", nullptr, summary.c_str()) != 1) {
-        return std::nullopt;
-    }
-    return AttributeDialog::batch(report);
-}
-
-dicom_editor::SaveAllReport EditorWindow::runSaveAllJob(dicom_editor::SaveAllTask task) {
-    struct JobState {
-        std::mutex mutex;
-        dicom_editor::SaveAllProgress progress;
-        std::optional<dicom_editor::SaveAllReport> report;
-    } state;
-
-    Fl_Window dialog(520, 150, "Saving DICOM Files");
-    Fl_Box current(20, 15, 480, 35, "Preparing save...");
-    current.align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_WRAP);
-    Fl_Progress progress(20, 60, 480, 25);
-    progress.minimum(0.0F);
-    progress.maximum(1.0F);
-    Fl_Button cancel(210, 105, 100, 30, "Cancel");
-    dialog.set_modal();
-    dialog.end();
-
-    std::jthread worker([&state, task = std::move(task)](std::stop_token stop) {
-        auto report = task(std::move(stop), [&state](const dicom_editor::SaveAllProgress &value) {
-            {
-                const std::scoped_lock lock(state.mutex);
-                state.progress = value;
-            }
-            Fl::awake();
-        });
-        {
-            const std::scoped_lock lock(state.mutex);
-            state.report = std::move(report);
-        }
-        Fl::awake();
-    });
-    const auto requestStop = [](Fl_Widget *, void *data) { static_cast<std::jthread *>(data)->request_stop(); };
-    cancel.callback(requestStop, &worker);
-    dialog.callback(requestStop, &worker);
-
-    deactivate();
-    dialog.show();
-    for (;;) {
-        dicom_editor::SaveAllProgress snapshot;
-        bool done{};
-        {
-            const std::scoped_lock lock(state.mutex);
-            snapshot = state.progress;
-            done = state.report.has_value();
-        }
-        if (snapshot.total != 0) {
-            progress.maximum(static_cast<float>(snapshot.total));
-            progress.value(static_cast<float>(snapshot.completed));
-            current.copy_label(std::format("{} of {}: {}", snapshot.completed, snapshot.total, snapshot.currentPath.string()).c_str());
-        }
-        if (done) {
-            break;
-        }
-        Fl::wait(0.05);
-    }
-    worker.join();
-    dialog.hide();
-    activate();
-    take_focus();
-    const std::scoped_lock lock(state.mutex);
-    return std::move(*state.report);
-}
-
-void EditorWindow::showError(const std::string &message) { fl_alert("%s", message.c_str()); }
-
-void EditorWindow::presentDocument(std::vector<dicom_editor::DicomNode> nodes, const std::string &title, const std::string &status) {
-    datasetPanel_->setNodes(std::move(nodes));
-    copy_label(title.c_str());
-    setStatus(status);
+void EditorWindow::presentDocument(dicom_editor::DocumentPresentation presentation) {
+    datasetPanel_->setNodes(std::move(presentation.nodes));
+    copy_label(presentation.title.c_str());
+    setStatus(presentation.status);
     updateActions();
 }
 
-void EditorWindow::presentOpenFiles(const std::vector<dicom_editor::OpenDicomFile> &files, bool hasLoadedFiles) {
-    fileTreePanel_->setFiles(files);
-    const auto active = std::ranges::find_if(files, [](const dicom_editor::OpenDicomFile &file) { return file.active; });
-    setWidgetActive(*previousFileButton_, active != files.end() && active != files.begin());
-    setWidgetActive(*nextFileButton_, active != files.end() && std::next(active) != files.end());
-    if (hasLoadedFiles && !workspaceHadFiles_) {
+void EditorWindow::presentOpenFiles(dicom_editor::OpenFilesPresentation presentation) {
+    fileTreePanel_->setFiles(presentation.files);
+    const auto active = std::ranges::find_if(presentation.files, [](const dicom_editor::OpenDicomFile &file) { return file.active; });
+    setWidgetActive(*previousFileButton_, active != presentation.files.end() && active != presentation.files.begin());
+    setWidgetActive(*nextFileButton_, active != presentation.files.end() && std::next(active) != presentation.files.end());
+    if (presentation.hasLoadedFiles && !workspaceHadFiles_) {
         setFileTreeVisible(true);
-    } else if (!hasLoadedFiles && workspaceHadFiles_) {
+    } else if (!presentation.hasLoadedFiles && workspaceHadFiles_) {
         setFileTreeVisible(false);
     }
-    workspaceHadFiles_ = hasLoadedFiles;
+    workspaceHadFiles_ = presentation.hasLoadedFiles;
 }
 
 void EditorWindow::presentPixelData(std::optional<dicom_editor::PixelDataPreview> preview) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dicom_editor/core/AttributeInput.hpp"
+#include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomWorkspace.hpp"
 
 #include <cstddef>
@@ -16,7 +17,6 @@ namespace dicom_editor {
 
 class DicomDocument;
 class DicomPath;
-struct DicomNode;
 struct PixelDataPreview;
 
 /// User choice when closing or reopening with unsaved changes.
@@ -41,6 +41,19 @@ struct ActionState {
     bool editEnabled{};
     /// Delete action enabled.
     bool deleteEnabled{};
+};
+
+/// Complete dataset-table presentation produced by the application layer.
+struct DocumentPresentation {
+    std::vector<DicomNode> nodes;
+    std::string title;
+    std::string status;
+};
+
+/// Complete open-files presentation produced by the application layer.
+struct OpenFilesPresentation {
+    std::vector<OpenDicomFile> files;
+    bool hasLoadedFiles{};
 };
 
 struct SaveAllProgress {
@@ -98,9 +111,9 @@ class EditorView {
     /// Shows an error message.
     virtual void showError(const std::string &message) = 0;
     /// Updates the document tree and window title.
-    virtual void presentDocument(std::vector<DicomNode> nodes, const std::string &title, const std::string &status) = 0;
+    virtual void presentDocument(DocumentPresentation presentation) = 0;
     /// Updates the patient/study/series/file hierarchy.
-    virtual void presentOpenFiles(const std::vector<OpenDicomFile> &files, bool hasLoadedFiles) = 0;
+    virtual void presentOpenFiles(OpenFilesPresentation presentation) = 0;
     /// Shows or hides the pixel preview.
     virtual void presentPixelData(std::optional<PixelDataPreview> preview) = 0;
     /// Updates the status bar text.

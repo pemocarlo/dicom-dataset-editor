@@ -119,6 +119,7 @@ set(DICOM_EDITOR_FLTK_SOURCES
     src/gui/fltk/AttributeDialog.cpp
     src/gui/fltk/DatasetPanel.cpp
     src/gui/fltk/EditorWindow.cpp
+    src/gui/fltk/EditorWindowDialogs.cpp
     src/gui/fltk/FileTreePanel.cpp
     src/gui/fltk/PixelDataPanel.cpp
 )

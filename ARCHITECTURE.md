@@ -30,6 +30,12 @@ GUI use cases, but has no GUI toolkit dependency. Moving it into core would make
 core own dialog policy and presentation state; moving it into FLTK would prevent
 reuse by another UI adapter or headless workflow.
 
+For a first code-reading pass, follow one action end to end: a callback in
+`EditorWindow.cpp`, its use case in `EditorController.cpp`, and the model
+operation in `src/core`. `EditorWindowDialogs.cpp` contains blocking prompts,
+file choosers, and the modal Save All runner so the main window file stays
+focused on widget construction, layout, presentation, and event dispatch.
+
 ## State Ownership
 
 - `DicomDocument` owns one `DcmFileFormat`, file path, dirty state, and a small
@@ -78,6 +84,10 @@ worker updates only core state. Progress wakes the FLTK event loop with
 `Fl::awake`; only the FLTK thread reads progress and touches widgets. Cancellation
 uses a stop token and is observed between files, so an in-progress DCMTK write is
 allowed to finish before the worker joins and the progress window closes.
+
+The `EditorView` boundary uses small presentation structs rather than parallel
+arguments. This names each value at construction, makes view updates easy to
+extend, and keeps toolkit-neutral presentation data in the application layer.
 
 ### Targeted Refreshes
 
