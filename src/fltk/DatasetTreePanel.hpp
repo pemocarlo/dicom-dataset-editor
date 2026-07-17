@@ -26,6 +26,7 @@ class DatasetTreePanel final : public Fl_Group {
     void SetSelectionChangedHandler(std::function<void()> handler);
     void SetValueChangedHandler(std::function<void(dicom_editor::DicomPath, std::string)> handler);
     void EditSelectedValue();
+    void FocusRows(int offset = 0);
     void resize(int x, int y, int width, int height) override;
 
   private:
