@@ -177,9 +177,11 @@ void FileTreePanel::setFiles(const std::vector<dicom_editor::OpenDicomFile> &fil
     tree_->vposition(previousScroll);
     const bool activeFileChanged = newActiveFileIndex != activeFileIndex_;
     activeFileIndex_ = newActiveFileIndex;
-    if (activeItem != nullptr && activeFileChanged) {
+    if (activeItem != nullptr && activeFileChanged && !activatingFromTree_) {
         Fl::remove_timeout(centerActiveCallback, this);
         Fl::add_timeout(0.0, centerActiveCallback, this);
+    } else if (activatingFromTree_) {
+        Fl::remove_timeout(centerActiveCallback, this);
     }
     tree_->redraw();
 }
@@ -245,7 +247,9 @@ void FileTreePanel::activatePendingCallback(void *data) {
     }
     const std::size_t index = *panel.pendingActivationIndex_;
     panel.pendingActivationIndex_.reset();
+    panel.activatingFromTree_ = true;
     panel.activationHandler_(index);
+    panel.activatingFromTree_ = false;
 }
 
 void FileTreePanel::centerActiveCallback(void *data) {
