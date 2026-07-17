@@ -24,6 +24,7 @@ struct DicomNode {
     std::string valuePreview;
     unsigned int depth{};
     bool editable{};
+    bool invalidValue{};
 };
 
 } // namespace dicom_editor

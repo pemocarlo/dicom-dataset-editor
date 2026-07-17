@@ -31,7 +31,7 @@ class DicomDocument {
     [[nodiscard]] const DcmItem &itemAt(const DicomPath &path) const;
     [[nodiscard]] DcmElement &elementAt(const DicomPath &path);
     [[nodiscard]] const DcmElement &elementAt(const DicomPath &path) const;
-    [[nodiscard]] std::vector<DicomNode> nodes() const;
+    [[nodiscard]] std::vector<DicomNode> nodes(bool validateValues = false) const;
     [[nodiscard]] const std::filesystem::path &filePath() const;
     [[nodiscard]] bool hasFilePath() const;
     [[nodiscard]] bool dirty() const;

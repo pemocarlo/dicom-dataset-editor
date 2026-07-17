@@ -21,7 +21,7 @@ void EditorController::refreshView() {
     const std::string name = document_.hasFilePath() ? document_.filePath().filename().string() : "Untitled";
     const std::string title = std::format("DICOM Dataset Editor - {}{}", name, document_.dirty() ? "*" : "");
     const std::string status = document_.hasFilePath() ? document_.filePath().string() : "New dataset";
-    view_.presentDocument(document_.nodes(), title, status);
+    view_.presentDocument(document_.nodes(validationEnabled_), title, status);
 }
 
 void EditorController::openDocument() {
@@ -59,7 +59,7 @@ void EditorController::editSelected(const DicomNode *selected) {
 
 void EditorController::editValue(const DicomPath &path, const std::string &value) {
     try {
-        DicomEditorService::editValue(document_, {.path = path, .value = value});
+        DicomEditorService::editValue(document_, {.path = path, .value = value, .validate = validationEnabled_});
         refreshView();
     } catch (const std::exception &error) {
         reportError(error, true);
@@ -77,7 +77,8 @@ void EditorController::addAttribute(const DicomNode *selected) {
         return;
     }
     try {
-        DicomEditorService::addAttribute(document_, {.parentItemPath = parent, .tag = *result->tag, .value = result->value});
+        DicomEditorService::addAttribute(
+            document_, {.parentItemPath = parent, .tag = *result->tag, .value = result->value, .validate = validationEnabled_});
         refreshView();
     } catch (const std::exception &error) {
         reportError(error, false);
@@ -93,6 +94,13 @@ void EditorController::deleteAttribute(const DicomNode *selected) {
         refreshView();
     } catch (const std::exception &error) {
         reportError(error, false);
+    }
+}
+
+void EditorController::setValidationEnabled(bool enabled) {
+    if (validationEnabled_ != enabled) {
+        validationEnabled_ = enabled;
+        refreshView();
     }
 }
 
