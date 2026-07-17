@@ -65,10 +65,13 @@ else()
 endif()
 
 set(DICOM_EDITOR_CORE_SOURCES
+    src/core/AttributeInput.cpp
+    src/core/DatasetViewModel.cpp
     src/core/DicomDocument.cpp
     src/core/DicomEditorService.cpp
     src/core/DicomNode.cpp
     src/core/DicomPath.cpp
+    src/core/EditorController.cpp
 )
 
 add_library(dicom_editor_core STATIC ${DICOM_EDITOR_CORE_SOURCES})

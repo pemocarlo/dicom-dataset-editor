@@ -1,10 +1,9 @@
 #pragma once
 
-#include "dicom_editor/DicomNode.hpp"
+#include "dicom_editor/DatasetViewModel.hpp"
 
 #include <FL/Fl_Group.H>
 
-#include <cstddef>
 #include <functional>
 #include <string>
 #include <vector>
@@ -15,7 +14,8 @@ class Fl_Widget;
 
 namespace dicom_editor {
 class DicomPath;
-}
+struct DicomNode;
+} // namespace dicom_editor
 
 class DatasetTreePanel final : public Fl_Group {
   public:
@@ -39,8 +39,7 @@ class DatasetTreePanel final : public Fl_Group {
 
     Fl_Input *filter_{};
     DatasetTable *table_{};
-    std::vector<dicom_editor::DicomNode> allNodes_;
-    std::vector<std::size_t> visibleToNode_;
+    dicom_editor::DatasetViewModel model_;
     std::function<void()> selectionChanged_;
     std::function<void(dicom_editor::DicomPath, std::string)> valueChanged_;
 };

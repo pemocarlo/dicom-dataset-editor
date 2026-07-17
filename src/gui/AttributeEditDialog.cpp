@@ -1,7 +1,6 @@
 #include "AttributeEditDialog.hpp"
 
-#include <dcmtk/dcmdata/dctagkey.h>
-#include <dcmtk/ofstd/oftypes.h>
+#include "dicom_editor/AttributeInput.hpp"
 
 #include <wx/defs.h>
 #include <wx/gdicmn.h>
@@ -10,21 +9,7 @@
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
 
-#include <charconv>
-#include <system_error>
-
 namespace {
-
-std::optional<unsigned int> parseHex(const std::string &text) {
-    unsigned int value{};
-    const auto *first = text.data();
-    const auto *last = text.data() + text.size();
-    const auto [ptr, ec] = std::from_chars(first, last, value, 16);
-    if (ec != std::errc() || ptr != last || value > 0xffffU) {
-        return std::nullopt;
-    }
-    return value;
-}
 
 void addLabeled(wxWindow *parent, wxSizer *sizer, const wxString &label, wxTextCtrl *control) {
     sizer->Add(new wxStaticText(parent, wxID_ANY, label), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 6);
@@ -33,7 +18,8 @@ void addLabeled(wxWindow *parent, wxSizer *sizer, const wxString &label, wxTextC
 
 } // namespace
 
-std::optional<AttributeDialogResult> AttributeEditDialog::Edit(wxWindow *parent, const wxString &title, const wxString &currentValue) {
+std::optional<dicom_editor::AttributeInput> AttributeEditDialog::Edit(wxWindow *parent, const wxString &title,
+                                                                      const wxString &currentValue) {
     AttributeEditDialog dialog(parent, title, false, currentValue);
     if (dialog.ShowModal() != wxID_OK) {
         return std::nullopt;
@@ -41,7 +27,7 @@ std::optional<AttributeDialogResult> AttributeEditDialog::Edit(wxWindow *parent,
     return dialog.Result();
 }
 
-std::optional<AttributeDialogResult> AttributeEditDialog::Add(wxWindow *parent) {
+std::optional<dicom_editor::AttributeInput> AttributeEditDialog::Add(wxWindow *parent) {
     AttributeEditDialog dialog(parent, "Add Attribute", true, "");
     if (dialog.ShowModal() != wxID_OK) {
         return std::nullopt;
@@ -70,16 +56,14 @@ AttributeEditDialog::AttributeEditDialog(wxWindow *parent, const wxString &title
     SetSizerAndFit(outer);
 }
 
-std::optional<AttributeDialogResult> AttributeEditDialog::Result() const {
-    AttributeDialogResult result;
+std::optional<dicom_editor::AttributeInput> AttributeEditDialog::Result() const {
+    dicom_editor::AttributeInput result;
     if (includeTag_) {
-        const auto group = parseHex(group_->GetValue().ToStdString());
-        const auto element = parseHex(element_->GetValue().ToStdString());
-        if (!group || !element) {
+        result.tag = dicom_editor::parseTagKey(group_->GetValue().ToStdString(), element_->GetValue().ToStdString());
+        if (!result.tag) {
             wxMessageBox("Enter a four-digit hexadecimal group and element.", "Invalid Tag", wxOK | wxICON_ERROR);
             return std::nullopt;
         }
-        result.tag = DcmTagKey(static_cast<Uint16>(*group), static_cast<Uint16>(*element));
     }
     result.value = value_->GetValue().ToStdString();
     return result;

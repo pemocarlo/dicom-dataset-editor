@@ -1,7 +1,6 @@
 #pragma once
 
-#include "dicom_editor/DicomDocument.hpp"
-#include "dicom_editor/DicomEditorService.hpp"
+#include "dicom_editor/EditorController.hpp"
 
 #include <wx/frame.h>
 
@@ -15,19 +14,22 @@ namespace dicom_editor {
 class DicomPath;
 }
 
-class MainFrame final : public wxFrame {
+class MainFrame final : public wxFrame, private dicom_editor::EditorControllerHost {
   public:
     MainFrame();
 
   private:
     void BuildMenus();
-    void RefreshDataset();
-    bool ConfirmDiscardChanges();
-    bool SaveCurrent();
-    void EditSelectedValue();
-    void EditValue(dicom_editor::DicomPath path, std::string value);
-    void ShowError(const std::string &message);
-    void UpdateActions();
+    [[nodiscard]] std::optional<std::filesystem::path> chooseOpenFile() override;
+    [[nodiscard]] std::optional<std::filesystem::path> chooseSaveFile() override;
+    [[nodiscard]] dicom_editor::SaveChangesChoice confirmSaveChanges() override;
+    [[nodiscard]] bool confirmDelete() override;
+    [[nodiscard]] std::optional<dicom_editor::AttributeInput> editAttribute(const std::string &title, const std::string &value) override;
+    [[nodiscard]] std::optional<dicom_editor::AttributeInput> addAttribute() override;
+    void showError(const std::string &message) override;
+    void presentDocument(std::vector<dicom_editor::DicomNode> nodes, const std::string &title, const std::string &status) override;
+    void setStatus(const std::string &status) override;
+    void updateActions();
 
     void OnOpen(wxCommandEvent &event);
     void OnSave(wxCommandEvent &event);
@@ -38,8 +40,7 @@ class MainFrame final : public wxFrame {
     void OnExit(wxCommandEvent &event);
 
     DatasetTreePanel *datasetPanel_{};
-    dicom_editor::DicomDocument document_;
-    dicom_editor::DicomEditorService editor_;
+    dicom_editor::EditorController controller_;
     wxMenuItem *saveItem_{};
     wxMenuItem *editItem_{};
     wxMenuItem *deleteItem_{};
