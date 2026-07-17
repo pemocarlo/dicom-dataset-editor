@@ -35,8 +35,9 @@ constexpr int MenuHeight = 28;
 constexpr int StatusHeight = 26;
 constexpr int PixelDataSplitterHeight = 6;
 constexpr int PixelDataPanelMinHeight = 180;
-constexpr int FileTreeWidth = 280;
-constexpr int FileTreeGap = 6;
+constexpr int FileTreeSplitterWidth = 6;
+constexpr int FileTreePanelMinWidth = 180;
+constexpr int EditorPanelMinWidth = 400;
 
 enum class MenuAction : std::uint8_t {
     OpenFiles,
@@ -50,6 +51,7 @@ enum class MenuAction : std::uint8_t {
     ValidateValues,
     PixelDataPreview,
     PixelDataPreviewVertical,
+    OpenFilesPanel,
     PreviousFile,
     NextFile,
 };
@@ -65,6 +67,7 @@ MenuAction deleteAction = MenuAction::Delete;
 MenuAction validateValuesAction = MenuAction::ValidateValues;
 MenuAction pixelDataPreviewAction = MenuAction::PixelDataPreview;
 MenuAction pixelDataPreviewVerticalAction = MenuAction::PixelDataPreviewVertical;
+MenuAction openFilesPanelAction = MenuAction::OpenFilesPanel;
 MenuAction previousFileAction = MenuAction::PreviousFile;
 MenuAction nextFileAction = MenuAction::NextFile;
 
@@ -130,6 +133,50 @@ class PixelSplitter final : public Fl_Widget {
     int dragOffset_{};
 };
 
+class FileTreeSplitter final : public Fl_Widget {
+  public:
+    explicit FileTreeSplitter(int x, int y, int width, int height, EditorWindow &owner) : Fl_Widget(x, y, width, height), owner_(owner) {}
+
+  private:
+    int handle(int event) override {
+        switch (event) {
+        case FL_PUSH:
+            if (Fl::event_button() == FL_LEFT_MOUSE) {
+                dragging_ = true;
+                dragOffset_ = Fl::event_x() - x();
+                return 1;
+            }
+            break;
+        case FL_DRAG:
+            if (dragging_) {
+                owner_.setFileTreePanelExtent(Fl::event_x() - dragOffset_);
+                return 1;
+            }
+            break;
+        case FL_RELEASE:
+            if (dragging_) {
+                dragging_ = false;
+                return 1;
+            }
+            break;
+        default:
+            break;
+        }
+        return Fl_Widget::handle(event);
+    }
+
+    void draw() override {
+        fl_color(fl_rgb_color(190, 197, 205));
+        fl_rectf(x(), y(), w(), h());
+        fl_color(fl_rgb_color(150, 158, 166));
+        fl_rectf(x() + w() / 2 - 1, y() + h() / 2 - 18, 2, 36);
+    }
+
+    EditorWindow &owner_;
+    bool dragging_{};
+    int dragOffset_{};
+};
+
 std::optional<std::filesystem::path> chooseFile(Fl_Native_File_Chooser::Type type, const char *title) {
     Fl_Native_File_Chooser chooser(type);
     chooser.title(title);
@@ -149,6 +196,15 @@ void setMenuActive(Fl_Menu_Bar &menu, const char *path, bool active) {
     menu.mode(index, active ? flags & ~FL_MENU_INACTIVE : flags | FL_MENU_INACTIVE);
 }
 
+void setMenuChecked(Fl_Menu_Bar &menu, const char *path, bool checked) {
+    const int index = menu.find_index(path);
+    if (index < 0) {
+        return;
+    }
+    const int flags = menu.mode(index);
+    menu.mode(index, checked ? flags | FL_MENU_VALUE : flags & ~FL_MENU_VALUE);
+}
+
 } // namespace
 
 EditorWindow::EditorWindow() : Fl_Double_Window(1180, 760, "DICOM Dataset Editor"), controller_(*this) {
@@ -164,14 +220,18 @@ EditorWindow::EditorWindow() : Fl_Double_Window(1180, 760, "DICOM Dataset Editor
     menu_->add("&Settings/&Validate DICOM Values", 0, menuCallback, &validateValuesAction, FL_MENU_TOGGLE | FL_MENU_VALUE);
     menu_->add("&View/&Pixel Data Preview", 0, menuCallback, &pixelDataPreviewAction, FL_MENU_TOGGLE);
     menu_->add("&View/Pixel Data Preview on &Right", 0, menuCallback, &pixelDataPreviewVerticalAction, FL_MENU_TOGGLE);
+    menu_->add("&View/&Open Files Panel", 0, menuCallback, &openFilesPanelAction, FL_MENU_TOGGLE);
     menu_->add("&View/&Previous File", FL_CTRL + FL_Page_Up, menuCallback, &previousFileAction);
     menu_->add("&View/&Next File", FL_CTRL + FL_Page_Down, menuCallback, &nextFileAction);
 
-    fileTreePanel_ = new FileTreePanel(0, MenuHeight, FileTreeWidth, h() - MenuHeight - StatusHeight);
+    fileTreePanel_ = new FileTreePanel(0, MenuHeight, fileTreePanelExtent_, h() - MenuHeight - StatusHeight);
     fileTreePanel_->setActivationHandler([this](std::size_t index) { controller_.activateDocument(index); });
+    fileTreePanel_->hide();
 
-    datasetPanel_ =
-        new DatasetPanel(FileTreeWidth + FileTreeGap, MenuHeight, w() - FileTreeWidth - FileTreeGap, h() - MenuHeight - StatusHeight);
+    fileTreeSplitter_ = new FileTreeSplitter(0, MenuHeight, FileTreeSplitterWidth, h() - MenuHeight - StatusHeight, *this);
+    fileTreeSplitter_->hide();
+
+    datasetPanel_ = new DatasetPanel(0, MenuHeight, w(), h() - MenuHeight - StatusHeight);
     datasetPanel_->setSelectionChangedHandler([this] { updateActions(); });
     datasetPanel_->setEditRequestedHandler([this] { controller_.editSelected(datasetPanel_->selectedNode()); });
 
@@ -206,7 +266,6 @@ int EditorWindow::handle(int event) {
 std::vector<std::filesystem::path> EditorWindow::chooseOpenFiles() {
     Fl_Native_File_Chooser chooser(Fl_Native_File_Chooser::BROWSE_MULTI_FILE);
     chooser.title("Open DICOM Files");
-    chooser.filter("DICOM files\t*.dcm\nAll files\t*");
     if (chooser.show() != 0) {
         return {};
     }
@@ -255,7 +314,13 @@ void EditorWindow::presentDocument(std::vector<dicom_editor::DicomNode> nodes, c
     updateActions();
 }
 
-void EditorWindow::presentOpenFiles(std::vector<dicom_editor::OpenDicomFile> files) { fileTreePanel_->setFiles(files); }
+void EditorWindow::presentOpenFiles(const std::vector<dicom_editor::OpenDicomFile> &files, bool hasLoadedFiles) {
+    fileTreePanel_->setFiles(files);
+    if (hasLoadedFiles && !workspaceHadFiles_) {
+        setFileTreeVisible(true);
+    }
+    workspaceHadFiles_ = workspaceHadFiles_ || hasLoadedFiles;
+}
 
 void EditorWindow::presentPixelData(std::optional<dicom_editor::PixelDataPreview> preview) {
     if (preview) {
@@ -273,19 +338,46 @@ void EditorWindow::setStatus(const std::string &status) { status_->copy_label(st
 
 void EditorWindow::resize(int x, int y, int width, int height) {
     Fl_Double_Window::resize(x, y, width, height);
-    if (menu_ != nullptr && datasetPanel_ != nullptr && pixelDataPanel_ != nullptr && status_ != nullptr) {
+    if (menu_ != nullptr && fileTreePanel_ != nullptr && fileTreeSplitter_ != nullptr && datasetPanel_ != nullptr &&
+        pixelDataPanel_ != nullptr && status_ != nullptr) {
         layoutContent();
     }
 }
 
 void EditorWindow::setPixelDataPanelExtent(int extent) {
-    const int contentExtent = pixelDataPreviewVertical_ ? w() - FileTreeWidth - FileTreeGap : h() - MenuHeight - StatusHeight;
+    const int fileTreeWidth = fileTreeVisible_ ? fileTreePanelExtent_ + FileTreeSplitterWidth : 0;
+    const int contentExtent = pixelDataPreviewVertical_ ? w() - fileTreeWidth : h() - MenuHeight - StatusHeight;
     const int maximumPreviewExtent = std::max(PixelDataPanelMinHeight, contentExtent - PixelDataSplitterHeight - PixelDataPanelMinHeight);
     const int clamped = std::clamp(extent, PixelDataPanelMinHeight, maximumPreviewExtent);
     if (pixelDataPanelExtent_ != clamped) {
         pixelDataPanelExtent_ = clamped;
         layoutContent();
     }
+}
+
+void EditorWindow::setFileTreePanelExtent(int extent) {
+    const int maximumWidth = std::max(FileTreePanelMinWidth, w() - FileTreeSplitterWidth - EditorPanelMinWidth);
+    const int clamped = std::clamp(extent, FileTreePanelMinWidth, maximumWidth);
+    if (fileTreePanelExtent_ != clamped) {
+        fileTreePanelExtent_ = clamped;
+        layoutContent();
+    }
+}
+
+void EditorWindow::setFileTreeVisible(bool visible) {
+    if (fileTreeVisible_ == visible) {
+        return;
+    }
+    fileTreeVisible_ = visible;
+    if (visible) {
+        fileTreePanel_->show();
+        fileTreeSplitter_->show();
+    } else {
+        fileTreePanel_->hide();
+        fileTreeSplitter_->hide();
+    }
+    setMenuChecked(*menu_, "&View/&Open Files Panel", visible);
+    layoutContent();
 }
 
 void EditorWindow::setPixelDataPreviewVertical(bool vertical) {
@@ -302,9 +394,16 @@ void EditorWindow::layoutContent() {
     status_->resize(6, h() - StatusHeight, w() - 12, StatusHeight);
 
     const int contentHeight = h() - MenuHeight - StatusHeight;
-    const int editorX = FileTreeWidth + FileTreeGap;
+    const int fileTreeWidth = fileTreeVisible_
+                                  ? std::clamp(fileTreePanelExtent_, FileTreePanelMinWidth,
+                                               std::max(FileTreePanelMinWidth, w() - FileTreeSplitterWidth - EditorPanelMinWidth))
+                                  : 0;
+    const int editorX = fileTreeVisible_ ? fileTreeWidth + FileTreeSplitterWidth : 0;
     const int editorWidth = std::max(1, w() - editorX);
-    fileTreePanel_->resize(0, MenuHeight, FileTreeWidth, contentHeight);
+    if (fileTreeVisible_) {
+        fileTreePanel_->resize(0, MenuHeight, fileTreeWidth, contentHeight);
+        fileTreeSplitter_->resize(fileTreeWidth, MenuHeight, FileTreeSplitterWidth, contentHeight);
+    }
     if (pixelDataPanel_->visible() != 0) {
         if (pixelDataPreviewVertical_) {
             const int maxPreviewWidth = std::max(PixelDataPanelMinHeight, editorWidth - PixelDataSplitterHeight - PixelDataPanelMinHeight);
@@ -379,6 +478,9 @@ void EditorWindow::menuCallback(Fl_Widget *widget, void *data) {
         break;
     case MenuAction::PixelDataPreviewVertical:
         window->setPixelDataPreviewVertical(window->menu_->mvalue()->value() != 0);
+        break;
+    case MenuAction::OpenFilesPanel:
+        window->setFileTreeVisible(window->menu_->mvalue()->value() != 0);
         break;
     case MenuAction::PreviousFile:
         window->controller_.showPreviousDocument();
