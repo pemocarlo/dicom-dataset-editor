@@ -34,6 +34,8 @@ class DatasetPanel final : public Fl_Group {
     void editSelectedValue();
     /// Focuses the table and optionally moves the selection.
     void focusRows(int offset = 0);
+    /// Applies the current application font size.
+    void setFontSize(int size);
     /// Repositions child widgets after resize.
     void resize(int x, int y, int width, int height) override;
 
@@ -43,6 +45,7 @@ class DatasetPanel final : public Fl_Group {
     void rebuild();
     void restoreSelection(const std::string &path);
     void selectionChanged();
+    void toggleSelectedSequence();
 
     static void filterCallback(Fl_Widget *widget, void *data);
 

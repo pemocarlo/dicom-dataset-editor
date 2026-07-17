@@ -20,9 +20,9 @@
 
 namespace {
 
-constexpr int Padding = 6;
-constexpr int FilterHeight = 28;
-constexpr int FilterLabelWidth = 48;
+constexpr int Padding = 10;
+constexpr int FilterHeight = 32;
+constexpr int FilterLabelWidth = 58;
 constexpr int ColumnCount = 5;
 constexpr std::array<const char *, ColumnCount> Headers{"Attribute", "Tag", "VR", "VM", "Value"};
 constexpr std::array<int, ColumnCount> ColumnWidths{230, 105, 50, 50, 445};
@@ -62,11 +62,13 @@ class DatasetTable final : public Fl_Table_Row {
     DatasetTable(int x, int y, int width, int height, DatasetPanel &owner) : Fl_Table_Row(x, y, width, height), owner_(owner) {
         cols(ColumnCount);
         type(SELECT_SINGLE);
-        selection_color(fl_rgb_color(210, 230, 250));
+        selection_color(fl_rgb_color(207, 228, 245));
         col_header(true);
         col_resize(true);
         row_header(false);
         row_resize(false);
+        row_height_all(26);
+        col_header_height(30);
         when(FL_WHEN_CHANGED);
         callback(tableCallback, this);
         for (int column = 0; column < ColumnCount; ++column) {
@@ -103,6 +105,12 @@ class DatasetTable final : public Fl_Table_Row {
         owner_.selectionChanged();
     }
 
+    void setFontSize(int size) {
+        row_height_all(size + 14);
+        col_header_height(size + 18);
+        redraw();
+    }
+
     int handle(int event) override {
         if (event == FL_KEYDOWN) {
             const int key = Fl::event_key();
@@ -115,14 +123,32 @@ class DatasetTable final : public Fl_Table_Row {
                 return 1;
             }
             if (key == FL_Enter) {
-                owner_.editSelectedValue();
+                const auto *node = owner_.selectedNode();
+                if (node != nullptr && node->kind == dicom_editor::DicomNodeKind::Sequence) {
+                    owner_.toggleSelectedSequence();
+                } else {
+                    owner_.editSelectedValue();
+                }
                 return 1;
+            }
+            if (key == FL_Left || key == FL_Right) {
+                const auto *node = owner_.selectedNode();
+                if (node != nullptr && node->kind == dicom_editor::DicomNodeKind::Sequence &&
+                    owner_.model_.sequenceCollapsed(node->path) == (key == FL_Right)) {
+                    owner_.toggleSelectedSequence();
+                    return 1;
+                }
             }
         }
 
         const int handled = Fl_Table_Row::handle(event);
         if (event == FL_PUSH && Fl::event_clicks() != 0) {
-            owner_.editSelectedValue();
+            const auto *node = owner_.selectedNode();
+            if (node != nullptr && node->kind == dicom_editor::DicomNodeKind::Sequence) {
+                owner_.toggleSelectedSequence();
+            } else {
+                owner_.editSelectedValue();
+            }
             return 1;
         }
         return handled;
@@ -135,9 +161,13 @@ class DatasetTable final : public Fl_Table_Row {
         switch (context) {
         case CONTEXT_COL_HEADER:
             fl_push_clip(x, y, width, height);
-            fl_draw_box(FL_THIN_UP_BOX, x, y, width, height, FL_BACKGROUND_COLOR);
-            fl_color(FL_FOREGROUND_COLOR);
-            fl_draw(Headers[static_cast<std::size_t>(column)], x + 4, y, width - 8, height, FL_ALIGN_LEFT);
+            fl_color(fl_rgb_color(227, 234, 240));
+            fl_rectf(x, y, width, height);
+            fl_color(fl_rgb_color(42, 62, 78));
+            fl_font(FL_HELVETICA_BOLD, FL_NORMAL_SIZE);
+            fl_draw(Headers[static_cast<std::size_t>(column)], x + 8, y, width - 12, height, FL_ALIGN_LEFT);
+            fl_color(fl_rgb_color(190, 202, 212));
+            fl_line(x + width - 1, y, x + width - 1, y + height);
             fl_pop_clip();
             break;
         case CONTEXT_CELL:
@@ -162,19 +192,25 @@ class DatasetTable final : public Fl_Table_Row {
         if (node == nullptr) {
             return;
         }
-        const std::array<std::string, ColumnCount> values{dicom_editor::DatasetViewModel::attributeLabel(*node), node->tag, node->vr,
-                                                          node->vm, node->valuePreview.empty() ? node->value : node->valuePreview};
+        std::string attribute = dicom_editor::DatasetViewModel::attributeLabel(*node);
+        if (node->kind == dicom_editor::DicomNodeKind::Sequence) {
+            attribute.insert(static_cast<std::size_t>(node->depth) * 2, model_->sequenceCollapsed(node->path) ? "[+] " : "[-] ");
+        }
+        const std::array<std::string, ColumnCount> values{std::move(attribute), node->tag, node->vr, node->vm,
+                                                          node->valuePreview.empty() ? node->value : node->valuePreview};
 
         fl_push_clip(x, y, width, height);
         const bool selected = row_selected(row) != 0;
-        const Fl_Color normalBackground = selected ? selection_color() : FL_BACKGROUND2_COLOR;
-        const Fl_Color invalidBackground = selected ? fl_rgb_color(245, 150, 150) : fl_rgb_color(255, 220, 220);
+        const Fl_Color normalBackground =
+            selected ? selection_color() : (row % 2 == 0 ? fl_rgb_color(252, 253, 254) : fl_rgb_color(244, 248, 251));
+        const Fl_Color invalidBackground = selected ? fl_rgb_color(245, 170, 170) : fl_rgb_color(255, 226, 226);
         fl_color(node->invalidValue ? invalidBackground : normalBackground);
         fl_rectf(x, y, width, height);
         fl_color(node->invalidValue ? fl_rgb_color(125, 18, 18) : (selected ? fl_rgb_color(24, 32, 42) : FL_FOREGROUND_COLOR));
-        fl_draw(values[static_cast<std::size_t>(column)].c_str(), x + 4, y, width - 8, height, FL_ALIGN_LEFT);
-        fl_color(FL_LIGHT2);
-        fl_rect(x, y, width, height);
+        fl_font(column == 0 ? FL_HELVETICA_BOLD : FL_HELVETICA, FL_NORMAL_SIZE);
+        fl_draw(values[static_cast<std::size_t>(column)].c_str(), x + 8, y, width - 12, height, FL_ALIGN_LEFT);
+        fl_color(fl_rgb_color(224, 230, 235));
+        fl_line(x, y + height - 1, x + width, y + height - 1);
         fl_pop_clip();
     }
 
@@ -183,9 +219,15 @@ class DatasetTable final : public Fl_Table_Row {
 };
 
 DatasetPanel::DatasetPanel(int x, int y, int width, int height) : Fl_Group(x, y, width, height) {
+    box(FL_FLAT_BOX);
+    color(fl_rgb_color(238, 243, 247));
     filter_ = new DatasetFilterInput(x + Padding + FilterLabelWidth, y + Padding, width - 2 * Padding - FilterLabelWidth, FilterHeight,
                                      "Filter:", *this);
     filter_->align(FL_ALIGN_LEFT);
+    filter_->box(FL_BORDER_BOX);
+    filter_->color(FL_WHITE);
+    filter_->textcolor(fl_rgb_color(31, 46, 58));
+    filter_->tooltip("Filter by attribute name, tag, VR, VM, or value");
     filter_->when(FL_WHEN_CHANGED);
     filter_->callback(filterCallback, this);
 
@@ -226,6 +268,13 @@ void DatasetPanel::focusRows(int offset) {
     table_->moveSelection(offset);
 }
 
+void DatasetPanel::setFontSize(int size) {
+    labelsize(size);
+    filter_->labelsize(size);
+    filter_->textsize(size);
+    table_->setFontSize(size);
+}
+
 void DatasetPanel::resize(int x, int y, int width, int height) {
     Fl_Group::resize(x, y, width, height);
     filter_->resize(x + Padding + FilterLabelWidth, y + Padding, width - 2 * Padding - FilterLabelWidth, FilterHeight);
@@ -260,6 +309,18 @@ void DatasetPanel::selectionChanged() {
     if (selectionChanged_) {
         selectionChanged_();
     }
+}
+
+void DatasetPanel::toggleSelectedSequence() {
+    const auto *selected = selectedNode();
+    if (selected == nullptr || selected->kind != dicom_editor::DicomNodeKind::Sequence) {
+        return;
+    }
+    const std::string path = selected->path.toString();
+    model_.toggleSequence(selected->path);
+    table_->setModel(&model_);
+    restoreSelection(path);
+    selectionChanged();
 }
 
 void DatasetPanel::filterCallback(Fl_Widget *, void *data) { static_cast<DatasetPanel *>(data)->rebuild(); }

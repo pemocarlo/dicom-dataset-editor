@@ -8,6 +8,7 @@
 #include <vector>
 
 class Fl_Tree;
+class Fl_Box;
 class Fl_Widget;
 
 namespace dicom_editor {
@@ -24,6 +25,7 @@ class FileTreePanel final : public Fl_Group {
     void setFiles(const std::vector<dicom_editor::OpenDicomFile> &files);
     void setActivationHandler(std::function<void(std::size_t)> handler);
     void setBatchEditHandler(std::function<void(const dicom_editor::BatchEditTarget &)> handler);
+    void setFontSize(int size);
     int handle(int event) override;
     void resize(int x, int y, int width, int height) override;
 
@@ -32,6 +34,7 @@ class FileTreePanel final : public Fl_Group {
 
     struct TreeItemData;
 
+    Fl_Box *heading_{};
     Fl_Tree *tree_{};
     std::vector<std::unique_ptr<TreeItemData>> itemData_;
     std::function<void(std::size_t)> activationHandler_;
