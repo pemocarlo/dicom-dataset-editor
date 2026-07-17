@@ -12,7 +12,7 @@ struct SequenceItemRef {
     DcmTagKey sequenceTag;
     unsigned long itemIndex{};
 
-    [[nodiscard]] bool operator==(const SequenceItemRef &other) const;
+    [[nodiscard]] bool operator==(const SequenceItemRef &other) const = default;
 };
 
 class DicomPath {

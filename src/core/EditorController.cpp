@@ -8,8 +8,10 @@
 
 #include <exception>
 #include <filesystem>
+#include <format>
 #include <optional>
 #include <string>
+#include <utility>
 
 namespace dicom_editor {
 
@@ -17,7 +19,7 @@ EditorController::EditorController(EditorView &view) : view_(view) {}
 
 void EditorController::refreshView() {
     const std::string name = document_.hasFilePath() ? document_.filePath().filename().string() : "Untitled";
-    const std::string title = "DICOM Dataset Editor - " + name + (document_.dirty() ? "*" : "");
+    const std::string title = std::format("DICOM Dataset Editor - {}{}", name, document_.dirty() ? "*" : "");
     const std::string status = document_.hasFilePath() ? document_.filePath().string() : "New dataset";
     view_.presentDocument(document_.nodes(), title, status);
 }
@@ -49,7 +51,7 @@ void EditorController::editSelected(const DicomNode *selected) {
     if (selected == nullptr || !selected->editable) {
         return;
     }
-    const auto result = view_.editAttribute("Edit " + selected->keyword, selected->value);
+    const auto result = view_.editAttribute(std::format("Edit {}", selected->keyword), selected->value);
     if (result) {
         editValue(selected->path, result->value);
     }
@@ -105,15 +107,17 @@ bool EditorController::confirmDiscardChanges() {
     if (!document_.dirty()) {
         return true;
     }
+    using enum SaveChangesChoice;
     switch (view_.confirmSaveChanges()) {
-    case SaveChangesChoice::Cancel:
+    case Cancel:
         return false;
-    case SaveChangesChoice::Discard:
+    case Discard:
         return true;
-    case SaveChangesChoice::Save:
+    case Save:
         return saveDocument();
+    default:
+        std::unreachable();
     }
-    return false;
 }
 
 bool EditorController::saveTo(const std::optional<std::filesystem::path> &path) {
@@ -132,7 +136,7 @@ bool EditorController::saveTo(const std::optional<std::filesystem::path> &path) 
         DicomDocument verified;
         verified.load(document_.filePath());
         refreshView();
-        view_.setStatus("Saved and reloaded successfully: " + document_.filePath().string());
+        view_.setStatus(std::format("Saved and reloaded successfully: {}", document_.filePath().string()));
         return true;
     } catch (const std::exception &error) {
         reportError(error, false);

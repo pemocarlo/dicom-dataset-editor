@@ -10,6 +10,8 @@
 
 - Keep edits ASCII unless the file already uses Unicode.
 - Prefer `apply_patch` for manual file edits.
+- Prefer C++23 language and library features when they make code clearer or
+  more explicit, but do not add cleverness for its own sake.
 - Keep docs concise. Put developer detail in [HACKING.md](HACKING.md), build detail in [BUILDING.md](BUILDING.md), and overview in [README.md](README.md).
 
 ## Verification
