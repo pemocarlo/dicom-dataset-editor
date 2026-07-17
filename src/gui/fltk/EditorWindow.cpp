@@ -19,8 +19,10 @@
 #include <FL/Fl_Menu_Bar.H>
 #include <FL/Fl_Menu_Item.H>
 #include <FL/Fl_Native_File_Chooser.H>
+#include <FL/Fl_Progress.H>
 #include <FL/Fl_Toggle_Button.H>
 #include <FL/Fl_Widget.H>
+#include <FL/Fl_Window.H>
 #include <FL/fl_ask.H>
 #include <FL/fl_draw.H>
 
@@ -32,9 +34,12 @@
 #include <functional>
 #include <initializer_list>
 #include <iterator>
+#include <mutex>
 #include <optional>
 #include <ranges>
+#include <stop_token>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -453,6 +458,69 @@ std::optional<dicom_editor::AttributeInput> EditorWindow::batchEditAttribute(con
         return std::nullopt;
     }
     return AttributeDialog::batch(report);
+}
+
+dicom_editor::SaveAllReport EditorWindow::runSaveAllJob(dicom_editor::SaveAllTask task) {
+    struct JobState {
+        std::mutex mutex;
+        dicom_editor::SaveAllProgress progress;
+        std::optional<dicom_editor::SaveAllReport> report;
+    } state;
+
+    Fl_Window dialog(520, 150, "Saving DICOM Files");
+    Fl_Box current(20, 15, 480, 35, "Preparing save...");
+    current.align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_WRAP);
+    Fl_Progress progress(20, 60, 480, 25);
+    progress.minimum(0.0F);
+    progress.maximum(1.0F);
+    Fl_Button cancel(210, 105, 100, 30, "Cancel");
+    dialog.set_modal();
+    dialog.end();
+
+    std::jthread worker([&state, task = std::move(task)](std::stop_token stop) {
+        auto report = task(std::move(stop), [&state](const dicom_editor::SaveAllProgress &value) {
+            {
+                const std::scoped_lock lock(state.mutex);
+                state.progress = value;
+            }
+            Fl::awake();
+        });
+        {
+            const std::scoped_lock lock(state.mutex);
+            state.report = std::move(report);
+        }
+        Fl::awake();
+    });
+    const auto requestStop = [](Fl_Widget *, void *data) { static_cast<std::jthread *>(data)->request_stop(); };
+    cancel.callback(requestStop, &worker);
+    dialog.callback(requestStop, &worker);
+
+    deactivate();
+    dialog.show();
+    for (;;) {
+        dicom_editor::SaveAllProgress snapshot;
+        bool done{};
+        {
+            const std::scoped_lock lock(state.mutex);
+            snapshot = state.progress;
+            done = state.report.has_value();
+        }
+        if (snapshot.total != 0) {
+            progress.maximum(static_cast<float>(snapshot.total));
+            progress.value(static_cast<float>(snapshot.completed));
+            current.copy_label(std::format("{} of {}: {}", snapshot.completed, snapshot.total, snapshot.currentPath.string()).c_str());
+        }
+        if (done) {
+            break;
+        }
+        Fl::wait(0.05);
+    }
+    worker.join();
+    dialog.hide();
+    activate();
+    take_focus();
+    const std::scoped_lock lock(state.mutex);
+    return std::move(*state.report);
 }
 
 void EditorWindow::showError(const std::string &message) { fl_alert("%s", message.c_str()); }

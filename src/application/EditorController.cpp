@@ -17,6 +17,7 @@
 #include <iterator>
 #include <optional>
 #include <ranges>
+#include <stop_token>
 #include <string>
 #include <utility>
 #include <vector>
@@ -30,6 +31,12 @@ DicomDocument &EditorController::document() { return workspace_.active(); }
 const DicomDocument &EditorController::document() const { return workspace_.active(); }
 
 void EditorController::refreshView() {
+    refreshDocument();
+    refreshOpenFiles();
+    refreshPixelData();
+}
+
+void EditorController::refreshDocument() {
     const auto &active = document();
     const std::string name = active.hasFilePath() ? active.filePath().filename().string() : "Untitled";
     const std::string title = std::format("DICOM Dataset Editor - {}{}", name, active.dirty() ? "*" : "");
@@ -40,9 +47,9 @@ void EditorController::refreshView() {
                                    ? std::format("File {} of {} | {}", visibleIndex + 1, ordered.size(), active.filePath().string())
                                    : "New dataset";
     view_.presentDocument(active.nodes(validationEnabled_), title, status);
-    view_.presentOpenFiles(workspace_.files(fileSortOrder_), workspace_.hasLoadedFiles());
-    refreshPixelData();
 }
+
+void EditorController::refreshOpenFiles() { view_.presentOpenFiles(workspace_.files(fileSortOrder_), workspace_.hasLoadedFiles()); }
 
 void EditorController::openDocument() {
     const auto paths = view_.chooseOpenFiles();
@@ -145,23 +152,45 @@ bool EditorController::saveDocumentAs() {
 }
 
 bool EditorController::saveAllDocuments() {
-    const std::size_t original = workspace_.activeIndex();
-    std::size_t saved{};
+    std::size_t total{};
     for (std::size_t index = 0; index < workspace_.size(); ++index) {
-        if (!workspace_.at(index).dirty()) {
-            continue;
-        }
-        static_cast<void>(workspace_.activate(index));
-        refreshView();
-        if (!saveDocument()) {
-            return false;
-        }
-        ++saved;
+        const auto &entry = workspace_.at(index);
+        total += entry.dirty() && entry.hasFilePath() ? 1U : 0U;
     }
-    static_cast<void>(workspace_.activate(original));
+    const auto report = view_.runSaveAllJob([this, total](const std::stop_token &stop, const SaveAllProgressCallback &progress) {
+        SaveAllReport result;
+        for (std::size_t index = 0; index < workspace_.size(); ++index) {
+            auto &entry = workspace_.at(index);
+            if (!entry.dirty() || !entry.hasFilePath()) {
+                continue;
+            }
+            if (stop.stop_requested()) {
+                result.cancelled = true;
+                break;
+            }
+            progress({.completed = result.saved + result.failures.size(), .total = total, .currentPath = entry.filePath()});
+            const auto path = entry.filePath();
+            const auto saved = entry.save();
+            if (saved) {
+                ++result.saved;
+            } else {
+                result.failures.push_back({.path = path, .error = saved.error().what()});
+            }
+            progress({.completed = result.saved + result.failures.size(), .total = total, .currentPath = path});
+        }
+        return result;
+    });
     refreshView();
-    view_.setStatus(std::format("Saved {} modified dataset(s).", saved));
-    return true;
+    if (!report.failures.empty()) {
+        std::string message = std::format("Failed to save {} dataset(s):", report.failures.size());
+        for (const auto &failure : report.failures) {
+            message += std::format("\n{}: {}", failure.path.string(), failure.error);
+        }
+        view_.showError(message);
+    }
+    view_.setStatus(std::format("Saved {} dataset(s){}{}.", report.saved, report.cancelled ? "; cancelled" : "",
+                                report.failures.empty() ? "" : std::format("; {} failed", report.failures.size())));
+    return !report.cancelled && report.failures.empty();
 }
 
 void EditorController::clearWorkspace() {
@@ -243,7 +272,8 @@ void EditorController::batchEdit(const BatchEditTarget &target) {
     }
     try {
         const auto changed = workspace_.batchEdit(target, *input->tag, input->value, validationEnabled_);
-        refreshView();
+        refreshDocument();
+        refreshOpenFiles();
         view_.setStatus(std::format("Batch edit applied to {} dataset(s). Save modified files individually.", changed));
     } catch (const std::exception &error) {
         reportError(error, true);

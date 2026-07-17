@@ -268,21 +268,19 @@ std::size_t DicomWorkspace::batchEdit(const BatchEditTarget &target, const DcmTa
     if (!tagAllowed(target.level, tag)) {
         throw DicomError("Attribute is not valid for selected batch-edit level");
     }
-    std::vector<DicomDocument *> selected;
+    std::size_t selected{};
+    bool validateValue = validate;
     for (auto &document : documents_) {
         if (document.hasFilePath() && matches(document.hierarchy(), target)) {
-            selected.push_back(&document);
+            DicomEditorService::setAttribute(document, tag, value, validateValue);
+            validateValue = false;
+            ++selected;
         }
     }
-    if (selected.empty()) {
+    if (selected == 0) {
         throw DicomError("No open datasets match selected batch-edit group");
     }
-    bool validateValue = validate;
-    for (auto *document : selected) {
-        DicomEditorService::setAttribute(*document, tag, value, validateValue);
-        validateValue = false;
-    }
-    return selected.size();
+    return selected;
 }
 
 } // namespace dicom_editor

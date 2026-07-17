@@ -32,12 +32,14 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <functional>
 #include <optional>
 #include <print>
 #include <ranges>
 #include <source_location>
 #include <span>
 #include <stdexcept>
+#include <stop_token>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -66,6 +68,11 @@ class ControllerView final : public dicom_editor::EditorView {
     std::string error;
     std::string status;
     std::string documentStatus;
+    std::size_t documentPresentations{};
+    std::size_t openFilesPresentations{};
+    std::size_t pixelPresentations{};
+    std::vector<dicom_editor::SaveAllProgress> saveProgress;
+    std::optional<std::size_t> cancelAfterCompleted;
 
     std::vector<std::filesystem::path> chooseOpenFiles() override { return chosenFiles; }
     std::optional<std::filesystem::path> chooseOpenFolder() override { return std::nullopt; }
@@ -82,15 +89,29 @@ class ControllerView final : public dicom_editor::EditorView {
     void viewAttribute(const std::string &, const std::string &) override {}
     std::optional<dicom_editor::AttributeInput> addAttribute() override { return std::nullopt; }
     std::optional<dicom_editor::AttributeInput> batchEditAttribute(const dicom_editor::BatchEditReport &) override { return batchInput; }
+    dicom_editor::SaveAllReport runSaveAllJob(dicom_editor::SaveAllTask task) override {
+        std::stop_source stop;
+        return task(stop.get_token(), [this, &stop](const dicom_editor::SaveAllProgress &value) {
+            saveProgress.push_back(value);
+            if (cancelAfterCompleted && value.completed >= *cancelAfterCompleted) {
+                stop.request_stop();
+            }
+        });
+    }
     void showError(const std::string &message) override { error = message; }
     void presentDocument(std::vector<dicom_editor::DicomNode>, const std::string &, const std::string &value) override {
+        ++documentPresentations;
         documentStatus = value;
     }
     void presentOpenFiles(const std::vector<dicom_editor::OpenDicomFile> &files, bool loaded) override {
+        ++openFilesPresentations;
         openFiles = files;
         hasLoadedFiles = loaded;
     }
-    void presentPixelData(std::optional<dicom_editor::PixelDataPreview> preview) override { pixelPreview = std::move(preview); }
+    void presentPixelData(std::optional<dicom_editor::PixelDataPreview> preview) override {
+        ++pixelPresentations;
+        pixelPreview = std::move(preview);
+    }
     void setStatus(const std::string &value) override { status = value; }
 };
 
@@ -474,11 +495,25 @@ void controllerSavesAllAndClearsWorkspace() {
     view.batchInput = dicom_editor::AttributeInput{.tag = DCM_PatientName, .value = "Saved^Together"};
     EditorController controller(view);
     controller.openDocument();
+    const auto activePath = std::ranges::find_if(view.openFiles, [](const auto &file) { return file.active; })->path;
+    view.documentPresentations = 0;
+    view.openFilesPresentations = 0;
+    view.pixelPresentations = 0;
     controller.batchEdit({.level = dicom_editor::BatchEditLevel::Patient, .id = "SAVE-ALL", .label = "Before^Patient"});
+    require(view.documentPresentations == 1);
+    require(view.openFilesPresentations == 1);
+    // cppcheck-suppress knownConditionTrueFalse
+    require(view.pixelPresentations == 0);
     require(controller.actionState(nullptr).saveAllEnabled);
-    require(controller.confirmClose());
-    require(view.workspaceConfirmations == 1);
+    view.documentPresentations = 0;
+    view.openFilesPresentations = 0;
+    view.pixelPresentations = 0;
     require(controller.saveAllDocuments());
+    require(view.documentPresentations == 1);
+    require(view.openFilesPresentations == 1);
+    // cppcheck-suppress knownConditionTrueFalse
+    require(view.pixelPresentations == 1);
+    require(std::ranges::find_if(view.openFiles, [](const auto &file) { return file.active; })->path == activePath);
     require(!controller.actionState(nullptr).saveAllEnabled);
 
     DicomDocument reloadedFirst;

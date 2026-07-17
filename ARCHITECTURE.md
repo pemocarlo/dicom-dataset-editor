@@ -63,9 +63,56 @@ sequenceDiagram
     V->>W: update widgets
 ```
 
-Controller methods are synchronous because FLTK interactions and current core
-operations are synchronous. Introduce background work only for measured blocking
-operations; results must return to FLTK thread before touching widgets.
+Most controller methods are synchronous. Save All is the deliberate exception:
+the application supplies a toolkit-neutral save task to `EditorView`, and the
+FLTK adapter runs it on a `std::jthread` behind a modal progress window. The
+worker updates only core state. Progress wakes the FLTK event loop with
+`Fl::awake`; only the FLTK thread reads progress and touches widgets. Cancellation
+uses a stop token and is observed between files, so an in-progress DCMTK write is
+allowed to finish before the worker joins and the progress window closes.
+
+### Targeted Refreshes
+
+`EditorController::refreshView()` remains the full presentation path for active
+file changes and completed operations. Internally, document, open-file tree, and
+Pixel Data presentation are separate refreshes so workflows update only affected
+state.
+
+- A metadata batch edit scans the workspace once, validates the replacement once,
+  and updates every matching document. It then presents the active dataset and
+  dirty/hierarchy file tree once. Pixel Data is not rerendered.
+- Save All never activates documents and never presents intermediate document
+  state. It performs one full refresh after success, cancellation, or partial
+  failure, preserving the user's active file throughout.
+- Pixel frame and file navigation still use a full refresh because they change
+  preview identity as well as active presentation state.
+
+This separation avoids rebuilding the dataset tree, hierarchy, and potentially
+expensive preview for every file in a batch operation.
+
+## Save Lifecycle
+
+`DicomDocument` owns rollback-safe persistence. Saving a file follows this
+per-file transaction:
+
+1. Write a unique sibling temporary file while the original remains available
+   for DCMTK deferred Pixel Data reads.
+2. Use the document's original transfer syntax. Use Explicit Little Endian only
+   when DCMTK reports an unknown original syntax, avoiding unintended
+   compression or decompression.
+3. Rename an existing target to a sibling backup, then move the completed
+   temporary file into place.
+4. Reload the saved file into the same `DicomDocument`. This verifies readability,
+   clears dirty state, restores deferred loading, and bounds memory across large
+   batches.
+5. Remove the backup after reload succeeds. If replacement or reload fails,
+   restore the backup and leave the document dirty.
+
+Save All operates on dirty, file-backed documents only. It reports progress as
+completed count, total count, and current path; records path-specific failures;
+continues after individual failures; and returns whether cancellation occurred.
+Completed files remain saved when later files fail or the user cancels, so the
+operation is rollback-safe per file rather than atomic across the workspace.
 
 ## Core Roles
 
@@ -109,4 +156,3 @@ silently shadowing dictionary shipped with a newer app.
   FLTK events.
 - Keep `App.cpp` free of policy; it is only composition root.
 - Add another GUI by implementing `EditorView`; do not fork core workflows.
-
