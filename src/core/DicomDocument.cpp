@@ -5,6 +5,7 @@
 #include "dicom_editor/RuntimePaths.hpp"
 
 #include <dcmtk/dcmdata/dcdatset.h>
+#include <dcmtk/dcmdata/dcdeftag.h>
 #include <dcmtk/dcmdata/dcelem.h>
 #include <dcmtk/dcmdata/dcfilefo.h>
 #include <dcmtk/dcmdata/dcitem.h>
@@ -78,6 +79,10 @@ std::string vmFor(DcmElement &element) {
 }
 
 std::string valueFor(DcmElement &element) {
+    if (element.getTag() == DCM_PixelData) {
+        return "<not displayed>";
+    }
+
     if (element.ident() == EVR_SQ) {
         const auto &sequence = static_cast<DcmSequenceOfItems &>(element);
         std::ostringstream out;
@@ -106,7 +111,7 @@ std::string valuePreviewFor(const std::string &value) {
     return preview;
 }
 
-bool isEditable(const DcmElement &element) { return element.ident() != EVR_SQ; }
+bool isEditable(const DcmElement &element) { return element.ident() != EVR_SQ && element.getTag() != DCM_PixelData; }
 
 void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &parents, unsigned int depth, std::vector<DicomNode> &nodes) {
     for (unsigned long index = 0; index < item.card(); ++index) {
@@ -127,7 +132,7 @@ void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &par
         node.vr = vrFor(*element);
         node.vm = vmFor(*element);
         node.value = valueFor(*element);
-        node.valuePreview = valuePreviewFor(node.value);
+        node.valuePreview = key == DCM_PixelData ? "" : valuePreviewFor(node.value);
         node.depth = depth;
         node.editable = isEditable(*element);
         nodes.push_back(std::move(node));

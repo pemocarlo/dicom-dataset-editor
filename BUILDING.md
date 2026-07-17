@@ -7,6 +7,8 @@ conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -p
 ```
 
 That command generates `build/Release/generators/CMakePresets.json` and the Conan toolchain.
+FLTK is the default GUI toolkit. To build the legacy wxWidgets backend, add `-o gui=wxwidgets`
+to the Conan install command and use a matching lockfile.
 
 ## Configure And Build
 
