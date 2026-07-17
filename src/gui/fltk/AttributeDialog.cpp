@@ -146,8 +146,10 @@ class BatchAttributeDialogWindow final : public Fl_Window {
 class ReadOnlyAttributeDialogWindow final : public Fl_Window {
   public:
     ReadOnlyAttributeDialogWindow(const std::string &title, const std::string &value) : Fl_Window(620, 360, title.c_str()) {
-        value_ = new Fl_Multiline_Output(20, 20, 580, 280);
+        value_ = new Fl_Multiline_Output(115, 20, 485, 280, "Value (read only)");
         value_->value(value.c_str());
+        auto *copy = new Fl_Button(430, 312, 80, 28, "Copy");
+        copy->callback(copyCallback, this);
         auto *close = new Fl_Button(520, 312, 80, 28, "Close");
         close->callback(closeCallback, this);
         set_modal();
@@ -162,6 +164,10 @@ class ReadOnlyAttributeDialogWindow final : public Fl_Window {
     }
 
   private:
+    static void copyCallback(Fl_Widget *, void *data) {
+        auto &dialog = *static_cast<ReadOnlyAttributeDialogWindow *>(data);
+        Fl::copy(dialog.value_->value(), dialog.value_->size(), 1);
+    }
     static void closeCallback(Fl_Widget *, void *data) { static_cast<ReadOnlyAttributeDialogWindow *>(data)->hide(); }
 
     Fl_Multiline_Output *value_{};

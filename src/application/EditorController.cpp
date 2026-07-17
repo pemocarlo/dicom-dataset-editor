@@ -333,10 +333,11 @@ bool EditorController::confirmClose() {
 
 ActionState EditorController::actionState(const DicomNode *selected) const {
     const bool editable = selected != nullptr && selected->editable;
+    const bool viewable = selected != nullptr && !selected->readOnlyValue.empty();
     return {.saveEnabled = document().dirty() || !document().hasFilePath(),
             .saveAllEnabled = workspace_.hasDirtyDocuments(),
             .clearWorkspaceEnabled = workspace_.hasLoadedFiles() || workspace_.hasDirtyDocuments(),
-            .editEnabled = editable,
+            .editEnabled = editable || viewable,
             .deleteEnabled = editable};
 }
 

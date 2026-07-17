@@ -55,7 +55,7 @@ namespace dicom_editor {
 
 namespace {
 
-constexpr std::string_view PixelDataPlaceholder = "[Pixel Data not displayed]";
+constexpr std::string_view PixelDataPlaceholder = "[Double-click to view Pixel Data]";
 
 class DecoderRegistry final {
   public:

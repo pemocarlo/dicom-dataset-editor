@@ -5,6 +5,7 @@
 #include <FL/Fl_Group.H>
 
 #include <functional>
+#include <string>
 #include <vector>
 
 class DatasetTable;
@@ -40,6 +41,7 @@ class DatasetPanel final : public Fl_Group {
     friend class DatasetTable;
 
     void rebuild();
+    void restoreSelection(const std::string &path);
     void selectionChanged();
 
     static void filterCallback(Fl_Widget *widget, void *data);
