@@ -65,6 +65,8 @@ class EditorView {
     [[nodiscard]] virtual bool confirmDelete() = 0;
     /// Collects a replacement value for an existing attribute.
     [[nodiscard]] virtual std::optional<AttributeInput> editAttribute(const std::string &title, const std::string &value) = 0;
+    /// Shows a copyable attribute value without allowing changes.
+    virtual void viewAttribute(const std::string &title, const std::string &value) = 0;
     /// Collects the fields for a new attribute.
     [[nodiscard]] virtual std::optional<AttributeInput> addAttribute() = 0;
     /// Reviews consistency and collects one scoped batch edit.
@@ -111,7 +113,7 @@ class EditorController {
     bool saveAllDocuments();
     /// Resolves dirty datasets then resets workspace.
     void clearWorkspace();
-    /// Edits the selected attribute when it is editable.
+    /// Edits the selected attribute or shows its read-only detail.
     void editSelected(const DicomNode *selected);
     /// Adds an attribute near the selected row.
     void addAttribute(const DicomNode *selected);

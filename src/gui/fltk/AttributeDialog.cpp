@@ -10,6 +10,7 @@
 #include <FL/Fl_Choice.H>
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Multiline_Input.H>
+#include <FL/Fl_Multiline_Output.H>
 #include <FL/Fl_Window.H>
 #include <FL/fl_ask.H>
 
@@ -142,11 +143,37 @@ class BatchAttributeDialogWindow final : public Fl_Window {
     std::optional<dicom_editor::AttributeInput> result_;
 };
 
+class ReadOnlyAttributeDialogWindow final : public Fl_Window {
+  public:
+    ReadOnlyAttributeDialogWindow(const std::string &title, const std::string &value) : Fl_Window(620, 360, title.c_str()) {
+        value_ = new Fl_Multiline_Output(20, 20, 580, 280);
+        value_->value(value.c_str());
+        auto *close = new Fl_Button(520, 312, 80, 28, "Close");
+        close->callback(closeCallback, this);
+        set_modal();
+        end();
+    }
+
+    void run() {
+        show();
+        while (shown()) {
+            Fl::wait();
+        }
+    }
+
+  private:
+    static void closeCallback(Fl_Widget *, void *data) { static_cast<ReadOnlyAttributeDialogWindow *>(data)->hide(); }
+
+    Fl_Multiline_Output *value_{};
+};
+
 } // namespace
 
 std::optional<dicom_editor::AttributeInput> AttributeDialog::edit(const std::string &title, const std::string &currentValue) {
     return AttributeDialogWindow(title, false, currentValue).run();
 }
+
+void AttributeDialog::view(const std::string &title, const std::string &value) { ReadOnlyAttributeDialogWindow(title, value).run(); }
 
 std::optional<dicom_editor::AttributeInput> AttributeDialog::add() { return AttributeDialogWindow("Add Attribute", true, "").run(); }
 

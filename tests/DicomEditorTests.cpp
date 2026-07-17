@@ -78,6 +78,7 @@ class ControllerView final : public dicom_editor::EditorView {
     }
     bool confirmDelete() override { return false; }
     std::optional<dicom_editor::AttributeInput> editAttribute(const std::string &, const std::string &) override { return std::nullopt; }
+    void viewAttribute(const std::string &, const std::string &) override {}
     std::optional<dicom_editor::AttributeInput> addAttribute() override { return std::nullopt; }
     std::optional<dicom_editor::AttributeInput> batchEditAttribute(const dicom_editor::BatchEditReport &) override { return batchInput; }
     void showError(const std::string &message) override { error = message; }

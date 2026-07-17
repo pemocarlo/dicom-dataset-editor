@@ -349,6 +349,8 @@ std::optional<dicom_editor::AttributeInput> EditorWindow::editAttribute(const st
     return AttributeDialog::edit(title, value);
 }
 
+void EditorWindow::viewAttribute(const std::string &title, const std::string &value) { AttributeDialog::view(title, value); }
+
 std::optional<dicom_editor::AttributeInput> EditorWindow::addAttribute() { return AttributeDialog::add(); }
 
 std::optional<dicom_editor::AttributeInput> EditorWindow::batchEditAttribute(const dicom_editor::BatchEditReport &report) {

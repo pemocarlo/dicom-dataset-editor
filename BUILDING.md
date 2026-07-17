@@ -152,7 +152,14 @@ cmake --preset production
 cmake --build --preset production
 ```
 
-On Windows cmd.exe, activate `build\Release\generators\conanbuild.bat` instead.
+On Windows, run from an x64 Native Tools Command Prompt:
+
+```batch
+call build\Release\generators\conanbuild.bat
+cmake --preset production
+cmake --build --preset production
+```
+
 Activation selects Conan's pinned CMake; a system CMake 4.0 or newer also works.
 
 For a Debug build with tests and fast daily checks, use the workflow documented

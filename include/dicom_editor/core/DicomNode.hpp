@@ -42,6 +42,8 @@ struct DicomNode {
     bool editable{};
     /// `true` when validation marked the value invalid.
     bool invalidValue{};
+    /// Copyable detail text shown instead of editing, when non-empty.
+    std::string readOnlyValue;
 };
 
 } // namespace dicom_editor
