@@ -2,21 +2,66 @@
 
 This project uses Conan profiles from the installed `dicom-dataset-editor-conf` package.
 
-## Install Or Update The Conan Configuration
+## Project Conan Home
 
-No custom Conan remote exists yet. The configuration recipe and package are
-handled locally in the Conan cache from the sibling repository.
-
-Create the configuration package from the sibling configuration repository, upgrade
-its revision in the lockfile, and only then install it:
+The checked-in [`.conanrc`](https://docs.conan.io/2/reference/config_files/conanrc.html)
+sets `conan_home=./conanhome`. Run Conan from this checkout or one of its
+subdirectories so it uses the ignored, project-local `conanhome` directory
+instead of the user-wide Conan cache. Confirm with:
 
 ```bash
-conan create ../dicom-dataset-editor-conf -s os=Linux
-conan lock upgrade-config . --no-remote --lockfile=conan.lock --lockfile-out=conan.lock --update-config-requires=dicom-dataset-editor-conf/0.2.0
-conan config install-pkg conanconfig.yml --lockfile=conan.lock --force
+conan config home
 ```
 
-Commit the updated `conan.lock` when its configuration package revision changes.
+The expected result is `<checkout>/conanhome`. This `.conanrc` setting takes
+precedence over `CONAN_HOME`. Conan documents `.conanrc` as a preview feature;
+this project requires Conan 2.28 or newer.
+
+## Install Or Update The Conan Configuration
+
+No custom Conan remote hosts the configuration package yet. Its recipe and
+package are handled locally from the sibling repository.
+
+On Linux, create the configuration package, disable remotes for `install-pkg`,
+and install the revision already pinned by `conan.lock`:
+
+```bash
+conan create ../dicom-dataset-editor-conf -pr:h=../dicom-dataset-editor-conf/profiles/linux-gcc-release -pr:b=../dicom-dataset-editor-conf/profiles/linux-gcc-release
+conan remote disable "*"
+conan config install-pkg conanconfig.yml --lockfile=conan.lock --force -s os=Linux
+```
+
+Use the Windows profile paths and `-s os=Windows` when bootstrapping on Windows.
+Explicit profile paths avoid depending on profiles that have not been installed
+into a fresh project home yet.
+
+After changing the configuration recipe or its exported files, create it again,
+then update the lock before running `config install-pkg`:
+
+```bash
+conan lock upgrade-config . --no-remote --lockfile=conan.lock --lockfile-out=conan.lock --update-config-requires=dicom-dataset-editor-conf/0.2.0 -pr:h=../dicom-dataset-editor-conf/profiles/linux-gcc-release -pr:b=../dicom-dataset-editor-conf/profiles/linux-gcc-release
+```
+
+Commit `conan.lock` when the configuration recipe revision changes. Do not run
+the upgrade merely to initialize a fresh home: recreating identical local recipe
+content can update its timestamp without changing its recipe revision.
+
+[`conan lock upgrade-config`](https://docs.conan.io/2/reference/commands/lock/upgrade_config.html)
+updates only the lockfile; it does not activate the configuration.
+[`conan config install-pkg`](https://docs.conan.io/2/reference/commands/config.html#conan-config-install-pkg)
+performs that second step. The latter always checks enabled servers for the
+latest version or revision and has no `--no-remote` option, so disabling remotes
+is required for a cache-only install. The installed configuration defines
+ConanCenter again. Run `conan remote disable "*"` after installation when the
+remaining build must stay offline.
+
+An offline build succeeds only when every locked recipe, required binary, and
+source needed by `--build=missing` is already in `conanhome`. Populate it while
+online first, or transfer an archive from a compatible Conan cache with
+[`conan cache save` and `conan cache restore`](https://docs.conan.io/2/devops/save_restore.html).
+Cache archive transfer is experimental; use the same Conan version on both
+sides. Configuration files are not part of that archive, so still run the
+configuration-package flow above.
 
 Install the dependencies with the profile that matches your platform.
 
