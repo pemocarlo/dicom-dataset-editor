@@ -277,6 +277,7 @@ int EditorWindow::handle(int event) {
 std::vector<std::filesystem::path> EditorWindow::chooseOpenFiles() {
     Fl_Native_File_Chooser chooser(Fl_Native_File_Chooser::BROWSE_MULTI_FILE);
     chooser.title("Open DICOM Files");
+    chooser.filter("DICOM files\t*.dcm");
     if (chooser.show() != 0) {
         return {};
     }
