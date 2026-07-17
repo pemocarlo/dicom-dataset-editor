@@ -26,4 +26,4 @@ cmake --build --preset conan-release
 ctest --preset conan-release
 ```
 
-Use [BUILDING.md](BUILDING.md) for the full install and relocatable install flow.
+Use [BUILDING.md](BUILDING.md) for install and Conan package creation.

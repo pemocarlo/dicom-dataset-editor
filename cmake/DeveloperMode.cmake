@@ -1,22 +1,56 @@
+include_guard()
+
+if(NOT DICOM_EDITOR_DEVELOPER_MODE)
+    return()
+elseif(NOT PROJECT_IS_TOP_LEVEL)
+    message(AUTHOR_WARNING "Developer mode is intended for developers of DicomDatasetEditor")
+endif()
+
+option(DICOM_EDITOR_ENABLE_STRICT_WARNINGS "Enable strict compiler warnings and treat them as errors" ON)
+option(DICOM_EDITOR_ENABLE_IWYU "Run include-what-you-use while compiling" OFF)
+
+function(dicom_editor_absolutize out_var)
+    set(paths ${ARGN})
+    list(TRANSFORM paths PREPEND "${PROJECT_SOURCE_DIR}/")
+    set(${out_var} "${paths}" PARENT_SCOPE)
+endfunction()
+
 find_program(DICOM_EDITOR_CLANG_FORMAT clang-format REQUIRED)
 find_program(DICOM_EDITOR_CLANG_TIDY clang-tidy REQUIRED)
 find_program(DICOM_EDITOR_CPPCHECK cppcheck REQUIRED)
 
-file(GLOB_RECURSE DICOM_EDITOR_FORMAT_FILES CONFIGURE_DEPENDS
-    "${PROJECT_SOURCE_DIR}/include/*.hpp"
-    "${PROJECT_SOURCE_DIR}/src/*.cpp"
-    "${PROJECT_SOURCE_DIR}/src/*.hpp"
-    "${PROJECT_SOURCE_DIR}/tests/*.cpp"
-)
+set(DICOM_EDITOR_DEVELOPER_TARGETS dicom_editor_core dicom-dataset-editor)
+if(BUILD_TESTING)
+    list(APPEND DICOM_EDITOR_DEVELOPER_TARGETS dicom_editor_tests)
+endif()
 
-file(GLOB_RECURSE DICOM_EDITOR_LINT_FILES CONFIGURE_DEPENDS
-    "${PROJECT_SOURCE_DIR}/src/core/*.cpp"
-    "${PROJECT_SOURCE_DIR}/tests/*.cpp"
+if(DICOM_EDITOR_ENABLE_STRICT_WARNINGS)
+    include("${CMAKE_CURRENT_LIST_DIR}/CompilerWarnings.cmake")
+    dicom_editor_enable_strict_warnings(${DICOM_EDITOR_DEVELOPER_TARGETS})
+endif()
+
+if(DICOM_EDITOR_ENABLE_IWYU)
+    find_program(DICOM_EDITOR_IWYU_EXECUTABLE include-what-you-use REQUIRED)
+    set_property(TARGET ${DICOM_EDITOR_DEVELOPER_TARGETS}
+        PROPERTY CXX_INCLUDE_WHAT_YOU_USE
+            "${DICOM_EDITOR_IWYU_EXECUTABLE};-Wno-unknown-warning-option;-Xiwyu;--error=1"
+    )
+endif()
+
+dicom_editor_absolutize(
+    DICOM_EDITOR_FORMAT_FILES
+    ${DICOM_EDITOR_PUBLIC_HEADERS}
+    ${DICOM_EDITOR_CORE_SOURCES}
+    ${DICOM_EDITOR_UI_HEADERS}
+    ${DICOM_EDITOR_UI_SOURCES}
+    ${DICOM_EDITOR_TEST_SOURCES}
 )
-list(TRANSFORM DICOM_EDITOR_UI_SOURCES PREPEND "${PROJECT_SOURCE_DIR}/"
-    OUTPUT_VARIABLE DICOM_EDITOR_UI_LINT_FILES
+dicom_editor_absolutize(
+    DICOM_EDITOR_LINT_FILES
+    ${DICOM_EDITOR_CORE_SOURCES}
+    ${DICOM_EDITOR_UI_SOURCES}
+    ${DICOM_EDITOR_TEST_SOURCES}
 )
-list(APPEND DICOM_EDITOR_LINT_FILES ${DICOM_EDITOR_UI_LINT_FILES})
 
 add_custom_target(format
     COMMAND ${DICOM_EDITOR_CLANG_FORMAT} -i ${DICOM_EDITOR_FORMAT_FILES}
@@ -34,7 +68,7 @@ add_custom_target(lint
     COMMAND ${DICOM_EDITOR_CLANG_TIDY}
         --quiet
         --warnings-as-errors=*
-        -p=${CMAKE_BINARY_DIR}
+        -p=${PROJECT_BINARY_DIR}
         ${DICOM_EDITOR_LINT_FILES}
     COMMENT "Linting C++ sources"
     VERBATIM
@@ -42,7 +76,7 @@ add_custom_target(lint
 
 add_custom_target(cppcheck
     COMMAND ${DICOM_EDITOR_CPPCHECK}
-        --project=${CMAKE_BINARY_DIR}/compile_commands.json
+        --project=${PROJECT_BINARY_DIR}/compile_commands.json
         --enable=warning,style,performance,portability
         --error-exitcode=1
         --inline-suppr
@@ -51,10 +85,10 @@ add_custom_target(cppcheck
     VERBATIM
 )
 
-if(DICOM_EDITOR_ENABLE_LSP)
+if(CMAKE_EXPORT_COMPILE_COMMANDS)
     if(CMAKE_GENERATOR MATCHES "Makefiles|Ninja")
         file(CREATE_LINK
-            "${CMAKE_BINARY_DIR}/compile_commands.json"
+            "${PROJECT_BINARY_DIR}/compile_commands.json"
             "${PROJECT_SOURCE_DIR}/compile_commands.json"
             SYMBOLIC
             RESULT DICOM_EDITOR_COMPILE_COMMANDS_LINK_RESULT
