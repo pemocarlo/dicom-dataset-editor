@@ -101,7 +101,6 @@ class DicomDocument {
     [[nodiscard]] bool hasFilePath() const;
     /// Returns `true` when the dataset has unsaved changes.
     [[nodiscard]] bool dirty() const;
-
     /// Marks the dataset as modified.
     void markDirty();
     /// Clears the modified state.
@@ -110,6 +109,7 @@ class DicomDocument {
   private:
     std::unique_ptr<DcmFileFormat> file_;
     std::filesystem::path filePath_;
+    mutable std::optional<DicomHierarchy> hierarchyCache_;
     bool dirty_{};
 };
 

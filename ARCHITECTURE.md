@@ -32,7 +32,9 @@ reuse by another UI adapter or headless workflow.
 
 ## State Ownership
 
-- `DicomDocument` owns one `DcmFileFormat`, file path, and dirty state.
+- `DicomDocument` owns one `DcmFileFormat`, file path, dirty state, and a small
+  cached hierarchy projection. Mutable dataset access and editor mutations
+  invalidate that projection.
 - `DicomWorkspace` owns all documents, active-document selection, discovery,
   ordering, DICOMDIR resolution, and scoped batch edits.
 - `EditorController` owns workspace plus session presentation state: validation,
@@ -44,6 +46,12 @@ reuse by another UI adapter or headless workflow.
 
 Avoid duplicate state. For example, active document lives in `DicomWorkspace`;
 file tree only renders `OpenDicomFile::active`.
+
+Clean inactive documents remain loaded. DCMTK already defers large element values
+such as Pixel Data, while unloading whole datasets would add activation I/O and
+failure handling throughout the controller. Revisit full lazy loading only when
+the synthetic benchmark and representative datasets show that retained metadata
+is a material memory problem.
 
 ## Request And Presentation Flow
 

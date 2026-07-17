@@ -163,6 +163,24 @@ cmake --preset iwyu
 cmake --build --preset iwyu
 ```
 
+## Performance Benchmark
+
+An opt-in synthetic benchmark measures workspace opening, repeated file-tree
+projection, and active dataset projection without requiring patient data. It
+generates temporary DICOM files with 256 KiB Pixel Data and nested metadata,
+then removes them after the run.
+
+```bash
+cmake --preset dev -DDICOM_EDITOR_BUILD_BENCHMARKS=ON
+cmake --build --preset dev --target dicom_editor_benchmarks
+./build/Debug/dicom_editor_benchmarks 100
+```
+
+The optional argument is the number of generated files. Run benchmarks in a
+stable Release build when comparing changes; Debug results are useful only for
+quick local checks. Benchmarks are not registered with CTest and do not affect
+normal builds.
+
 ## Strict Warnings
 
 All developer configurations enable strict warnings by default. Override with
