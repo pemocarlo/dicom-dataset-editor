@@ -24,6 +24,10 @@ class DicomDatasetEditorRecipe(ConanFile):
 
     requires = ("dcmtk/3.7.0", "fltk/1.4.5")
 
+    def build_requirements(self):
+        self.tool_requires("cmake/4.3.2")
+        self.tool_requires("cppcheck/2.20.0")
+
     def validate(self):
         check_min_cppstd(self, "23")
 
