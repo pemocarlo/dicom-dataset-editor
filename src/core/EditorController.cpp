@@ -1,5 +1,6 @@
 #include "dicom_editor/EditorController.hpp"
 
+#include "dicom_editor/DicomEditorService.hpp"
 #include "dicom_editor/DicomNode.hpp"
 #include "dicom_editor/DicomPath.hpp"
 
@@ -56,7 +57,7 @@ void EditorController::editSelected(const DicomNode *selected) {
 
 void EditorController::editValue(const DicomPath &path, const std::string &value) {
     try {
-        editor_.editValue(document_, {.path = path, .value = value});
+        DicomEditorService::editValue(document_, {.path = path, .value = value});
         refreshView();
     } catch (const std::exception &error) {
         reportError(error, true);
@@ -74,7 +75,7 @@ void EditorController::addAttribute(const DicomNode *selected) {
         return;
     }
     try {
-        editor_.addAttribute(document_, {.parentItemPath = parent, .tag = *result->tag, .value = result->value});
+        DicomEditorService::addAttribute(document_, {.parentItemPath = parent, .tag = *result->tag, .value = result->value});
         refreshView();
     } catch (const std::exception &error) {
         reportError(error, false);
@@ -86,7 +87,7 @@ void EditorController::deleteAttribute(const DicomNode *selected) {
         return;
     }
     try {
-        editor_.deleteAttribute(document_, selected->path);
+        DicomEditorService::deleteAttribute(document_, selected->path);
         refreshView();
     } catch (const std::exception &error) {
         reportError(error, false);
