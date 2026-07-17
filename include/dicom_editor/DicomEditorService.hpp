@@ -1,12 +1,14 @@
 #pragma once
 
-#include "dicom_editor/DicomDocument.hpp"
+#include "dicom_editor/DicomPath.hpp"
 
 #include <dcmtk/dcmdata/dctagkey.h>
 
 #include <string>
 
 namespace dicom_editor {
+
+class DicomDocument;
 
 struct EditRequest {
     DicomPath path;

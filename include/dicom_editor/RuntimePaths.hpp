@@ -42,7 +42,7 @@ inline std::filesystem::path executableDirectory() {
 #endif
 }
 
-inline std::filesystem::path installedDataPath(const std::filesystem::path &relativePath) {
+inline std::filesystem::path installedDataPath([[maybe_unused]] const std::filesystem::path &relativePath) {
 #ifdef DICOM_EDITOR_INSTALL_DATADIR
     const auto executableDir = executableDirectory();
     if (!executableDir.empty()) {

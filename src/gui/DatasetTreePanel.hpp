@@ -2,12 +2,22 @@
 
 #include "dicom_editor/DicomNode.hpp"
 
-#include <wx/dataview.h>
 #include <wx/panel.h>
-#include <wx/srchctrl.h>
 
+#include <cstddef>
 #include <functional>
+#include <string>
 #include <vector>
+
+class wxCommandEvent;
+class wxDataViewEvent;
+class wxDataViewListCtrl;
+class wxSearchCtrl;
+class wxWindow;
+
+namespace dicom_editor {
+class DicomPath;
+}
 
 class DatasetTreePanel final : public wxPanel {
   public:

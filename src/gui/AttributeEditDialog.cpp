@@ -1,10 +1,17 @@
 #include "AttributeEditDialog.hpp"
 
+#include <dcmtk/dcmdata/dctagkey.h>
+#include <dcmtk/ofstd/oftypes.h>
+
+#include <wx/defs.h>
+#include <wx/gdicmn.h>
 #include <wx/msgdlg.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
+#include <wx/textctrl.h>
 
 #include <charconv>
+#include <system_error>
 
 namespace {
 
