@@ -63,14 +63,20 @@ cmake --preset production
 cmake --build --preset production
 ```
 
-Windows:
+Windows (prefer an **x64 Native Tools Command Prompt for Visual Studio**, which
+sets up MSVC and the Windows SDK):
 
-```powershell
+```batch
 conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release -c tools.build:skip_test=True
+call build\Release\generators\conanbuild.bat
 cmake --preset production
 cmake --build --preset production
+cmake --install build\Release --prefix build\install --config Release
+build\install\bin\dicom-dataset-editor.exe
 ```
 
 `production` uses CMake's standard Release configuration. Daily development
 uses a separate Debug profile and the `dev` preset; see [HACKING.md](HACKING.md).
-Use [BUILDING.md](BUILDING.md) for installation and Conan package creation.
+Before the first command, bootstrap the project-local Conan configuration as
+described in [BUILDING.md](BUILDING.md). Use that guide for the full Windows
+setup, installation details, and Conan package creation.

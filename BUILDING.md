@@ -23,6 +23,26 @@ project-local home; the separate storage avoids a ConanCenter Meson wrapper
 that cannot handle spaces in cache paths. Other platforms use Conan's default
 storage under `conanhome`.
 
+## Windows Production Quick Start
+
+Use an **x64 Native Tools Command Prompt for Visual Studio** (or initialize the
+same MSVC and Windows SDK environment before running the commands). Then
+bootstrap the project-local Conan configuration using the Windows commands in
+[Configuration Package](#configuration-package). After that succeeds, run:
+
+```batch
+conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release -c tools.build:skip_test=True
+call build\Release\generators\conanbuild.bat
+cmake --preset production
+cmake --build --preset production
+cmake --install build\Release --prefix build\install --config Release
+build\install\bin\dicom-dataset-editor.exe
+```
+
+The executable is installed at `build\install\bin\dicom-dataset-editor.exe`.
+For a non-development PC, install the current Microsoft Visual C++ x64
+Redistributable if Windows reports that an MSVC runtime DLL is missing.
+
 ## Install Or Update The Conan Configuration
 
 No custom Conan remote hosts the configuration package yet. Its recipe and
@@ -71,6 +91,12 @@ conan lock upgrade-config . --no-remote --lockfile=conan.lock --lockfile-out=con
 If `config install-pkg` cannot find the package after `conan create` succeeds,
 the lock likely pins another recipe revision. Run the matching
 `lock upgrade-config` command above and retry the install.
+
+This is expected after updating the sibling configuration checkout. For a
+Windows production build, run the Windows `lock upgrade-config` command,
+rerun `conan config install-pkg`, then rerun `conan install`. If the build must
+remain offline, disable remotes again after `config install-pkg`, because that
+command restores the remotes supplied by the configuration package.
 
 Commit `conan.lock` when the configuration recipe revision changes. Do not run
 the upgrade merely to initialize a fresh home: recreating identical local recipe
@@ -201,9 +227,9 @@ cmake --install build/Release --prefix <your-install-prefix> --config Release
 The `--config Release` flag is harmless for single-config generators and required
 when the build tree uses a multi-config generator such as Visual Studio.
 
-```powershell
+```batch
 cmake --install build/Release --prefix build/install --config Release
-.\build\install\bin\dicom-dataset-editor.exe
+build\install\bin\dicom-dataset-editor.exe
 ```
 
 Expected layout:
@@ -212,8 +238,9 @@ Expected layout:
 - `<your-install-prefix>/bin/dicom-dataset-editor.exe` on Windows
 
 Dictionary is compiled into executable, so install has no runtime data directory.
-CMake does not bundle dependency libraries; provide them through system, Conan,
-or platform-specific deployment step.
+The locked Windows production profile links third-party dependencies statically.
+The application may still require the Microsoft Visual C++ x64 Redistributable
+on a machine without the corresponding MSVC runtime.
 The Windows executable uses the GUI subsystem and does not open a separate console window.
 
 ## Conan Package
