@@ -92,7 +92,16 @@ Use this tested LLVM/IWYU pairing on both platforms:
 On Windows, install the official
 [LLVM 22.1.6 x64 package](https://github.com/llvm/llvm-project/releases/tag/llvmorg-22.1.6)
 and add its `bin` directory to `PATH`; it provides `clang-format`, `clang-tidy`,
-and `clangd`. IWYU 0.26 publishes source only. For `all-checks`, build the
+and `clangd`. Alternatively, the LLVM/Clang tools installed with Visual Studio
+work for `dev-check-ninja` and `quality-checks`. From an x64 Native Tools
+Command Prompt, expose them for the current shell with:
+
+```batch
+set "PATH=%VSINSTALLDIR%\VC\Tools\Llvm\x64\bin;%PATH%"
+```
+
+The Visual Studio LLVM 22.1.3 tools were verified for formatting and
+clang-tidy on this project. IWYU 0.26 publishes source only. For `all-checks`, build the
 [`clang_22` branch](https://github.com/include-what-you-use/include-what-you-use/tree/clang_22)
 against the full LLVM x64 archive and add the resulting
 `include-what-you-use.exe` to `PATH`. The
@@ -117,6 +126,8 @@ Run Windows commands from an x64 Native Tools Command Prompt so `cl.exe`, the
 Windows SDK, and MSVC environment variables are available. Verify setup with:
 
 ```batch
+call build\Ninja-Debug\generators\conanbuild.bat
+set "PATH=%VSINSTALLDIR%\VC\Tools\Llvm\x64\bin;%PATH%"
 cmake --version
 ninja --version
 clang-format --version

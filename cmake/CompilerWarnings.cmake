@@ -61,7 +61,9 @@ function(dicom_editor_enable_strict_warnings)
             -Wzero-as-null-pointer-constant
         )
     elseif(MSVC)
-        set(warnings /W4 /WX /permissive-)
+        # MSVC otherwise emits C4530 from standard-library and DCMTK headers;
+        # with /WX enabled that prevents every Debug workflow from compiling.
+        set(warnings /W4 /WX /permissive- /EHsc)
     else()
         message(WARNING "Strict warnings are not configured for ${CMAKE_CXX_COMPILER_ID}")
         return()
