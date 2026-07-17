@@ -73,6 +73,15 @@ call build\Debug\generators\conanbuild.bat
 call build\Ninja-Debug\generators\conanbuild.bat
 ```
 
+From PowerShell, use the repository launcher instead. It initializes the x64
+Visual Studio environment, activates the matching Conan environment, and exposes
+Visual Studio's LLVM tools before running the selected workflow:
+
+```powershell
+.\scripts\Invoke-DeveloperWorkflow.ps1
+.\scripts\Invoke-DeveloperWorkflow.ps1 -Preset quality-checks
+```
+
 External LLVM tools are intentionally not Conan requirements. Required tools by
 workflow:
 
