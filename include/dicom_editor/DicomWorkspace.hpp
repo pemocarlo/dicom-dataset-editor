@@ -81,6 +81,10 @@ class DicomWorkspace {
     [[nodiscard]] std::size_t size() const;
     /// Returns true when workspace contains at least one file-backed dataset.
     [[nodiscard]] bool hasLoadedFiles() const;
+    /// Returns true when any dataset has unsaved changes.
+    [[nodiscard]] bool hasDirtyDocuments() const;
+    /// Returns number of datasets with unsaved changes.
+    [[nodiscard]] std::size_t dirtyDocumentCount() const;
     /// Returns active document index.
     [[nodiscard]] std::size_t activeIndex() const;
     /// Activates document when index valid and different.
@@ -89,6 +93,8 @@ class DicomWorkspace {
     [[nodiscard]] bool activatePrevious(FileSortOrder order = FileSortOrder::InstanceNumber);
     /// Activates next document when available.
     [[nodiscard]] bool activateNext(FileSortOrder order = FileSortOrder::InstanceNumber);
+    /// Replaces all open documents with one empty dataset.
+    void clear();
     /// Projects workspace state for file-tree views.
     [[nodiscard]] std::vector<OpenDicomFile> files(FileSortOrder order = FileSortOrder::InstanceNumber) const;
     /// Builds consistency information for one patient or study group.

@@ -126,6 +126,36 @@ bool EditorController::saveDocumentAs() {
     return path ? saveTo(path) : false;
 }
 
+bool EditorController::saveAllDocuments() {
+    const std::size_t original = workspace_.activeIndex();
+    std::size_t saved{};
+    for (std::size_t index = 0; index < workspace_.size(); ++index) {
+        if (!workspace_.at(index).dirty()) {
+            continue;
+        }
+        static_cast<void>(workspace_.activate(index));
+        refreshView();
+        if (!saveDocument()) {
+            return false;
+        }
+        ++saved;
+    }
+    static_cast<void>(workspace_.activate(original));
+    refreshView();
+    view_.setStatus(std::format("Saved {} modified dataset(s).", saved));
+    return true;
+}
+
+void EditorController::clearWorkspace() {
+    if (!confirmClose()) {
+        return;
+    }
+    workspace_.clear();
+    pixelFrame_ = 0;
+    refreshView();
+    view_.setStatus("Workspace cleared.");
+}
+
 void EditorController::editSelected(const DicomNode *selected) {
     if (selected == nullptr || !selected->editable) {
         return;
@@ -267,7 +297,11 @@ bool EditorController::confirmClose() {
 
 ActionState EditorController::actionState(const DicomNode *selected) const {
     const bool editable = selected != nullptr && selected->editable;
-    return {.saveEnabled = document().dirty() || !document().hasFilePath(), .editEnabled = editable, .deleteEnabled = editable};
+    return {.saveEnabled = document().dirty() || !document().hasFilePath(),
+            .saveAllEnabled = workspace_.hasDirtyDocuments(),
+            .clearWorkspaceEnabled = workspace_.hasLoadedFiles() || workspace_.hasDirtyDocuments(),
+            .editEnabled = editable,
+            .deleteEnabled = editable};
 }
 
 bool EditorController::confirmDiscardChanges() {

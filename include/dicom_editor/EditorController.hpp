@@ -31,6 +31,10 @@ enum class SaveChangesChoice {
 struct ActionState {
     /// Save action enabled.
     bool saveEnabled{};
+    /// Save-all action enabled.
+    bool saveAllEnabled{};
+    /// Clear-workspace action enabled.
+    bool clearWorkspaceEnabled{};
     /// Edit action enabled.
     bool editEnabled{};
     /// Delete action enabled.
@@ -97,6 +101,10 @@ class EditorController {
     bool saveDocument();
     /// Saves the document to a new file.
     bool saveDocumentAs();
+    /// Saves every modified dataset, prompting for paths when needed.
+    bool saveAllDocuments();
+    /// Resolves dirty datasets then resets workspace.
+    void clearWorkspace();
     /// Edits the selected attribute when it is editable.
     void editSelected(const DicomNode *selected);
     /// Adds an attribute near the selected row.
