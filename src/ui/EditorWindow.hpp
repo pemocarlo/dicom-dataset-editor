@@ -4,6 +4,7 @@
 
 #include <FL/Fl_Double_Window.H>
 
+#include <cstddef>
 #include <string>
 
 class DatasetPanel;
@@ -37,6 +38,7 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     [[nodiscard]] std::optional<std::filesystem::path> chooseDicomDirectory() override;
     [[nodiscard]] std::optional<std::filesystem::path> chooseSaveFile() override;
     [[nodiscard]] dicom_editor::SaveChangesChoice confirmSaveChanges() override;
+    [[nodiscard]] dicom_editor::SaveChangesChoice confirmWorkspaceChanges(std::size_t dirtyCount) override;
     [[nodiscard]] bool confirmDelete() override;
     [[nodiscard]] std::optional<dicom_editor::AttributeInput> editAttribute(const std::string &title, const std::string &value) override;
     [[nodiscard]] std::optional<dicom_editor::AttributeInput> addAttribute() override;
