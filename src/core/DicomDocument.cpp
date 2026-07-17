@@ -16,22 +16,19 @@ namespace dicom_editor {
 
 namespace {
 
-std::string conditionMessage(const OFCondition& condition)
-{
+std::string conditionMessage(const OFCondition &condition) {
     return condition.text() == nullptr ? "unknown DCMTK error" : condition.text();
 }
 
-void requireGood(const OFCondition& condition, const std::string& action)
-{
+void requireGood(const OFCondition &condition, const std::string &action) {
     if (condition.bad()) {
         throw DicomError(action + ": " + conditionMessage(condition));
     }
 }
 
-void ensureDictionaryPath()
-{
+void ensureDictionaryPath() {
     const auto installedPath = installedDataPath("dcmtk/dicom.dic");
-    const char* current = std::getenv("DCMDICTPATH");
+    const char *current = std::getenv("DCMDICTPATH");
     if ((current == nullptr || !std::filesystem::exists(current)) && std::filesystem::exists(installedPath)) {
         setenv("DCMDICTPATH", installedPath.string().c_str(), 1);
         return;
@@ -45,38 +42,32 @@ void ensureDictionaryPath()
 #endif
 }
 
-std::string tagToString(const DcmTagKey& key)
-{
+std::string tagToString(const DcmTagKey &key) {
     std::ostringstream out;
-    out << '(' << std::hex << std::setw(4) << std::setfill('0') << key.getGroup() << ','
-        << std::setw(4) << key.getElement() << ')';
+    out << '(' << std::hex << std::setw(4) << std::setfill('0') << key.getGroup() << ',' << std::setw(4) << key.getElement() << ')';
     return out.str();
 }
 
-std::string keywordFor(DcmTag& tag)
-{
-    const char* name = tag.getTagName();
+std::string keywordFor(DcmTag &tag) {
+    const char *name = tag.getTagName();
     return name == nullptr ? "" : name;
 }
 
-std::string vrFor(const DcmElement& element)
-{
+std::string vrFor(const DcmElement &element) {
     DcmVR vr(element.getVR());
-    const char* vrName = vr.getVRName();
+    const char *vrName = vr.getVRName();
     return vrName == nullptr ? "" : vrName;
 }
 
-std::string vmFor(DcmElement& element)
-{
+std::string vmFor(DcmElement &element) {
     std::ostringstream out;
     out << element.getVM();
     return out.str();
 }
 
-std::string valueFor(DcmElement& element)
-{
+std::string valueFor(DcmElement &element) {
     if (element.ident() == EVR_SQ) {
-        const auto& sequence = static_cast<DcmSequenceOfItems&>(element);
+        const auto &sequence = static_cast<DcmSequenceOfItems &>(element);
         std::ostringstream out;
         out << sequence.card() << " item";
         if (sequence.card() != 1) {
@@ -93,8 +84,7 @@ std::string valueFor(DcmElement& element)
     return value.c_str();
 }
 
-std::string valuePreviewFor(const std::string& value)
-{
+std::string valuePreviewFor(const std::string &value) {
     std::string preview(value);
     constexpr std::size_t maxPreviewLength = 160;
     if (preview.size() > maxPreviewLength) {
@@ -104,18 +94,11 @@ std::string valuePreviewFor(const std::string& value)
     return preview;
 }
 
-bool isEditable(const DcmElement& element)
-{
-    return element.ident() != EVR_SQ;
-}
+bool isEditable(const DcmElement &element) { return element.ident() != EVR_SQ; }
 
-void collectNodesFromItem(DcmItem& item,
-    const std::vector<SequenceItemRef>& parents,
-    unsigned int depth,
-    std::vector<DicomNode>& nodes)
-{
+void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &parents, unsigned int depth, std::vector<DicomNode> &nodes) {
     for (unsigned long index = 0; index < item.card(); ++index) {
-        DcmElement* element = item.getElement(index);
+        DcmElement *element = item.getElement(index);
         if (element == nullptr) {
             continue;
         }
@@ -141,7 +124,7 @@ void collectNodesFromItem(DcmItem& item,
             continue;
         }
 
-        auto& sequenceElement = static_cast<DcmSequenceOfItems&>(*element);
+        auto &sequenceElement = static_cast<DcmSequenceOfItems &>(*element);
         for (unsigned long itemIndex = 0; itemIndex < sequenceElement.card(); ++itemIndex) {
             std::vector<SequenceItemRef> itemParents = parents;
             itemParents.push_back({key, itemIndex});
@@ -159,7 +142,7 @@ void collectNodesFromItem(DcmItem& item,
             itemNode.editable = false;
             nodes.push_back(std::move(itemNode));
 
-            DcmItem* nested = sequenceElement.getItem(itemIndex);
+            DcmItem *nested = sequenceElement.getItem(itemIndex);
             if (nested != nullptr) {
                 collectNodesFromItem(*nested, itemParents, depth + 2, nodes);
             }
@@ -167,18 +150,17 @@ void collectNodesFromItem(DcmItem& item,
     }
 }
 
-DcmItem& resolveItem(DcmItem& root, const DicomPath& path)
-{
-    DcmItem* current = &root;
-    for (const auto& parent : path.parents()) {
-        DcmElement* element = nullptr;
+DcmItem &resolveItem(DcmItem &root, const DicomPath &path) {
+    DcmItem *current = &root;
+    for (const auto &parent : path.parents()) {
+        DcmElement *element = nullptr;
         requireGood(current->findAndGetElement(parent.sequenceTag, element), "Find sequence " + tagToString(parent.sequenceTag));
         if (element == nullptr || element->ident() != EVR_SQ) {
             throw DicomError("Path segment is not a sequence: " + tagToString(parent.sequenceTag));
         }
 
-        auto* sequence = static_cast<DcmSequenceOfItems*>(element);
-        DcmItem* next = sequence->getItem(parent.itemIndex);
+        auto *sequence = static_cast<DcmSequenceOfItems *>(element);
+        DcmItem *next = sequence->getItem(parent.itemIndex);
         if (next == nullptr) {
             throw DicomError("Sequence item index is out of range: " + std::to_string(parent.itemIndex));
         }
@@ -187,28 +169,22 @@ DcmItem& resolveItem(DcmItem& root, const DicomPath& path)
     return *current;
 }
 
-const DcmItem& resolveItem(const DcmItem& root, const DicomPath& path)
-{
-    return resolveItem(const_cast<DcmItem&>(root), path);
-}
+const DcmItem &resolveItem(const DcmItem &root, const DicomPath &path) { return resolveItem(const_cast<DcmItem &>(root), path); }
 
 } // namespace
 
-DicomDocument::DicomDocument()
-{
+DicomDocument::DicomDocument() {
     ensureDictionaryPath();
     createEmpty();
 }
 
-void DicomDocument::createEmpty()
-{
+void DicomDocument::createEmpty() {
     file_ = std::make_unique<DcmFileFormat>();
     filePath_.clear();
     dirty_ = false;
 }
 
-void DicomDocument::load(const std::filesystem::path& path)
-{
+void DicomDocument::load(const std::filesystem::path &path) {
     auto loaded = std::make_unique<DcmFileFormat>();
     requireGood(loaded->loadFile(path.string().c_str()), "Load DICOM file");
     file_ = std::move(loaded);
@@ -216,8 +192,7 @@ void DicomDocument::load(const std::filesystem::path& path)
     dirty_ = false;
 }
 
-void DicomDocument::save()
-{
+void DicomDocument::save() {
     if (filePath_.empty()) {
         throw DicomError("Cannot save without a file path");
     }
@@ -225,45 +200,35 @@ void DicomDocument::save()
     dirty_ = false;
 }
 
-void DicomDocument::saveAs(const std::filesystem::path& path)
-{
+void DicomDocument::saveAs(const std::filesystem::path &path) {
     filePath_ = path;
     save();
 }
 
-DcmDataset& DicomDocument::dataset()
-{
-    return *file_->getDataset();
-}
+DcmDataset &DicomDocument::dataset() { return *file_->getDataset(); }
 
-const DcmDataset& DicomDocument::dataset() const
-{
-    return *file_->getDataset();
-}
+const DcmDataset &DicomDocument::dataset() const { return *file_->getDataset(); }
 
-DcmItem& DicomDocument::itemAt(const DicomPath& path)
-{
+DcmItem &DicomDocument::itemAt(const DicomPath &path) {
     if (!path.pointsToDatasetItem()) {
         throw DicomError("Path does not point to a dataset item: " + path.toString());
     }
     return resolveItem(dataset(), path);
 }
 
-const DcmItem& DicomDocument::itemAt(const DicomPath& path) const
-{
+const DcmItem &DicomDocument::itemAt(const DicomPath &path) const {
     if (!path.pointsToDatasetItem()) {
         throw DicomError("Path does not point to a dataset item: " + path.toString());
     }
     return resolveItem(dataset(), path);
 }
 
-DcmElement& DicomDocument::elementAt(const DicomPath& path)
-{
+DcmElement &DicomDocument::elementAt(const DicomPath &path) {
     if (!path.pointsToElement()) {
         throw DicomError("Path does not point to an element: " + path.toString());
     }
-    DcmItem& parent = resolveItem(dataset(), path);
-    DcmElement* element = nullptr;
+    DcmItem &parent = resolveItem(dataset(), path);
+    DcmElement *element = nullptr;
     requireGood(parent.findAndGetElement(*path.elementTag(), element), "Find element " + path.toString());
     if (element == nullptr) {
         throw DicomError("Element not found: " + path.toString());
@@ -271,13 +236,9 @@ DcmElement& DicomDocument::elementAt(const DicomPath& path)
     return *element;
 }
 
-const DcmElement& DicomDocument::elementAt(const DicomPath& path) const
-{
-    return const_cast<DicomDocument&>(*this).elementAt(path);
-}
+const DcmElement &DicomDocument::elementAt(const DicomPath &path) const { return const_cast<DicomDocument &>(*this).elementAt(path); }
 
-std::vector<DicomNode> DicomDocument::nodes() const
-{
+std::vector<DicomNode> DicomDocument::nodes() const {
     std::vector<DicomNode> result;
     DicomNode root;
     root.kind = DicomNodeKind::Dataset;
@@ -287,33 +248,18 @@ std::vector<DicomNode> DicomDocument::nodes() const
     root.valuePreview = root.value;
     root.editable = false;
     result.push_back(std::move(root));
-    collectNodesFromItem(const_cast<DcmDataset&>(dataset()), {}, 1, result);
+    collectNodesFromItem(const_cast<DcmDataset &>(dataset()), {}, 1, result);
     return result;
 }
 
-const std::filesystem::path& DicomDocument::filePath() const
-{
-    return filePath_;
-}
+const std::filesystem::path &DicomDocument::filePath() const { return filePath_; }
 
-bool DicomDocument::hasFilePath() const
-{
-    return !filePath_.empty();
-}
+bool DicomDocument::hasFilePath() const { return !filePath_.empty(); }
 
-bool DicomDocument::dirty() const
-{
-    return dirty_;
-}
+bool DicomDocument::dirty() const { return dirty_; }
 
-void DicomDocument::markDirty()
-{
-    dirty_ = true;
-}
+void DicomDocument::markDirty() { dirty_ = true; }
 
-void DicomDocument::clearDirty()
-{
-    dirty_ = false;
-}
+void DicomDocument::clearDirty() { dirty_ = false; }
 
 } // namespace dicom_editor

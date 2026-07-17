@@ -19,17 +19,15 @@ using dicom_editor::SequenceItemRef;
 
 namespace {
 
-std::string stringValue(DicomDocument& document, const DicomPath& path)
-{
+std::string stringValue(DicomDocument &document, const DicomPath &path) {
     OFString value;
     const auto condition = document.elementAt(path).getOFStringArray(value);
     assert(condition.good());
     return value.c_str();
 }
 
-void seedDataset(DicomDocument& document)
-{
-    auto& dataset = document.dataset();
+void seedDataset(DicomDocument &document) {
+    auto &dataset = document.dataset();
     dataset.putAndInsertString(DCM_SpecificCharacterSet, "ISO_IR 100");
     dataset.putAndInsertString(DCM_SOPClassUID, UID_SecondaryCaptureImageStorage);
     dataset.putAndInsertString(DCM_SOPInstanceUID, "1.2.826.0.1.3680043.10.543.1");
@@ -38,16 +36,15 @@ void seedDataset(DicomDocument& document)
     dataset.putAndInsertString(DCM_Modality, "OT");
     dataset.putAndInsertString(DCM_PatientName, "Before^Patient");
 
-    auto* sequence = new DcmSequenceOfItems(DCM_ReferencedStudySequence);
-    auto* item = new DcmItem();
+    auto *sequence = new DcmSequenceOfItems(DCM_ReferencedStudySequence);
+    auto *item = new DcmItem();
     item->putAndInsertString(DCM_ReferencedSOPClassUID, UID_SecondaryCaptureImageStorage);
     item->putAndInsertString(DCM_ReferencedSOPInstanceUID, "1.2.826.0.1.3680043.10.543.4");
     sequence->append(item);
     dataset.insert(sequence, true);
 }
 
-void scalarEdit()
-{
+void scalarEdit() {
     DicomDocument document;
     DicomEditorService editor;
     seedDataset(document);
@@ -59,8 +56,7 @@ void scalarEdit()
     assert(stringValue(document, patientName) == "After^Patient");
 }
 
-void addDeleteElement()
-{
+void addDeleteElement() {
     DicomDocument document;
     DicomEditorService editor;
     seedDataset(document);
@@ -71,12 +67,11 @@ void addDeleteElement()
     assert(stringValue(document, patientId) == "PID-123");
 
     editor.deleteAttribute(document, patientId);
-    DcmElement* deleted = nullptr;
+    DcmElement *deleted = nullptr;
     assert(document.dataset().findAndGetElement(tag, deleted).bad());
 }
 
-void nestedSequenceEdit()
-{
+void nestedSequenceEdit() {
     DicomDocument document;
     DicomEditorService editor;
     seedDataset(document);
@@ -88,8 +83,7 @@ void nestedSequenceEdit()
     assert(stringValue(document, referencedSop) == "1.2.826.0.1.3680043.10.543.99");
 }
 
-void saveReloadPersistence()
-{
+void saveReloadPersistence() {
     DicomDocument document;
     DicomEditorService editor;
     seedDataset(document);
@@ -107,8 +101,7 @@ void saveReloadPersistence()
     std::filesystem::remove(output);
 }
 
-void recursiveNodeListing()
-{
+void recursiveNodeListing() {
     DicomDocument document;
     seedDataset(document);
     const auto nodes = document.nodes();
@@ -116,7 +109,7 @@ void recursiveNodeListing()
     bool sawPatientName = false;
     bool sawSequence = false;
     bool sawNestedValue = false;
-    for (const auto& node : nodes) {
+    for (const auto &node : nodes) {
         sawPatientName = sawPatientName || node.keyword == "PatientName";
         sawSequence = sawSequence || node.keyword == "ReferencedStudySequence";
         sawNestedValue = sawNestedValue || node.keyword == "ReferencedSOPInstanceUID";
@@ -127,13 +120,12 @@ void recursiveNodeListing()
     assert(sawNestedValue);
 }
 
-void nodeKeepsFullValue()
-{
+void nodeKeepsFullValue() {
     DicomDocument document;
     const std::string longValue(200, 'x');
     document.dataset().putAndInsertString(DCM_PatientComments, longValue.c_str());
 
-    for (const auto& node : document.nodes()) {
+    for (const auto &node : document.nodes()) {
         if (node.keyword == "PatientComments") {
             assert(node.value == longValue);
             assert(node.valuePreview.size() == 160);
@@ -145,8 +137,7 @@ void nodeKeepsFullValue()
 
 } // namespace
 
-int main()
-{
+int main() {
     scalarEdit();
     addDeleteElement();
     nestedSequenceEdit();
