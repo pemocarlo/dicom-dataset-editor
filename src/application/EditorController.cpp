@@ -1,7 +1,7 @@
 #include "dicom_editor/application/EditorController.hpp"
 
-#include "dicom_editor/core/DicomDocument.hpp"
 #include "dicom_editor/core/DicomDictionary.hpp"
+#include "dicom_editor/core/DicomDocument.hpp"
 #include "dicom_editor/core/DicomEditorService.hpp"
 #include "dicom_editor/core/DicomError.hpp"
 #include "dicom_editor/core/DicomNode.hpp"

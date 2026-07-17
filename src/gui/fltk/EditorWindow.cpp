@@ -4,11 +4,11 @@
 #include "DatasetPanel.hpp"
 #include "FileTreePanel.hpp"
 #include "PixelDataPanel.hpp"
+#include "dicom_editor/application/EditorController.hpp"
 #include "dicom_editor/core/AttributeInput.hpp"
 #include "dicom_editor/core/DicomDocument.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomWorkspace.hpp"
-#include "dicom_editor/application/EditorController.hpp"
 
 #include <dcmtk/dcmdata/dctagkey.h>
 

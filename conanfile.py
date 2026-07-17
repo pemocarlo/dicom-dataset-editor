@@ -28,13 +28,20 @@ class DicomDatasetEditorRecipe(ConanFile):
     def build_requirements(self):
         self.tool_requires("cmake/4.3.2")
         self.tool_requires("cppcheck/2.20.0")
+        generator = self.conf.get("tools.cmake.cmaketoolchain:generator", default=None)
+        if generator == "Ninja":
+            self.tool_requires("ninja/1.13.2")
 
     def validate(self):
         check_min_cppstd(self, "23")
 
     def layout(self):
         cmake_layout(self, build_folder="build")
-        self.folders.build = os.path.join("build", str(self.settings.build_type))
+        default_build_folder = os.path.join("build", str(self.settings.build_type))
+        self.folders.build = self.conf.get(
+            "user.dicom_dataset_editor:build_folder",
+            default=default_build_folder,
+        )
         self.folders.generators = os.path.join(self.folders.build, "generators")
 
     def generate(self):

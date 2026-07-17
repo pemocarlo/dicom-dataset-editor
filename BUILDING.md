@@ -33,7 +33,8 @@ conan config install-pkg conanconfig.yml --lockfile=conan.lock --force -s os=Lin
 
 Use the Windows profile paths and `-s os=Windows` when bootstrapping on Windows.
 Explicit profile paths avoid depending on profiles that have not been installed
-into a fresh project home yet.
+into a fresh project home yet. The package installs Release, Debug, and optional
+Ninja Debug profiles for both Linux/GCC and Windows/MSVC.
 
 After changing the configuration recipe or its exported files, create it again,
 then update the lock before running `config install-pkg`:
@@ -63,42 +64,73 @@ Cache archive transfer is experimental; use the same Conan version on both
 sides. Configuration files are not part of that archive, so still run the
 configuration-package flow above.
 
-Install the dependencies with the profile that matches your platform.
+Install dependencies with profiles matching the intended configuration. Host
+libraries use that configuration; build tools such as CMake and cppcheck stay
+in Release.
 
-On Linux:
+For the final optimized Linux executable:
 
-```powershell
+```bash
 conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release
 ```
 
-On Windows from PowerShell:
+For daily Linux development with assertions and debug information:
 
-```powershell
-conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release
+```bash
+conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-debug -pr:b=linux-gcc-release
 ```
 
-That command generates `build/Release/generators/CMakePresets.json` and the Conan toolchain.
-It also passes DCMTK dictionary location to CMake. Dictionary is embedded during
-build; installed application does not depend on Conan cache or separate data file.
-Pinned build tools declared by the recipe are installed in Conan's build context and
-recorded by the lockfile. Activate the generated Conan build environment before
-running CMake to select the pinned CMake. The Conan toolchain adds pinned build
-tools to CMake's program search path.
+Windows uses the equivalent host profiles while retaining the Release build
+profile. Run these from an x64 Native Tools Command Prompt:
+
+```batch
+conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release
+conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-debug -pr:b=windows-msvc-release
+```
+
+Default Debug uses Unix Makefiles on Linux and Visual Studio on Windows. Install
+the optional Ninja Debug profile for `dev-ninja`, `quality-checks`, and
+`all-checks`:
+
+```bash
+# Linux
+conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-debug-ninja -pr:b=linux-gcc-release
+
+# Windows x64 Native Tools Command Prompt
+conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-debug-ninja -pr:b=windows-msvc-release
+```
+
+Release, default Debug, and Ninja Debug installs generate toolchains under
+`build/Release/generators`, `build/Debug/generators`, and
+`build/Ninja-Debug/generators`, respectively. They coexist; switching generators
+does not overwrite another toolchain. Conan also passes the DCMTK dictionary
+location to CMake; the build embeds it, so the installed application does not
+depend on the Conan cache or a separate data file. Pinned CMake and cppcheck,
+plus Ninja when selected, are installed in Conan's Release build context and
+recorded by the lockfile.
 
 In-source builds are not supported.
 
-## Build And Test
+## Production Build
 
-After the Conan install, use the checked-in portable CMake presets:
+`production` is the project-facing name for CMake's standard optimized Release
+configuration. It builds the executable delivered to users and omits tests and
+developer tooling:
 
-```powershell
-cmake --preset release
-cmake --build --preset release
-ctest --preset release
+```bash
+source build/Release/generators/conanbuild.sh
+cmake --preset production
+cmake --build --preset production
 ```
 
-Run the Conan install again after changing the recipe, lockfile, profiles, or dependencies.
-CMake configuration is expected to use the generated Conan toolchain; configuring without it requires manually providing all dependencies and `DICOM_EDITOR_DCMTK_DICT_FILE`.
+On Windows cmd.exe, activate `build\Release\generators\conanbuild.bat` instead.
+Activation selects Conan's pinned CMake; a system CMake 4.0 or newer also works.
+
+For a Debug build with tests and fast daily checks, use the workflow documented
+in [HACKING.md](HACKING.md). Run the matching Conan install again after changing
+the recipe, lockfile, profiles, or dependencies. Configuring without a generated
+toolchain requires manually providing all dependencies and
+`DICOM_EDITOR_DCMTK_DICT_FILE`.
 
 ## Install
 
