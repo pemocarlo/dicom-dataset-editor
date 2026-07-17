@@ -174,6 +174,7 @@ the official LLVM installer and point the editor at its `bin` directory.
 ## Code Layout
 
 - `DicomDocument`: DICOM file ownership, load/save, dirty state, recursive node listing.
+- `PixelDataPanel`: optional scaled pixel preview and multi-frame navigation.
 - `DicomPath`: stable path through sequence items and optional element tag.
 - `DicomEditorService`: add/edit/delete operations.
 - `EditorController`: document workflows and action state.
