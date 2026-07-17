@@ -13,8 +13,10 @@
 #include <FL/Fl_Window.H>
 #include <FL/fl_ask.H>
 
+#include <algorithm>
 #include <cstddef>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <utility>
 #include <vector>
@@ -89,6 +91,8 @@ class BatchAttributeDialogWindow final : public Fl_Window {
         }
         attribute_->value(0);
         value_ = new Fl_Multiline_Input(115, 58, 380, 200, "New value");
+        attribute_->callback(attributeCallback, this);
+        updateValue();
         auto *cancel = new Fl_Button(325, 274, 80, 28, "Cancel");
         cancel->callback(cancelCallback, this);
         auto *ok = new Fl_Button(415, 274, 80, 28, "Apply");
@@ -108,6 +112,19 @@ class BatchAttributeDialogWindow final : public Fl_Window {
   private:
     static void cancelCallback(Fl_Widget *, void *data) { static_cast<BatchAttributeDialogWindow *>(data)->hide(); }
     static void okCallback(Fl_Widget *, void *data) { static_cast<BatchAttributeDialogWindow *>(data)->accept(); }
+    static void attributeCallback(Fl_Widget *, void *data) { static_cast<BatchAttributeDialogWindow *>(data)->updateValue(); }
+
+    void updateValue() {
+        const int selected = attribute_->value();
+        if (selected < 0 || static_cast<std::size_t>(selected) >= attributes_.size()) {
+            value_->value("");
+            return;
+        }
+        const auto &values = attributes_[static_cast<std::size_t>(selected)].values;
+        const auto existing = std::ranges::find_if(values, [](const std::string &value) { return value != "<missing>"; });
+        value_->value(existing == values.end() ? "" : existing->c_str());
+        value_->insert_position(0, value_->size());
+    }
 
     void accept() {
         const int selected = attribute_->value();
