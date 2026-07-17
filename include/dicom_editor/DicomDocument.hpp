@@ -10,12 +10,14 @@
 #include <expected>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 class DcmDataset;
 class DcmElement;
 class DcmItem;
+class DcmTagKey;
 
 namespace dicom_editor {
 
@@ -53,6 +55,7 @@ struct DicomHierarchy {
     std::string studyId;
     std::string seriesLabel;
     std::string seriesId;
+    std::optional<long> instanceNumber;
 };
 
 /// Owns the loaded DICOM file and exposes tree, edit, and preview operations.
@@ -88,6 +91,8 @@ class DicomDocument {
     [[nodiscard]] PixelDataPreview renderPixelData(unsigned long frameIndex) const;
     /// Reads the patient/study/series grouping fields for the workspace tree.
     [[nodiscard]] DicomHierarchy hierarchy() const;
+    /// Reads a root-dataset string attribute.
+    [[nodiscard]] std::optional<std::string> attributeValue(const DcmTagKey &tag) const;
     /// Returns true when loaded object is a DICOM media directory.
     [[nodiscard]] bool isDicomDirectory() const;
     /// Returns the active file path.
