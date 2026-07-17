@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <vector>
 
 class Fl_Tree;
@@ -31,6 +32,8 @@ class FileTreePanel final : public Fl_Group {
 
   private:
     static void treeCallback(Fl_Widget *widget, void *data);
+    static void centerActiveCallback(void *data);
+    static void activatePendingCallback(void *data);
 
     struct TreeItemData;
 
@@ -39,4 +42,6 @@ class FileTreePanel final : public Fl_Group {
     std::vector<std::unique_ptr<TreeItemData>> itemData_;
     std::function<void(std::size_t)> activationHandler_;
     std::function<void(const dicom_editor::BatchEditTarget &)> batchEditHandler_;
+    std::optional<std::size_t> activeFileIndex_;
+    std::optional<std::size_t> pendingActivationIndex_;
 };
