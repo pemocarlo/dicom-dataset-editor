@@ -10,6 +10,7 @@ project(
 
 option(DICOM_EDITOR_DEVELOPER_MODE "Enable developer tooling targets" OFF)
 option(DICOM_EDITOR_BUILD_BENCHMARKS "Build synthetic performance benchmarks" OFF)
+option(DICOM_EDITOR_ENABLE_VALGRIND "Provide a Valgrind CTest MemCheck target" OFF)
 
 find_package(DCMTK CONFIG REQUIRED)
 find_package(fltk CONFIG REQUIRED)
@@ -149,6 +150,17 @@ target_sources(dicom-dataset-editor
 target_link_libraries(dicom-dataset-editor PRIVATE DicomDatasetEditor::fltk)
 
 install(TARGETS dicom-dataset-editor)
+
+if(DICOM_EDITOR_ENABLE_VALGRIND)
+    if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        message(FATAL_ERROR "DICOM_EDITOR_ENABLE_VALGRIND is currently supported only on Linux")
+    endif()
+    find_program(MEMORYCHECK_COMMAND valgrind REQUIRED)
+    set(MEMORYCHECK_TYPE Valgrind)
+    set(MEMORYCHECK_COMMAND_OPTIONS
+        "--tool=memcheck --error-exitcode=1 --leak-check=full --show-leak-kinds=definite,indirect,possible --errors-for-leak-kinds=definite,indirect"
+    )
+endif()
 
 include(CTest)
 if(BUILD_TESTING)
