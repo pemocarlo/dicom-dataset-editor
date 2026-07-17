@@ -53,6 +53,8 @@ class EditorView {
     [[nodiscard]] virtual std::optional<std::filesystem::path> chooseOpenFolder() = 0;
     /// Prompts for a DICOMDIR media directory file.
     [[nodiscard]] virtual std::optional<std::filesystem::path> chooseDicomDirectory() = 0;
+    /// Prompts for a DCMTK-format data dictionary.
+    [[nodiscard]] virtual std::optional<std::filesystem::path> chooseDataDictionary() = 0;
     /// Prompts for a file to save.
     [[nodiscard]] virtual std::optional<std::filesystem::path> chooseSaveFile() = 0;
     /// Resolves unsaved changes.
@@ -93,6 +95,8 @@ class EditorController {
     void openFolder();
     /// Opens only datasets referenced by a selected DICOMDIR.
     void openDicomDirectory();
+    /// Replaces the embedded dictionary with a selected DCMTK-format dictionary.
+    void loadDataDictionary();
     /// Makes an open file active.
     void activateDocument(std::size_t index);
     /// Moves to the previous open file.
