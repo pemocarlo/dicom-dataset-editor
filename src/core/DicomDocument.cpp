@@ -90,6 +90,7 @@ void logPixelPreview(std::string_view message) noexcept {
 #endif
     } catch (...) {
         // Diagnostics must never make pixel preview fail.
+        return;
     }
 }
 
@@ -262,6 +263,8 @@ void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &par
                 .valuePreview = itemValue,
                 .depth = depth + 1,
                 .editable = false,
+                .invalidValue = false,
+                .readOnlyValue = {},
             };
             nodes.push_back(std::move(itemNode));
 
@@ -383,6 +386,8 @@ std::vector<DicomNode> DicomDocument::nodes(bool validateValues) const {
         .valuePreview = rootValue,
         .depth = 0,
         .editable = false,
+        .invalidValue = false,
+        .readOnlyValue = {},
     }};
     collectNodesFromItem(const_cast<DcmDataset &>(dataset()), {}, 1, validateValues, result);
     return result;

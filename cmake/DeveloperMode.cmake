@@ -35,7 +35,7 @@ set(DICOM_EDITOR_DEVELOPER_TARGETS
     dicom-dataset-editor
 )
 if(BUILD_TESTING)
-    list(APPEND DICOM_EDITOR_DEVELOPER_TARGETS dicom_editor_tests)
+    list(APPEND DICOM_EDITOR_DEVELOPER_TARGETS dicom_editor_tests dicom_editor_gui_smoke_test)
 endif()
 
 if(DICOM_EDITOR_ENABLE_STRICT_WARNINGS)
@@ -66,6 +66,7 @@ dicom_editor_absolutize(
     ${DICOM_EDITOR_FLTK_SOURCES}
     ${DICOM_EDITOR_APP_SOURCES}
     ${DICOM_EDITOR_TEST_SOURCES}
+    ${DICOM_EDITOR_GUI_SMOKE_TEST_SOURCES}
 )
 dicom_editor_absolutize(
     DICOM_EDITOR_LINT_FILES
@@ -74,6 +75,7 @@ dicom_editor_absolutize(
     ${DICOM_EDITOR_FLTK_SOURCES}
     ${DICOM_EDITOR_APP_SOURCES}
     ${DICOM_EDITOR_TEST_SOURCES}
+    ${DICOM_EDITOR_GUI_SMOKE_TEST_SOURCES}
 )
 
 if(DICOM_EDITOR_ENABLE_CLANG_FORMAT)

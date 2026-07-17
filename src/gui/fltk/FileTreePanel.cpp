@@ -73,26 +73,50 @@ void FileTreePanel::setFiles(const std::vector<dicom_editor::OpenDicomFile> &fil
     tree_->clear();
     itemData_.clear();
     itemData_.reserve(files.size() * 3);
+    Fl_Tree_Item *patientItem = nullptr;
+    Fl_Tree_Item *studyItem = nullptr;
+    Fl_Tree_Item *seriesItem = nullptr;
+    std::string previousPatientPath;
+    std::string previousStudyPath;
+    std::string previousSeriesPath;
     for (const auto &file : files) {
         const auto &hierarchy = file.hierarchy;
         const std::string patientPath = groupLabel(hierarchy.patientLabel, hierarchy.patientId);
         const std::string studyPath = patientPath + "/" + groupLabel(hierarchy.studyLabel, hierarchy.studyId);
         const std::string seriesPath = studyPath + "/" + groupLabel(hierarchy.seriesLabel, hierarchy.seriesId);
-        if (auto *patient = tree_->add(patientPath.c_str()); patient != nullptr && patient->user_data() == nullptr) {
+        if (patientPath != previousPatientPath) {
+            patientItem = tree_->add(patientPath.c_str());
+            studyItem = nullptr;
+            seriesItem = nullptr;
+            previousPatientPath = patientPath;
+            previousStudyPath.clear();
+            previousSeriesPath.clear();
+        }
+        if (patientItem != nullptr && patientItem->user_data() == nullptr) {
             auto data = std::make_unique<TreeItemData>();
             data->kind = TreeItemData::Kind::Patient;
             data->target = {.level = dicom_editor::BatchEditLevel::Patient, .id = hierarchy.patientId, .label = hierarchy.patientLabel};
-            patient->user_data(data.get());
+            patientItem->user_data(data.get());
             itemData_.push_back(std::move(data));
         }
-        if (auto *study = tree_->add(studyPath.c_str()); study != nullptr && study->user_data() == nullptr) {
+        if (studyPath != previousStudyPath) {
+            studyItem = tree_->add(patientItem, groupLabel(hierarchy.studyLabel, hierarchy.studyId).c_str());
+            seriesItem = nullptr;
+            previousStudyPath = studyPath;
+            previousSeriesPath.clear();
+        }
+        if (studyItem != nullptr && studyItem->user_data() == nullptr) {
             auto data = std::make_unique<TreeItemData>();
             data->kind = TreeItemData::Kind::Study;
             data->target = {.level = dicom_editor::BatchEditLevel::Study, .id = hierarchy.studyId, .label = hierarchy.studyLabel};
-            study->user_data(data.get());
+            studyItem->user_data(data.get());
             itemData_.push_back(std::move(data));
         }
-        if (auto *item = tree_->add((seriesPath + "/" + fileLabel(file)).c_str()); item != nullptr) {
+        if (seriesPath != previousSeriesPath) {
+            seriesItem = tree_->add(studyItem, groupLabel(hierarchy.seriesLabel, hierarchy.seriesId).c_str());
+            previousSeriesPath = seriesPath;
+        }
+        if (auto *item = tree_->add(seriesItem, fileLabel(file).c_str()); item != nullptr) {
             auto data = std::make_unique<TreeItemData>();
             data->kind = TreeItemData::Kind::File;
             data->fileIndex = file.index;

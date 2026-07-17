@@ -266,8 +266,10 @@ std::size_t DicomWorkspace::batchEdit(const BatchEditTarget &target, const DcmTa
     if (selected.empty()) {
         throw DicomError("No open datasets match selected batch-edit group");
     }
+    bool validateValue = validate;
     for (auto *document : selected) {
-        DicomEditorService::setAttribute(*document, tag, value, validate);
+        DicomEditorService::setAttribute(*document, tag, value, validateValue);
+        validateValue = false;
     }
     return selected.size();
 }
