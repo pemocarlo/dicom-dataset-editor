@@ -17,6 +17,12 @@ Run the normal Conan install before developer workflows:
 conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release
 ```
 
+The checked-in developer presets currently target the Linux single-config
+workflow. On Windows, use the Release workflow in [BUILDING.md](BUILDING.md).
+Running the developer checks on Windows additionally requires a Ninja-based
+profile so CMake can generate `compile_commands.json`, plus `clang-format` and
+`clang-tidy` on `PATH`.
+
 The Conan toolchain adds cppcheck to CMake's program search path, so the
 `cppcheck` target does not depend on a system cppcheck. Conan also generates
 build-environment activation scripts under `build/Release/generators` for pinned

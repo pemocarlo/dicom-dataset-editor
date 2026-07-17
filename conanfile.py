@@ -33,6 +33,8 @@ class DicomDatasetEditorRecipe(ConanFile):
 
     def layout(self):
         cmake_layout(self, build_folder="build")
+        self.folders.build = os.path.join("build", str(self.settings.build_type))
+        self.folders.generators = os.path.join(self.folders.build, "generators")
 
     def generate(self):
         deps = CMakeConfigDeps(self)
