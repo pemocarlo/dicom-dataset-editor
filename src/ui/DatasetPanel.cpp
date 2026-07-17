@@ -1,4 +1,4 @@
-#include "DatasetTreePanel.hpp"
+#include "DatasetPanel.hpp"
 
 #include "dicom_editor/DatasetViewModel.hpp"
 #include "dicom_editor/DicomNode.hpp"
@@ -29,22 +29,22 @@ constexpr std::array<int, ColumnCount> ColumnWidths{220, 105, 55, 55, 260, 420, 
 
 class DatasetFilterInput final : public Fl_Input {
   public:
-    DatasetFilterInput(int x, int y, int width, int height, const char *label, DatasetTreePanel &owner)
+    DatasetFilterInput(int x, int y, int width, int height, const char *label, DatasetPanel &owner)
         : Fl_Input(x, y, width, height, label), owner_(owner) {}
 
     int handle(int event) override {
         if (event == FL_KEYDOWN) {
             const int key = Fl::event_key();
             if (key == FL_Escape) {
-                owner_.FocusRows();
+                owner_.focusRows();
                 return 1;
             }
             if (key == FL_Up) {
-                owner_.FocusRows(-1);
+                owner_.focusRows(-1);
                 return 1;
             }
             if (key == FL_Down) {
-                owner_.FocusRows(1);
+                owner_.focusRows(1);
                 return 1;
             }
         }
@@ -52,12 +52,12 @@ class DatasetFilterInput final : public Fl_Input {
     }
 
   private:
-    DatasetTreePanel &owner_;
+    DatasetPanel &owner_;
 };
 
 class DatasetTable final : public Fl_Table_Row {
   public:
-    DatasetTable(int x, int y, int width, int height, DatasetTreePanel &owner) : Fl_Table_Row(x, y, width, height), owner_(owner) {
+    DatasetTable(int x, int y, int width, int height, DatasetPanel &owner) : Fl_Table_Row(x, y, width, height), owner_(owner) {
         cols(ColumnCount);
         type(SELECT_SINGLE);
         selection_color(fl_rgb_color(210, 230, 250));
@@ -98,7 +98,7 @@ class DatasetTable final : public Fl_Table_Row {
         select_row(target);
         move_cursor(target, 0);
         redraw();
-        owner_.SelectionChanged();
+        owner_.selectionChanged();
     }
 
     int handle(int event) override {
@@ -113,21 +113,21 @@ class DatasetTable final : public Fl_Table_Row {
                 return 1;
             }
             if (key == FL_Enter) {
-                owner_.EditSelectedValue();
+                owner_.editSelectedValue();
                 return 1;
             }
         }
 
         const int handled = Fl_Table_Row::handle(event);
         if (event == FL_PUSH && Fl::event_clicks() != 0) {
-            owner_.EditSelectedValue();
+            owner_.editSelectedValue();
             return 1;
         }
         return handled;
     }
 
   private:
-    static void tableCallback(Fl_Widget *, void *data) { static_cast<DatasetTable *>(data)->owner_.SelectionChanged(); }
+    static void tableCallback(Fl_Widget *, void *data) { static_cast<DatasetTable *>(data)->owner_.selectionChanged(); }
 
     void draw_cell(TableContext context, int row, int column, int x, int y, int width, int height) override {
         switch (context) {
@@ -175,11 +175,11 @@ class DatasetTable final : public Fl_Table_Row {
         fl_pop_clip();
     }
 
-    DatasetTreePanel &owner_;
+    DatasetPanel &owner_;
     const dicom_editor::DatasetViewModel *model_{};
 };
 
-DatasetTreePanel::DatasetTreePanel(int x, int y, int width, int height) : Fl_Group(x, y, width, height) {
+DatasetPanel::DatasetPanel(int x, int y, int width, int height) : Fl_Group(x, y, width, height) {
     filter_ = new DatasetFilterInput(x + Padding + FilterLabelWidth, y + Padding, width - 2 * Padding - FilterLabelWidth, FilterHeight,
                                      "Filter:", *this);
     filter_->align(FL_ALIGN_LEFT);
@@ -192,51 +192,49 @@ DatasetTreePanel::DatasetTreePanel(int x, int y, int width, int height) : Fl_Gro
     end();
 }
 
-void DatasetTreePanel::SetNodes(std::vector<dicom_editor::DicomNode> nodes) {
+void DatasetPanel::setNodes(std::vector<dicom_editor::DicomNode> nodes) {
     model_.setNodes(std::move(nodes));
-    Rebuild();
+    rebuild();
 }
 
-const dicom_editor::DicomNode *DatasetTreePanel::SelectedNode() const {
+const dicom_editor::DicomNode *DatasetPanel::selectedNode() const {
     const int row = table_->selectedRow();
     return row < 0 ? nullptr : model_.nodeAt(static_cast<std::size_t>(row));
 }
 
-void DatasetTreePanel::SetSelectionChangedHandler(std::function<void()> handler) { selectionChanged_ = std::move(handler); }
+void DatasetPanel::setSelectionChangedHandler(std::function<void()> handler) { selectionChanged_ = std::move(handler); }
 
-void DatasetTreePanel::SetValueChangedHandler(std::function<void(dicom_editor::DicomPath, std::string)> handler) {
-    valueChanged_ = std::move(handler);
-}
+void DatasetPanel::setEditRequestedHandler(std::function<void()> handler) { editRequested_ = std::move(handler); }
 
-void DatasetTreePanel::EditSelectedValue() {
-    const auto *selected = SelectedNode();
-    if (selected != nullptr && selected->editable && valueChanged_) {
-        valueChanged_(selected->path, selected->value);
+void DatasetPanel::editSelectedValue() {
+    const auto *selected = selectedNode();
+    if (selected != nullptr && selected->editable && editRequested_) {
+        editRequested_();
     }
 }
 
-void DatasetTreePanel::FocusRows(int offset) {
+void DatasetPanel::focusRows(int offset) {
     Fl::focus(table_);
     table_->moveSelection(offset);
 }
 
-void DatasetTreePanel::resize(int x, int y, int width, int height) {
+void DatasetPanel::resize(int x, int y, int width, int height) {
     Fl_Group::resize(x, y, width, height);
     filter_->resize(x + Padding + FilterLabelWidth, y + Padding, width - 2 * Padding - FilterLabelWidth, FilterHeight);
     const int tableY = y + Padding + FilterHeight + Padding;
     table_->resize(x + Padding, tableY, width - 2 * Padding, height - (tableY - y) - Padding);
 }
 
-void DatasetTreePanel::Rebuild() {
+void DatasetPanel::rebuild() {
     model_.setFilter(filter_->value());
     table_->setModel(&model_);
-    SelectionChanged();
+    selectionChanged();
 }
 
-void DatasetTreePanel::SelectionChanged() {
+void DatasetPanel::selectionChanged() {
     if (selectionChanged_) {
         selectionChanged_();
     }
 }
 
-void DatasetTreePanel::filterCallback(Fl_Widget *, void *data) { static_cast<DatasetTreePanel *>(data)->Rebuild(); }
+void DatasetPanel::filterCallback(Fl_Widget *, void *data) { static_cast<DatasetPanel *>(data)->rebuild(); }
