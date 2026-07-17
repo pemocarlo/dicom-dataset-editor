@@ -1,6 +1,6 @@
 #include "PixelDataPanel.hpp"
 
-#include "dicom_editor/DicomDocument.hpp"
+#include "dicom_editor/core/DicomDocument.hpp"
 
 #include <FL/Enumerations.H>
 #include <FL/Fl_Box.H>

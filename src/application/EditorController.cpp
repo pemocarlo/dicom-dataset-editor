@@ -1,10 +1,10 @@
-#include "dicom_editor/EditorController.hpp"
+#include "dicom_editor/application/EditorController.hpp"
 
-#include "dicom_editor/DicomDocument.hpp"
-#include "dicom_editor/DicomEditorService.hpp"
-#include "dicom_editor/DicomError.hpp"
-#include "dicom_editor/DicomNode.hpp"
-#include "dicom_editor/DicomPath.hpp"
+#include "dicom_editor/core/DicomDocument.hpp"
+#include "dicom_editor/core/DicomEditorService.hpp"
+#include "dicom_editor/core/DicomError.hpp"
+#include "dicom_editor/core/DicomNode.hpp"
+#include "dicom_editor/core/DicomPath.hpp"
 
 #include <dcmtk/dcmdata/dctagkey.h>
 

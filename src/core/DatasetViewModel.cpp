@@ -1,6 +1,6 @@
-#include "dicom_editor/DatasetViewModel.hpp"
+#include "dicom_editor/core/DatasetViewModel.hpp"
 
-#include "dicom_editor/DicomPath.hpp"
+#include "dicom_editor/core/DicomPath.hpp"
 
 #include <algorithm>
 #include <cctype>
