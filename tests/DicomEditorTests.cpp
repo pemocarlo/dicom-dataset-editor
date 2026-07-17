@@ -2,6 +2,7 @@
 #include "dicom_editor/DatasetViewModel.hpp"
 #include "dicom_editor/DicomDocument.hpp"
 #include "dicom_editor/DicomEditorService.hpp"
+#include "dicom_editor/DicomError.hpp"
 #include "dicom_editor/DicomNode.hpp"
 #include "dicom_editor/DicomPath.hpp"
 
@@ -20,6 +21,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <exception>
+#include <expected>
 #include <filesystem>
 #include <optional>
 #include <print>
@@ -159,10 +161,10 @@ void saveReloadPersistence() {
     DicomEditorService::editValue(document, EditRequest{.path = patientName, .value = "Persisted^Patient"});
 
     const auto output = std::filesystem::temp_directory_path() / "dicom_editor_persistence_test.dcm";
-    document.saveAs(output);
+    require(document.saveAs(output).has_value());
 
     DicomDocument reloaded;
-    reloaded.load(output);
+    require(reloaded.load(output).has_value());
     require(stringValue(reloaded, patientName) == "Persisted^Patient");
 
     std::filesystem::remove(output);

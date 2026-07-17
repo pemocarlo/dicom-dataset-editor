@@ -1,10 +1,12 @@
 #pragma once
 
+#include "dicom_editor/DicomError.hpp"
 #include "dicom_editor/DicomNode.hpp"
 
 #include <dcmtk/dcmdata/dcfilefo.h>
 
 #include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -45,11 +47,11 @@ class DicomDocument {
     /// Replaces the current content with a new empty dataset.
     void createEmpty();
     /// Loads a DICOM file and clears the dirty flag.
-    void load(const std::filesystem::path &path);
+    [[nodiscard]] std::expected<void, DicomError> load(const std::filesystem::path &path);
     /// Saves to the current file path.
-    void save();
+    [[nodiscard]] std::expected<void, DicomError> save();
     /// Saves to a new file path and adopts it as the active path.
-    void saveAs(const std::filesystem::path &path);
+    [[nodiscard]] std::expected<void, DicomError> saveAs(const std::filesystem::path &path);
 
     /// Returns the root dataset.
     [[nodiscard]] DcmDataset &dataset();
