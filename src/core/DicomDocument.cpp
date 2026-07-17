@@ -1,6 +1,7 @@
 #include "dicom_editor/DicomDocument.hpp"
 
 #include "dicom_editor/DicomError.hpp"
+#include "dicom_editor/RuntimePaths.hpp"
 
 #include <dcmtk/dcmdata/dcdeftag.h>
 #include <dcmtk/dcmdata/dcsequen.h>
@@ -29,9 +30,15 @@ void requireGood(const OFCondition& condition, const std::string& action)
 
 void ensureDictionaryPath()
 {
+    const auto installedPath = installedDataPath("dcmtk/dicom.dic");
+    const char* current = std::getenv("DCMDICTPATH");
+    if ((current == nullptr || !std::filesystem::exists(current)) && std::filesystem::exists(installedPath)) {
+        setenv("DCMDICTPATH", installedPath.string().c_str(), 1);
+        return;
+    }
+
 #ifdef DICOM_EDITOR_DCMTK_DICT_PATH
     const auto configuredPath = std::filesystem::path(DICOM_EDITOR_DCMTK_DICT_PATH);
-    const char* current = std::getenv("DCMDICTPATH");
     if ((current == nullptr || !std::filesystem::exists(current)) && std::filesystem::exists(configuredPath)) {
         setenv("DCMDICTPATH", configuredPath.string().c_str(), 1);
     }
