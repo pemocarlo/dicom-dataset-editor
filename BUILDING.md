@@ -17,6 +17,12 @@ The expected result is `<checkout>/conanhome`. This `.conanrc` setting takes
 precedence over `CONAN_HOME`. Conan documents `.conanrc` as a preview feature;
 this project requires Conan 2.28 or newer.
 
+On Windows, the installed configuration automatically stores packages in a
+short, unique `C:\conan_<hash>` path. Profiles and configuration remain in the
+project-local home; the separate storage avoids a ConanCenter Meson wrapper
+that cannot handle spaces in cache paths. Other platforms use Conan's default
+storage under `conanhome`.
+
 ## Install Or Update The Conan Configuration
 
 No custom Conan remote hosts the configuration package yet. Its recipe and
@@ -79,8 +85,9 @@ ConanCenter again. Run `conan remote disable "*"` after installation when the
 remaining build must stay offline.
 
 An offline build succeeds only when every locked recipe, required binary, and
-source needed by `--build=missing` is already in `conanhome`. Populate it while
-online first, or transfer an archive from a compatible Conan cache with
+source needed by `--build=missing` is already in Conan's configured package
+storage. Populate it while online first, or transfer an archive from a
+compatible Conan cache with
 [`conan cache save` and `conan cache restore`](https://docs.conan.io/2/devops/save_restore.html).
 Cache archive transfer is experimental; use the same Conan version on both
 sides. Configuration files are not part of that archive, so still run the
