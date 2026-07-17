@@ -108,6 +108,7 @@ if(DICOM_EDITOR_ENABLE_CPPCHECK)
     add_custom_target(cppcheck
         COMMAND ${DICOM_EDITOR_CPPCHECK}
             --project=${PROJECT_BINARY_DIR}/compile_commands.json
+            "-DTEST_CASE(...)=void catch_test_##__LINE__()"
             --enable=warning,style,performance,portability
             --error-exitcode=1
             --inline-suppr

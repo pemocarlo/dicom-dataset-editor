@@ -26,6 +26,8 @@ class DicomDatasetEditorRecipe(ConanFile):
     requires = ("dcmtk/3.7.0", "fltk/1.4.5")
 
     def build_requirements(self):
+        if not self.conf.get("tools.build:skip_test", default=False):
+            self.test_requires("catch2/3.15.1")
         self.tool_requires("cmake/4.3.2")
         self.tool_requires("cppcheck/2.20.0")
         generator = self.conf.get("tools.cmake.cmaketoolchain:generator", default=None)

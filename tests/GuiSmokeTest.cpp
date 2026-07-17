@@ -2,12 +2,14 @@
 
 #include "dicom_editor/core/DicomWorkspace.hpp"
 
+#include <catch2/catch_test_macros.hpp>
+
 #include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
 
-int main() {
+TEST_CASE("file tree accepts empty and populated models", "[gui][smoke]") {
     FileTreePanel panel(0, 0, 320, 480);
     const std::vector<dicom_editor::OpenDicomFile> files{{
         .index = 0,
