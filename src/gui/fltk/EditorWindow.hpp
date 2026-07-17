@@ -57,6 +57,7 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     void setStatus(const std::string &status) override;
     void updateActions();
     void layoutContent();
+    void ensurePixelDataPanelExtent();
     void setUiZoom(int size);
     void exit();
     void resize(int x, int y, int width, int height) override;
@@ -81,7 +82,8 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     PixelDataPanel *pixelDataPanel_{};
     Fl_Box *status_{};
     dicom_editor::EditorController controller_;
-    int pixelDataPanelExtent_{400};
+    int pixelDataRightExtent_{};
+    int pixelDataBottomExtent_{};
     int fileTreePanelExtent_{300};
     bool pixelDataPreviewVertical_{true};
     bool fileTreeVisible_{};

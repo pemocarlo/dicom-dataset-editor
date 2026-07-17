@@ -57,7 +57,12 @@ enum class MenuAction : std::uint8_t {
     ValidateValues,
     LoadDataDictionary,
     PixelDataPreview,
-    PixelDataPreviewVertical,
+    PixelDataPreviewRight,
+    PixelDataPreviewBottom,
+    PixelZoomIn,
+    PixelZoomOut,
+    PixelZoomFit,
+    PixelActualSize,
     OpenFilesPanel,
     SortFilesByFilename,
     PreviousFile,
@@ -81,7 +86,12 @@ MenuAction deleteAction = MenuAction::Delete;
 MenuAction validateValuesAction = MenuAction::ValidateValues;
 MenuAction loadDataDictionaryAction = MenuAction::LoadDataDictionary;
 MenuAction pixelDataPreviewAction = MenuAction::PixelDataPreview;
-MenuAction pixelDataPreviewVerticalAction = MenuAction::PixelDataPreviewVertical;
+MenuAction pixelDataPreviewRightAction = MenuAction::PixelDataPreviewRight;
+MenuAction pixelDataPreviewBottomAction = MenuAction::PixelDataPreviewBottom;
+MenuAction pixelZoomInAction = MenuAction::PixelZoomIn;
+MenuAction pixelZoomOutAction = MenuAction::PixelZoomOut;
+MenuAction pixelZoomFitAction = MenuAction::PixelZoomFit;
+MenuAction pixelActualSizeAction = MenuAction::PixelActualSize;
 MenuAction openFilesPanelAction = MenuAction::OpenFilesPanel;
 MenuAction sortFilesByFilenameAction = MenuAction::SortFilesByFilename;
 MenuAction previousFileAction = MenuAction::PreviousFile;
@@ -247,8 +257,13 @@ EditorWindow::EditorWindow() : Fl_Double_Window(1280, 820, "DICOM Dataset Editor
     menu_->add("&Edit/&Delete Attribute", FL_Delete, menuCallback, &deleteAction);
     menu_->add("&Settings/&Validate DICOM Values", 0, menuCallback, &validateValuesAction, FL_MENU_TOGGLE | FL_MENU_VALUE);
     menu_->add("&Settings/&Load Data Dictionary...", 0, menuCallback, &loadDataDictionaryAction);
-    menu_->add("&View/&Pixel Data Preview", 0, menuCallback, &pixelDataPreviewAction, FL_MENU_TOGGLE);
-    menu_->add("&View/Pixel Data Preview on &Right", 0, menuCallback, &pixelDataPreviewVerticalAction, FL_MENU_TOGGLE);
+    menu_->add("&View/&Show Pixel Preview", FL_CTRL + 'p', menuCallback, &pixelDataPreviewAction, FL_MENU_TOGGLE);
+    menu_->add("&View/Pixel Preview Placement/Move to &Right", 0, menuCallback, &pixelDataPreviewRightAction);
+    menu_->add("&View/Pixel Preview Placement/Move to &Bottom", 0, menuCallback, &pixelDataPreviewBottomAction);
+    menu_->add("&View/Pixel Preview/Zoom &In", 0, menuCallback, &pixelZoomInAction);
+    menu_->add("&View/Pixel Preview/Zoom &Out", 0, menuCallback, &pixelZoomOutAction);
+    menu_->add("&View/Pixel Preview/&Fit to Pane", 0, menuCallback, &pixelZoomFitAction);
+    menu_->add("&View/Pixel Preview/&Actual Size", 0, menuCallback, &pixelActualSizeAction);
     menu_->add("&View/&Open Files Panel", 0, menuCallback, &openFilesPanelAction, FL_MENU_TOGGLE);
     menu_->add("&View/Sort Files by &Filename", 0, menuCallback, &sortFilesByFilenameAction, FL_MENU_TOGGLE);
     menu_->add("&View/&Previous File", FL_CTRL + FL_Page_Up, menuCallback, &previousFileAction);
@@ -283,8 +298,7 @@ EditorWindow::EditorWindow() : Fl_Double_Window(1280, 820, "DICOM Dataset Editor
     deleteButton_->tooltip("Delete the selected attribute (Delete)");
     previousFileButton_->tooltip("Show previous open dataset (Ctrl+Page Up)");
     nextFileButton_->tooltip("Show next open dataset (Ctrl+Page Down)");
-    pixelPreviewButton_->tooltip("Show or hide pixel data preview");
-    setMenuChecked(*menu_, "&View/Pixel Data Preview on &Right", true);
+    pixelPreviewButton_->tooltip("Show or hide pixel preview (Ctrl+P)");
 
     fileTreePanel_ = new FileTreePanel(0, ContentTop, fileTreePanelExtent_, h() - ContentTop - StatusHeight);
     fileTreePanel_->setActivationHandler([this](std::size_t index) { controller_.activateDocument(index); });
@@ -371,6 +385,7 @@ void EditorWindow::presentOpenFiles(dicom_editor::OpenFilesPresentation presenta
 
 void EditorWindow::presentPixelData(std::optional<dicom_editor::PixelDataPreview> preview) {
     if (preview) {
+        ensurePixelDataPanelExtent();
         pixelDataPanel_->setPreview(std::move(*preview));
         pixelDataPanel_->show();
         pixelSplitter_->show();
@@ -394,10 +409,12 @@ void EditorWindow::resize(int x, int y, int width, int height) {
 void EditorWindow::setPixelDataPanelExtent(int extent) {
     const int fileTreeWidth = fileTreeVisible_ ? fileTreePanelExtent_ + FileTreeSplitterWidth : 0;
     const int contentExtent = pixelDataPreviewVertical_ ? w() - fileTreeWidth : h() - ContentTop - StatusHeight;
-    const int maximumPreviewExtent = std::max(PixelDataPanelMinExtent, contentExtent - PixelDataSplitterHeight - PixelDataPanelMinExtent);
+    const int remainingMinimum = pixelDataPreviewVertical_ ? EditorPanelMinWidth : PixelDataPanelMinExtent;
+    const int maximumPreviewExtent = std::max(PixelDataPanelMinExtent, contentExtent - PixelDataSplitterHeight - remainingMinimum);
     const int clamped = std::clamp(extent, PixelDataPanelMinExtent, maximumPreviewExtent);
-    if (pixelDataPanelExtent_ != clamped) {
-        pixelDataPanelExtent_ = clamped;
+    int &currentExtent = pixelDataPreviewVertical_ ? pixelDataRightExtent_ : pixelDataBottomExtent_;
+    if (currentExtent != clamped) {
+        currentExtent = clamped;
         layoutContent();
     }
 }
@@ -430,11 +447,25 @@ void EditorWindow::setFileTreeVisible(bool visible) {
 void EditorWindow::setPixelDataPreviewVertical(bool vertical) {
     if (pixelDataPreviewVertical_ != vertical) {
         pixelDataPreviewVertical_ = vertical;
+        ensurePixelDataPanelExtent();
         layoutContent();
     }
 }
 
 bool EditorWindow::pixelDataPreviewVertical() const { return pixelDataPreviewVertical_; }
+
+void EditorWindow::ensurePixelDataPanelExtent() {
+    int &extent = pixelDataPreviewVertical_ ? pixelDataRightExtent_ : pixelDataBottomExtent_;
+    if (extent > 0) {
+        return;
+    }
+    const int fileTreeWidth = fileTreeVisible_ ? fileTreePanelExtent_ + FileTreeSplitterWidth : 0;
+    const int contentExtent = pixelDataPreviewVertical_ ? w() - fileTreeWidth : h() - ContentTop - StatusHeight;
+    const int remainingMinimum = pixelDataPreviewVertical_ ? EditorPanelMinWidth : PixelDataPanelMinExtent;
+    const int maximumExtent = std::max(PixelDataPanelMinExtent, contentExtent - PixelDataSplitterHeight - remainingMinimum);
+    const double preferredFraction = pixelDataPreviewVertical_ ? 0.5 : 0.55;
+    extent = std::clamp(static_cast<int>(contentExtent * preferredFraction), PixelDataPanelMinExtent, maximumExtent);
+}
 
 void EditorWindow::layoutContent() {
     menu_->resize(0, 0, w(), MenuHeight);
@@ -454,8 +485,8 @@ void EditorWindow::layoutContent() {
     }
     if (pixelDataPanel_->visible() != 0) {
         if (pixelDataPreviewVertical_) {
-            const int maxPreviewWidth = std::max(PixelDataPanelMinExtent, editorWidth - PixelDataSplitterHeight - PixelDataPanelMinExtent);
-            const int previewWidth = std::clamp(pixelDataPanelExtent_, PixelDataPanelMinExtent, maxPreviewWidth);
+            const int maxPreviewWidth = std::max(PixelDataPanelMinExtent, editorWidth - PixelDataSplitterHeight - EditorPanelMinWidth);
+            const int previewWidth = std::clamp(pixelDataRightExtent_, PixelDataPanelMinExtent, maxPreviewWidth);
             const int datasetWidth = std::max(1, editorWidth - previewWidth - PixelDataSplitterHeight);
             datasetPanel_->resize(editorX, ContentTop, datasetWidth, contentHeight);
             pixelSplitter_->resize(editorX + datasetWidth, ContentTop, PixelDataSplitterHeight, contentHeight);
@@ -463,7 +494,7 @@ void EditorWindow::layoutContent() {
         } else {
             const int maxPreviewHeight =
                 std::max(PixelDataPanelMinExtent, contentHeight - PixelDataSplitterHeight - PixelDataPanelMinExtent);
-            const int previewHeight = std::clamp(pixelDataPanelExtent_, PixelDataPanelMinExtent, maxPreviewHeight);
+            const int previewHeight = std::clamp(pixelDataBottomExtent_, PixelDataPanelMinExtent, maxPreviewHeight);
             const int datasetHeight = std::max(1, contentHeight - previewHeight - PixelDataSplitterHeight);
             datasetPanel_->resize(editorX, ContentTop, editorWidth, datasetHeight);
             pixelSplitter_->resize(editorX, ContentTop + datasetHeight, editorWidth, PixelDataSplitterHeight);
@@ -559,12 +590,27 @@ void EditorWindow::menuCallback(Fl_Widget *widget, void *data) {
         if (widget == window->menu_) {
             window->pixelPreviewButton_->value(window->menu_->mvalue()->value());
         } else {
-            setMenuChecked(*window->menu_, "&View/&Pixel Data Preview", window->pixelPreviewButton_->value() != 0);
+            setMenuChecked(*window->menu_, "&View/&Show Pixel Preview", window->pixelPreviewButton_->value() != 0);
         }
         window->controller_.setPixelDataVisible(window->pixelPreviewButton_->value() != 0);
         break;
-    case MenuAction::PixelDataPreviewVertical:
-        window->setPixelDataPreviewVertical(window->menu_->mvalue()->value() != 0);
+    case MenuAction::PixelDataPreviewRight:
+        window->setPixelDataPreviewVertical(true);
+        break;
+    case MenuAction::PixelDataPreviewBottom:
+        window->setPixelDataPreviewVertical(false);
+        break;
+    case MenuAction::PixelZoomIn:
+        window->pixelDataPanel_->zoomIn();
+        break;
+    case MenuAction::PixelZoomOut:
+        window->pixelDataPanel_->zoomOut();
+        break;
+    case MenuAction::PixelZoomFit:
+        window->pixelDataPanel_->fitImage();
+        break;
+    case MenuAction::PixelActualSize:
+        window->pixelDataPanel_->showActualSize();
         break;
     case MenuAction::OpenFilesPanel:
         window->setFileTreeVisible(window->menu_->mvalue()->value() != 0);
