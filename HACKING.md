@@ -1,0 +1,86 @@
+# Hacking
+
+Developer mode is opt-in. It enables strict warnings, `clang-format`, `clang-tidy`, IWYU, tests, and `compile_commands.json`.
+
+## Developer Workflow
+
+```bash
+cmake --workflow --preset dev-check
+```
+
+For IWYU too:
+
+```bash
+cmake --workflow --preset all-checks
+```
+
+Individual targets:
+
+```bash
+cmake --preset dev
+cmake --build --preset dev
+ctest --preset dev
+cmake --build --preset format
+cmake --build --preset check-format
+cmake --build --preset lint
+cmake --preset iwyu
+cmake --build --preset iwyu
+```
+
+## Strict Warnings
+
+Developer preset turns on `DICOM_EDITOR_ENABLE_STRICT_WARNINGS`.
+
+GCC flags include `-Wall`, `-Wextra`, `-Wpedantic`, `-Werror`, conversion checks, shadowing, format checks, switch coverage, null-dereference, pointer-arithmetic, overflow, fallthrough, VLA, and string literal diagnostics.
+
+Why not every GCC warning:
+
+- GCC has no real `-Weverything`.
+- Some warnings are noisy, mutually incompatible, or target code outside this project.
+- Some diagnostics are useful only when the compiler sees a very specific API shape.
+
+## Clang-Tidy
+
+Enabled groups focus on defects with high signal:
+
+- `clang-analyzer-*`
+- `bugprone-*`
+- `performance-*`
+- `portability-*`
+- selected `readability-*`
+- `modernize-use-nullptr`
+
+Explicit exclusions:
+
+- `bugprone-easily-swappable-parameters`: many GUI APIs intentionally pass same-type values.
+- `bugprone-exception-escape`: wxWidgets callback boundaries are not modeled well enough for this app.
+- `bugprone-suspicious-call-argument`: heuristic name matching creates false positives.
+- `bugprone-unsafe-functions`: broad policy check is too coarse for portable third-party APIs.
+- `portability-avoid-pragma-once`: this project accepts `#pragma once`.
+
+`WarningsAsErrors: '*'` stays enabled.
+
+## IWYU
+
+`include-what-you-use` runs through CMake's native `CXX_INCLUDE_WHAT_YOU_USE` support in the `iwyu` preset.
+
+If the executable is local only, pass its path explicitly:
+
+```bash
+cmake --preset iwyu -DDICOM_EDITOR_IWYU_EXECUTABLE=/path/to/include-what-you-use
+```
+
+`iwyu.imp` maps wxWidgets platform-private implementation headers back to public headers. Without that mapping, IWYU tries to pull in platform-private `wx/gtk/*` headers on Linux builds.
+
+## Editor Support
+
+Developer mode enables `compile_commands.json` at source root for clangd and Neovim LSP.
+
+## Code Layout
+
+- `DicomDocument`: DICOM file ownership, load/save, dirty state, recursive node listing.
+- `DicomPath`: stable path through sequence items and optional element tag.
+- `DicomEditorService`: add/edit/delete operations.
+- `MainFrame`: menus, save prompts, app-level actions.
+- `DatasetTreePanel`: recursive tree, filtering, inline edits.
+- `AttributeEditDialog`: tag/value entry for additions and raw value editing.
