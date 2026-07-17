@@ -111,7 +111,15 @@ class DatasetTable final : public Fl_Table_Row {
         redraw();
     }
 
+    [[nodiscard]] int firstVisibleRow() { return row_position(); }
+
+    void restoreFirstVisibleRow(int row) { row_position(std::clamp(row, 0, std::max(0, rows() - 1))); }
+
     int handle(int event) override {
+        if (event == FL_MOUSEWHEEL && Fl::event_dy() != 0) {
+            restoreFirstVisibleRow(row_position() + Fl::event_dy() * 2);
+            return 1;
+        }
         if (event == FL_KEYDOWN) {
             const int key = Fl::event_key();
             if (key == FL_Up || key == 'k') {
@@ -316,10 +324,12 @@ void DatasetPanel::toggleSelectedSequence() {
     if (selected == nullptr || selected->kind != dicom_editor::DicomNodeKind::Sequence) {
         return;
     }
+    const int firstVisibleRow = table_->firstVisibleRow();
     const std::string path = selected->path.toString();
     model_.toggleSequence(selected->path);
     table_->setModel(&model_);
     restoreSelection(path);
+    table_->restoreFirstVisibleRow(firstVisibleRow);
     selectionChanged();
 }
 

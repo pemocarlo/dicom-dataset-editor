@@ -65,6 +65,7 @@ class ControllerView final : public dicom_editor::EditorView {
     bool hasLoadedFiles{};
     std::string error;
     std::string status;
+    std::string documentStatus;
 
     std::vector<std::filesystem::path> chooseOpenFiles() override { return chosenFiles; }
     std::optional<std::filesystem::path> chooseOpenFolder() override { return std::nullopt; }
@@ -82,7 +83,9 @@ class ControllerView final : public dicom_editor::EditorView {
     std::optional<dicom_editor::AttributeInput> addAttribute() override { return std::nullopt; }
     std::optional<dicom_editor::AttributeInput> batchEditAttribute(const dicom_editor::BatchEditReport &) override { return batchInput; }
     void showError(const std::string &message) override { error = message; }
-    void presentDocument(std::vector<dicom_editor::DicomNode>, const std::string &, const std::string &) override {}
+    void presentDocument(std::vector<dicom_editor::DicomNode>, const std::string &, const std::string &value) override {
+        documentStatus = value;
+    }
     void presentOpenFiles(const std::vector<dicom_editor::OpenDicomFile> &files, bool loaded) override {
         openFiles = files;
         hasLoadedFiles = loaded;
@@ -353,6 +356,7 @@ void controllerOpensAndNavigatesMultipleFiles() {
     require(view.error.empty());
     require(view.openFiles.size() == 2);
     require(view.openFiles[0].active);
+    require(view.documentStatus.starts_with("File 1 of 2"));
     require(view.openFiles[0].hierarchy.patientId == "PATIENT-1");
     require(view.openFiles[0].hierarchy.studyLabel == "Workspace study");
 
@@ -360,6 +364,7 @@ void controllerOpensAndNavigatesMultipleFiles() {
     require(view.pixelPreview && view.pixelPreview->sourceIndex == 0);
     controller.showNextDocument();
     require(view.openFiles[1].active);
+    require(view.documentStatus.starts_with("File 2 of 2"));
     require(view.pixelPreview && view.pixelPreview->sourceIndex == 1);
     controller.showPreviousDocument();
     require(view.openFiles[0].active);
@@ -409,6 +414,7 @@ void workspaceSortsByInstanceOrFilename() {
     require(workspace.open({secondPath, firstPath}).opened == 2);
     const auto byInstance = workspace.files();
     require(byInstance[0].path == firstPath);
+    require(byInstance[0].active);
     const auto byFilename = workspace.files(dicom_editor::FileSortOrder::Filename);
     require(byFilename[0].path == secondPath);
     require(workspace.activateNext());
