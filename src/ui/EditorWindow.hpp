@@ -12,12 +12,18 @@ class Fl_Menu_Bar;
 class Fl_Widget;
 class PixelDataPanel;
 
+/// Main application window and view implementation.
 class EditorWindow final : public Fl_Double_Window, private dicom_editor::EditorView {
   public:
+    /// Creates the window and child widgets.
     EditorWindow();
+    /// Returns focus to the dataset table on Escape.
     int handle(int event) override;
+    /// Sets the preview pane size.
     void setPixelDataPanelExtent(int extent);
+    /// Chooses whether the preview pane is shown below or beside the dataset.
     void setPixelDataPreviewVertical(bool vertical);
+    /// Returns `true` when the preview pane is on the right.
     [[nodiscard]] bool pixelDataPreviewVertical() const;
 
   private:
