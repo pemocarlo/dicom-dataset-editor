@@ -6,7 +6,7 @@ Makefiles on Linux and Visual Studio on Windows. Ninja remains available for a
 compilation database and the slower static and runtime analysis checks.
 
 Conan commands use the ignored, project-local `conanhome` selected by `.conanrc`.
-Bootstrap its profiles and seed its package cache as described in
+Install the locked configuration package from `myartifactory` as described in
 [BUILDING.md](BUILDING.md) before running developer workflows offline.
 
 ## Developer Tools
@@ -21,27 +21,28 @@ add pinned Ninja:
 Catch2 `3.15.1` is a conditional Conan `test_requires` dependency in the host
 context. It is present only when `tools.build:skip_test` is false.
 
-All three have x86-64 ConanCenter binaries for Linux and Windows.
+All three have x86-64 binaries available through the project's Artifactory
+virtual repository for Linux and Windows.
 
 Install Debug host dependencies before the default developer workflow. Build
 tools stay in Release so Conan does not rebuild them as Debug packages:
 
 ```bash
 # Linux
-conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-debug -pr:b=linux-gcc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-debug -pr:b=linux-gcc-release
 
 # Windows x64 Native Tools Command Prompt
-conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-debug -pr:b=windows-msvc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-debug -pr:b=windows-msvc-release
 ```
 
 Install the separate Ninja toolchain before `dev-ninja`, `quality`, or `iwyu`:
 
 ```bash
 # Linux
-conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-debug-ninja -pr:b=linux-gcc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-debug-ninja -pr:b=linux-gcc-release
 
 # Windows x64 Native Tools Command Prompt
-conan install . --build=missing --lockfile=conan.lock -pr:h=windows-msvc-debug-ninja -pr:b=windows-msvc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-debug-ninja -pr:b=windows-msvc-release
 ```
 
 The checked-in presets separate build intent and tool cost:
@@ -213,8 +214,8 @@ Install both profiles once, or repeat after dependency, recipe, lockfile, or
 profile changes:
 
 ```bash
-conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-asan-ninja -pr:b=linux-gcc-release
-conan install . --build=missing --lockfile=conan.lock -pr:h=linux-gcc-tsan-ninja -pr:b=linux-gcc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-asan-ninja -pr:b=linux-gcc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-tsan-ninja -pr:b=linux-gcc-release
 ```
 
 Activate both the build environment and the profile's runtime environment, then
