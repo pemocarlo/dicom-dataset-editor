@@ -72,6 +72,10 @@ call build\Debug\generators\conanbuild.bat
 
 # Windows x64 Native Tools Command Prompt, Ninja
 call build\Ninja-Debug\generators\conanbuild.bat
+
+# PowerShell launcher from a Visual Studio Developer PowerShell
+.\scripts\Invoke-DeveloperWorkflow.ps1
+.\scripts\Invoke-DeveloperWorkflow.ps1 -Preset quality-checks
 ```
 
 External LLVM tools are intentionally not Conan requirements. Required tools by
