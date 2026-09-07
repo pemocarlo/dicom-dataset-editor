@@ -162,6 +162,8 @@ class EditorController {
     void batchEdit(const BatchEditTarget &target);
     [[nodiscard]] std::vector<ReportNode> structuredReportNodes();
     bool editReportNode(const DicomPath &path, const std::vector<std::string> &values);
+    bool changeReportStructure(const DicomPath &path, bool remove, DicomPath &selection);
+    bool insertReportNode(const DicomPath &anchor, ReportInsertion placement, const ReportNodeInput &input, DicomPath &selection);
     /// Changes file-leaf ordering.
     void setFileSortOrder(FileSortOrder order);
     /// Enables or disables value validation.

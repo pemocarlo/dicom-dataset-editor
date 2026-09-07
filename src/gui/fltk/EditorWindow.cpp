@@ -553,10 +553,19 @@ void EditorWindow::menuCallback(Fl_Widget *widget, void *data) {
 
     switch (action) {
     case MenuAction::StructuredReport:
-        showStructuredReportDialog(window->controller_.structuredReportNodes(),
-                                   [window](const dicom_editor::DicomPath &path, const std::vector<std::string> &values) {
-                                       return window->controller_.editReportNode(path, values);
-                                   });
+        showStructuredReportDialog(
+            window->controller_.structuredReportNodes(),
+            [window](const dicom_editor::DicomPath &path, const std::vector<std::string> &values) {
+                return window->controller_.editReportNode(path, values);
+            },
+            [window](const dicom_editor::DicomPath &path, bool remove, dicom_editor::DicomPath &selection) {
+                return window->controller_.changeReportStructure(path, remove, selection);
+            },
+            [window] { return window->controller_.structuredReportNodes(); },
+            [window](const dicom_editor::DicomPath &anchor, dicom_editor::ReportInsertion placement,
+                     const dicom_editor::ReportNodeInput &input, dicom_editor::DicomPath &selection) {
+                return window->controller_.insertReportNode(anchor, placement, input, selection);
+            });
         break;
     case MenuAction::OpenFiles:
         window->controller_.openDocument();

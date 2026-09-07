@@ -21,6 +21,10 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
 - Toggle an aspect-fitted pixel data preview with separate file and frame navigation and a draggable split, either below or beside the
   dataset.
 - Edit scalar values inline by double-clicking the `Value` column.
+- Collapse sequences, individual items, or the dataset root using the `[+]`/`[-]`
+  control, Enter, or Left/Right. `Collapse all` and `Show all` above the dataset
+  table clear the filter and fold or expand every branch. Search includes
+  collapsed descendants; clearing the filter restores the previous folds.
 - Optionally validate DICOM values and highlight invalid values in red.
 - Add, delete, save, and reload datasets.
 - Carry DCMTK data dictionary inside executable and optionally load updated
@@ -53,19 +57,46 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
 ## Structured Reports
 
 Open an SR file normally, then choose `Edit > Structured Report...` (`Ctrl+R`).
-The report editor shows nested content items with their concept names, value
-types, and relationships. Select a node to edit its existing concept-name
-fields and supported value fields: text, codes, numeric measurements and units,
-dates, times, person names, and UID references. Container names are editable too.
+The report editor shows nested content items with their concept names
+and value previews. Indentation shows parent-child structure; bracketed labels
+show exact DICOM relationship names, including `CONTAINS`, `HAS PROPERTIES`,
+and `INFERRED FROM`. Select a
+node to see its technical value type and full relationship, and edit supported
+value fields: text, codes, numeric measurements and units, dates, times, person names, and UID
+references. Concept-name fields are hidden by default; enable `Edit concept
+name (advanced)` when needed. The detail header shows the node relationship.
+The node name is always shown above a separate Value section. Resize the
+window to give the overview and value editor more room.
+Drag the divider between the SR tree and details to adjust their widths.
+The chosen proportion is retained when resizing the window. `Collapse all`
+and `Show all` above the SR tree fold or expand every node. Collapsing all
+selects the report root, with the usual prompt for unapplied edits.
+
+`Add copy` appends a copy of the selected node and all its descendants under
+the same parent, then selects the copy for editing. Review its values before
+saving. `Delete subtree...` removes the selected node and descendants after
+confirmation. The report root cannot be copied or deleted. Tree changes are
+blocked when the report contains by-reference content items.
+
+Right-click a node for `Insert before...`, `Insert after...`, or `Add child...`.
+New nodes can be TEXT, NUM, CODE, CONTAINER, DATE, TIME, DATETIME, PNAME, or
+UIDREF. Enter a concept name (code, coding scheme, meaning), choose its
+relationship to the parent, and fill in the type-specific value fields.
+NUM requires a number and coded units; CODE requires a coded value. The form
+keeps entered values when validation fails. The new node is selected after
+creation. The root accepts children but cannot have siblings. Parent/type/
+relationship constraints are checked for the report's SOP class.
 
 `Apply node` validates and updates the in-memory document. `Close` returns to
 the raw dataset editor; use the normal Save or Save All commands to persist
 changes. Switching nodes or closing prompts about unapplied form changes.
 
-This interface edits existing fields, not tree structure: adding, deleting,
-moving, or changing node types is not supported. Spatial/temporal coordinates,
-image/composite/waveform references, and alternate numeric representations
+Moving nodes or changing existing node types is not supported. Spatial/temporal coordinates,
+image/composite/waveform references
 remain in the dataset unchanged and can be inspected in the raw editor.
+Numeric values remain editable when optional floating-point or rational
+encodings exist. Changing the number removes those alternate encodings so
+they cannot retain a conflicting value; unchanged numbers preserve them.
 Verified or digitally signed reports are read-only in the SR editor. Validation
 uses DCMTK value checks and dcmsr coded-entry checks; it does not certify report
 templates or clinical content. Unrelated attributes and sequences are preserved.

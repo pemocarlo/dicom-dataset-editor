@@ -42,6 +42,11 @@ std::span<const DicomNode> DatasetViewModel::nodes() const { return nodes_; }
 std::span<const std::size_t> DatasetViewModel::visibleIndices() const { return visibleIndices_; }
 
 void DatasetViewModel::toggleSequence(const DicomPath &path) {
+    if (std::ranges::none_of(nodes_, [&path](const DicomNode &node) {
+            return node.kind != DicomNodeKind::Element && node.path.toString() == path.toString();
+        })) {
+        return;
+    }
     const auto key = path.toString();
     if (const auto found = collapsedSequences_.find(key); found != collapsedSequences_.end()) {
         collapsedSequences_.erase(found);
@@ -52,6 +57,20 @@ void DatasetViewModel::toggleSequence(const DicomPath &path) {
 }
 
 bool DatasetViewModel::sequenceCollapsed(const DicomPath &path) const { return collapsedSequences_.contains(path.toString()); }
+
+void DatasetViewModel::collapseAll() {
+    for (const auto &node : nodes_) {
+        if (node.kind != DicomNodeKind::Element) {
+            collapsedSequences_.insert(node.path.toString());
+        }
+    }
+    rebuild();
+}
+
+void DatasetViewModel::showAll() {
+    collapsedSequences_.clear();
+    rebuild();
+}
 
 std::string DatasetViewModel::attributeLabel(const DicomNode &node) {
     std::string label(static_cast<std::size_t>(node.depth) * 2, ' ');
@@ -90,7 +109,7 @@ void DatasetViewModel::rebuild() {
         if (filter_.empty() || containsCaseInsensitive(searchable, filter_)) {
             visibleIndices_.push_back(index);
         }
-        if (filter_.empty() && node.kind == DicomNodeKind::Sequence && sequenceCollapsed(node.path)) {
+        if (filter_.empty() && node.kind != DicomNodeKind::Element && sequenceCollapsed(node.path)) {
             collapsedDepth = node.depth;
         }
     }
