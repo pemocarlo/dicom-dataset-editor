@@ -398,6 +398,29 @@ bool EditorController::editReportNode(const DicomPath &path, const std::vector<s
     }
 }
 
+bool EditorController::changeReportStructure(const DicomPath &path, bool remove, DicomPath &selection) {
+    try {
+        selection = StructuredReport::changeStructure(document(), path, remove);
+        refreshView();
+        return true;
+    } catch (const std::exception &error) {
+        reportError(error, false);
+        return false;
+    }
+}
+
+bool EditorController::insertReportNode(const DicomPath &anchor, ReportInsertion placement, const ReportNodeInput &input,
+                                        DicomPath &selection) {
+    try {
+        selection = StructuredReport::insert(document(), anchor, placement, input);
+        refreshView();
+        return true;
+    } catch (const std::exception &error) {
+        reportError(error, false);
+        return false;
+    }
+}
+
 bool EditorController::confirmDiscardChanges() {
     if (!document().dirty()) {
         return true;

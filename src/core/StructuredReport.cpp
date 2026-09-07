@@ -10,6 +10,7 @@
 #include <dcmtk/dcmdata/dcsequen.h>
 #include <dcmtk/dcmdata/dctagkey.h>
 #include <dcmtk/dcmsr/dsrcodvl.h>
+#include <dcmtk/dcmsr/dsriodcc.h>
 #include <dcmtk/dcmsr/dsrtypes.h>
 #include <dcmtk/ofstd/ofcond.h>
 #include <dcmtk/ofstd/ofstring.h>
@@ -73,7 +74,7 @@ ReportNode project(DcmItem &item, const DicomPath &path, std::size_t depth) {
     const auto &parents = path.parents();
     codeFields(node, item, parents, DCM_ConceptNameCodeSequence, "Name");
     if (node.valueType == "TEXT") {
-        field(node, item, parents, DCM_TextValue, "Text");
+        node.fields.push_back({.path = DicomPath::element(parents, DCM_TextValue), .label = "Text", .value = text(item, DCM_TextValue)});
     } else if (node.valueType == "CODE") {
         codeFields(node, item, parents, DCM_ConceptCodeSequence, "Value");
     } else if (node.valueType == "NUM") {
@@ -82,12 +83,11 @@ ReportNode project(DcmItem &item, const DicomPath &path, std::size_t depth) {
             auto nested = parents;
             nested.push_back({.sequenceTag = DCM_MeasuredValueSequence, .itemIndex = 0});
             auto &measurement = *measured->getItem(0);
-            // Alternate numeric representations must not become inconsistent with Numeric Value.
-            if (!measurement.tagExists(DCM_FloatingPointValue) && !measurement.tagExists(DCM_RationalNumeratorValue) &&
-                !measurement.tagExists(DCM_RationalDenominatorValue)) {
-                field(node, measurement, nested, DCM_NumericValue, "Number");
-                codeFields(node, measurement, nested, DCM_MeasurementUnitsCodeSequence, "Units");
-            }
+            node.fields.push_back(
+                {.path = DicomPath::element(nested, DCM_NumericValue),
+                 .label = "Number",
+                 .value = text(measurement, measurement.tagExists(DCM_NumericValue) ? DCM_NumericValue : DCM_FloatingPointValue)});
+            codeFields(node, measurement, nested, DCM_MeasurementUnitsCodeSequence, "Units");
         }
     } else if (node.valueType == "DATE") {
         field(node, item, parents, DCM_Date, "Date (YYYYMMDD)");
@@ -135,6 +135,134 @@ bool StructuredReport::supports(const DicomDocument &document) {
     return DSRTypes::sopClassUIDToDocumentType(document.attributeValue(DCM_SOPClassUID).value_or("")) != DSRTypes::DT_invalid;
 }
 
+DicomPath StructuredReport::insert(DicomDocument &document, const DicomPath &anchor, ReportInsertion placement,
+                                   const ReportNodeInput &input) {
+    const auto report = nodes(document);
+    if (!anchor.pointsToDatasetItem() ||
+        std::ranges::none_of(report, [&anchor](const ReportNode &node) { return node.path.parents() == anchor.parents(); })) {
+        throw DicomError("Select an SR content item as the insertion point.");
+    }
+    if (document.attributeValue(DCM_VerificationFlag) == "VERIFIED" || document.dataset().tagExists(DCM_DigitalSignaturesSequence, true)) {
+        throw DicomError("Verified or digitally signed reports are read-only in the SR editor.");
+    }
+    if (document.dataset().tagExists(DCM_ReferencedContentItemIdentifier, true)) {
+        throw DicomError("Tree changes are unavailable for reports with content references.");
+    }
+    auto parents = anchor.parents();
+    unsigned long index = 0;
+    if (placement != ReportInsertion::Child) {
+        if (parents.empty()) {
+            throw DicomError("The report root cannot have siblings. Add a child instead.");
+        }
+        index = parents.back().itemIndex + (placement == ReportInsertion::After ? 1UL : 0UL);
+        parents.pop_back();
+    }
+    if (parents.size() >= 128) {
+        throw DicomError("SR content exceeds the supported nesting depth (128).");
+    }
+    auto &parent = document.itemAt(DicomPath::item(parents));
+    const std::unique_ptr<DSRIODConstraintChecker> constraints(
+        DSRTypes::createIODConstraintChecker(DSRTypes::sopClassUIDToDocumentType(document.attributeValue(DCM_SOPClassUID).value_or(""))));
+    if (!constraints || !constraints->checkContentRelationship(DSRTypes::definedTermToValueType(text(parent, DCM_ValueType)),
+                                                               DSRTypes::definedTermToRelationshipType(input.relationship),
+                                                               DSRTypes::definedTermToValueType(input.valueType))) {
+        throw DicomError("This relationship and value type are not allowed under the selected parent for this SR document type.");
+    }
+    auto node = std::make_unique<DcmItem>();
+    auto put = [](DcmItem &item, const DcmTagKey &tag, const std::string &value) {
+        if (value.empty()) {
+            throw DicomError("Enter all required node value fields.");
+        }
+        check(item.putAndInsertString(tag, value.c_str()));
+        DcmElement *element = nullptr;
+        check(item.findAndGetElement(tag, element));
+        check(element->checkValue("1"));
+    };
+    put(*node, DCM_ValueType, input.valueType);
+    put(*node, DCM_RelationshipType, input.relationship);
+    DSRCodedEntryValue name(input.nameCode, input.nameScheme, input.nameMeaning);
+    check(name.checkCurrentValue());
+    check(name.writeSequence(*node, DCM_ConceptNameCodeSequence));
+    if (input.valueType == "CONTAINER") {
+        put(*node, DCM_ContinuityOfContent, "SEPARATE");
+    } else if (input.valueType == "CODE" || input.valueType == "NUM") {
+        DSRCodedEntryValue code(input.valueCode, input.valueScheme, input.valueMeaning);
+        check(code.checkCurrentValue());
+        if (input.valueType == "CODE") {
+            check(code.writeSequence(*node, DCM_ConceptCodeSequence));
+        } else {
+            DcmItem *measurement = nullptr;
+            check(node->findOrCreateSequenceItem(DCM_MeasuredValueSequence, measurement, 0));
+            put(*measurement, DCM_NumericValue, input.value);
+            check(code.writeSequence(*measurement, DCM_MeasurementUnitsCodeSequence));
+        }
+    } else if (input.valueType == "TEXT") {
+        put(*node, DCM_TextValue, input.value);
+    } else if (input.valueType == "DATE") {
+        put(*node, DCM_Date, input.value);
+    } else if (input.valueType == "TIME") {
+        put(*node, DCM_Time, input.value);
+    } else if (input.valueType == "DATETIME") {
+        put(*node, DCM_DateTime, input.value);
+    } else if (input.valueType == "PNAME") {
+        put(*node, DCM_PersonName, input.value);
+    } else if (input.valueType == "UIDREF") {
+        put(*node, DCM_UID, input.value);
+    } else {
+        throw DicomError("This value type is not supported by the node creation form.");
+    }
+    DcmSequenceOfItems *existing = nullptr;
+    parent.findAndGetSequence(DCM_ContentSequence, existing);
+    auto sequence = existing == nullptr ? std::make_unique<DcmSequenceOfItems>(DCM_ContentSequence)
+                                        : std::unique_ptr<DcmSequenceOfItems>(static_cast<DcmSequenceOfItems *>(existing->clone()));
+    if (placement == ReportInsertion::Child) {
+        index = sequence->card();
+    }
+    check(index == sequence->card() ? sequence->append(node.get()) : sequence->insert(node.get(), index, OFTrue));
+    node.release(); // NOLINT(bugprone-unused-return-value): ownership transferred to sequence
+    check(parent.insert(sequence.get(), true));
+    sequence.release(); // NOLINT(bugprone-unused-return-value): ownership transferred to parent
+    document.markDirty();
+    parents.push_back({.sequenceTag = DCM_ContentSequence, .itemIndex = index});
+    return DicomPath::item(std::move(parents));
+}
+
+DicomPath StructuredReport::changeStructure(DicomDocument &document, const DicomPath &path, bool remove) {
+    const auto report = nodes(document);
+    if (path.parents().empty() || !path.pointsToDatasetItem() ||
+        std::ranges::none_of(report, [&path](const ReportNode &node) { return node.path.parents() == path.parents(); })) {
+        throw DicomError("Select a non-root SR content item.");
+    }
+    if (document.attributeValue(DCM_VerificationFlag) == "VERIFIED" || document.dataset().tagExists(DCM_DigitalSignaturesSequence, true)) {
+        throw DicomError("Verified or digitally signed reports are read-only in the SR editor.");
+    }
+    if (document.dataset().tagExists(DCM_ReferencedContentItemIdentifier, true)) {
+        throw DicomError("Tree changes are unavailable for reports with content references.");
+    }
+    auto parents = path.parents();
+    const auto index = parents.back().itemIndex;
+    parents.pop_back();
+    auto &parent = document.itemAt(DicomPath::item(parents));
+    DcmSequenceOfItems *sequence = nullptr;
+    check(parent.findAndGetSequence(DCM_ContentSequence, sequence));
+    DicomPath selection = DicomPath::item(parents);
+    if (remove) {
+        const std::unique_ptr<DcmItem> removed(sequence->remove(index));
+        if (sequence->card() == 0) {
+            check(parent.findAndDeleteElement(DCM_ContentSequence));
+        }
+    } else {
+        auto copy = std::unique_ptr<DcmItem>(static_cast<DcmItem *>(sequence->getItem(index)->clone()));
+        parents.push_back({.sequenceTag = DCM_ContentSequence, .itemIndex = sequence->card()});
+        selection = DicomPath::item(std::move(parents));
+        check(sequence->append(copy.get()));
+        // append succeeded; the sequence now owns the copied item.
+        copy.release(); // NOLINT(bugprone-unused-return-value)
+    }
+    document.markDirty();
+    return selection;
+}
+
 std::vector<ReportNode> StructuredReport::nodes(DicomDocument &document) {
     if (!supports(document)) {
         return {};
@@ -169,9 +297,17 @@ void StructuredReport::edit(DicomDocument &document, const DicomPath &path, cons
         if (!tag) {
             throw DicomError("SR field has no attribute tag.");
         }
+        check(item.putAndInsertString(*tag, values[index].c_str()));
         check(item.findAndGetElement(*tag, element));
-        check(element->putString(values[index].c_str()));
         check(element->checkValue("1"));
+        if (*tag == DCM_NumericValue) {
+            // Numeric Value becomes authoritative; optional alternate encodings must not retain the old number.
+            for (const auto &alternate : {DCM_FloatingPointValue, DCM_RationalNumeratorValue, DCM_RationalDenominatorValue}) {
+                if (item.tagExists(alternate)) {
+                    check(item.findAndDeleteElement(alternate));
+                }
+            }
+        }
         changed = true;
     }
     if (!changed) {

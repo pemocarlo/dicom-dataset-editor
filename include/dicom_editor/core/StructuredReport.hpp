@@ -24,6 +24,21 @@ struct ReportNode {
     std::vector<ReportField> fields;
 };
 
+enum class ReportInsertion { Before, After, Child };
+
+struct ReportNodeInput {
+    std::string valueType{"TEXT"};
+    std::string relationship{"CONTAINS"};
+    std::string nameCode;
+    std::string nameScheme;
+    std::string nameMeaning;
+    std::string value;
+    // Coded value for CODE, measurement units for NUM.
+    std::string valueCode;
+    std::string valueScheme;
+    std::string valueMeaning;
+};
+
 /// Projects SR content without rewriting unsupported content or private attributes.
 class StructuredReport {
   public:
@@ -31,5 +46,9 @@ class StructuredReport {
     [[nodiscard]] static std::vector<ReportNode> nodes(DicomDocument &document);
     /// Validates all fields before committing changes to one existing content item.
     static void edit(DicomDocument &document, const DicomPath &node, const std::vector<std::string> &values);
+    /// Copies a subtree to the end of its sibling list, or removes it. Root is protected.
+    [[nodiscard]] static DicomPath changeStructure(DicomDocument &document, const DicomPath &node, bool remove);
+    [[nodiscard]] static DicomPath insert(DicomDocument &document, const DicomPath &anchor, ReportInsertion placement,
+                                          const ReportNodeInput &input);
 };
 } // namespace dicom_editor

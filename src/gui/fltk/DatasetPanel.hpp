@@ -10,6 +10,7 @@
 
 class DatasetTable;
 class Fl_Input;
+class Fl_Button;
 class Fl_Widget;
 
 namespace dicom_editor {
@@ -38,6 +39,8 @@ class DatasetPanel final : public Fl_Group {
     void setFontSize(int size);
     /// Repositions child widgets after resize.
     void resize(int x, int y, int width, int height) override;
+    /// Clears the filter and expands or collapses every branch.
+    void setAllExpanded(bool expanded);
 
   private:
     friend class DatasetTable;
@@ -50,6 +53,8 @@ class DatasetPanel final : public Fl_Group {
     static void filterCallback(Fl_Widget *widget, void *data);
 
     Fl_Input *filter_{};
+    Fl_Button *collapseAll_{};
+    Fl_Button *showAll_{};
     DatasetTable *table_{};
     dicom_editor::DatasetViewModel model_;
     std::function<void()> selectionChanged_;
