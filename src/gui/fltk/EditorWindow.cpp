@@ -3,6 +3,7 @@
 #include "DatasetPanel.hpp"
 #include "FileTreePanel.hpp"
 #include "PixelDataPanel.hpp"
+#include "StructuredReportDialog.hpp"
 #include "dicom_editor/application/EditorController.hpp"
 #include "dicom_editor/core/DicomDocument.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
@@ -43,6 +44,7 @@ constexpr int FileTreePanelMinWidth = 180;
 constexpr int EditorPanelMinWidth = 480;
 
 enum class MenuAction : std::uint8_t {
+    StructuredReport,
     OpenFiles,
     OpenFolder,
     OpenDicomDirectory,
@@ -73,6 +75,7 @@ enum class MenuAction : std::uint8_t {
 };
 
 MenuAction openFilesAction = MenuAction::OpenFiles;
+MenuAction structuredReportAction = MenuAction::StructuredReport;
 MenuAction openFolderAction = MenuAction::OpenFolder;
 MenuAction openDicomDirectoryAction = MenuAction::OpenDicomDirectory;
 MenuAction saveAction = MenuAction::Save;
@@ -253,6 +256,7 @@ EditorWindow::EditorWindow() : Fl_Double_Window(1280, 820, "DICOM Dataset Editor
     menu_->add("&File/&Clear Workspace", FL_CTRL + 'w', menuCallback, &clearWorkspaceAction);
     menu_->add("&File/E&xit", 0, menuCallback, &exitAction);
     menu_->add("&Edit/Edit or &View Value...", FL_Enter, menuCallback, &editAction);
+    menu_->add("&Edit/Structured &Report...", FL_CTRL + 'r', menuCallback, &structuredReportAction);
     menu_->add("&Edit/&Add Attribute...", FL_CTRL + 'n', menuCallback, &addAction);
     menu_->add("&Edit/&Delete Attribute", FL_Delete, menuCallback, &deleteAction);
     menu_->add("&Settings/&Validate DICOM Values", 0, menuCallback, &validateValuesAction, FL_MENU_TOGGLE | FL_MENU_VALUE);
@@ -526,6 +530,7 @@ void EditorWindow::setUiZoom(int size) {
 
 void EditorWindow::updateActions() {
     const auto actions = controller_.actionState(datasetPanel_->selectedNode());
+    setMenuActive(*menu_, "&Edit/Structured &Report...", actions.structuredReportEnabled);
     setMenuActive(*menu_, "&Edit/Edit or &View Value...", actions.editEnabled);
     setMenuActive(*menu_, "&Edit/&Delete Attribute", actions.deleteEnabled);
     setMenuActive(*menu_, "&File/&Save", actions.saveEnabled);
@@ -547,6 +552,12 @@ void EditorWindow::menuCallback(Fl_Widget *widget, void *data) {
     const auto action = *static_cast<MenuAction *>(data);
 
     switch (action) {
+    case MenuAction::StructuredReport:
+        showStructuredReportDialog(window->controller_.structuredReportNodes(),
+                                   [window](const dicom_editor::DicomPath &path, const std::vector<std::string> &values) {
+                                       return window->controller_.editReportNode(path, values);
+                                   });
+        break;
     case MenuAction::OpenFiles:
         window->controller_.openDocument();
         break;

@@ -17,6 +17,7 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
 - Browse open files in a patient/study/series hierarchy, sorted by Instance Number by default, and switch files without losing edits.
 - Batch-edit patient- or study-level attributes after reviewing consistency across matching datasets.
 - Browse recursive dataset tree, including sequence items.
+- Edit Structured Report content in a separate tree and node form (`Edit > Structured Report...`, `Ctrl+R`).
 - Toggle an aspect-fitted pixel data preview with separate file and frame navigation and a draggable split, either below or beside the
   dataset.
 - Edit scalar values inline by double-clicking the `Value` column.
@@ -48,6 +49,26 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
   datasets normally, or use `File > Save All` (`Ctrl+Alt+S`). Batch value entry starts with existing value for small corrections.
 - `File > Clear Workspace` (`Ctrl+W`) resolves unsaved changes then returns to one empty dataset. Closing with multiple dirty datasets
   offers one `Discard All`, `Save All`, or `Cancel` choice instead of prompting once per file.
+
+## Structured Reports
+
+Open an SR file normally, then choose `Edit > Structured Report...` (`Ctrl+R`).
+The report editor shows nested content items with their concept names, value
+types, and relationships. Select a node to edit its existing concept-name
+fields and supported value fields: text, codes, numeric measurements and units,
+dates, times, person names, and UID references. Container names are editable too.
+
+`Apply node` validates and updates the in-memory document. `Close` returns to
+the raw dataset editor; use the normal Save or Save All commands to persist
+changes. Switching nodes or closing prompts about unapplied form changes.
+
+This interface edits existing fields, not tree structure: adding, deleting,
+moving, or changing node types is not supported. Spatial/temporal coordinates,
+image/composite/waveform references, and alternate numeric representations
+remain in the dataset unchanged and can be inspected in the raw editor.
+Verified or digitally signed reports are read-only in the SR editor. Validation
+uses DCMTK value checks and dcmsr coded-entry checks; it does not certify report
+templates or clinical content. Unrelated attributes and sequences are preserved.
 
 ## Quick Build
 

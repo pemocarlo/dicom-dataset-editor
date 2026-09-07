@@ -44,6 +44,7 @@ set(DICOM_EDITOR_PUBLIC_HEADERS
     include/dicom_editor/core/DicomNode.hpp
     include/dicom_editor/core/DicomPath.hpp
     include/dicom_editor/core/DicomWorkspace.hpp
+    include/dicom_editor/core/StructuredReport.hpp
 )
 set(DICOM_EDITOR_CORE_SOURCES
     src/core/AttributeInput.cpp
@@ -54,6 +55,7 @@ set(DICOM_EDITOR_CORE_SOURCES
     src/core/DicomNode.cpp
     src/core/DicomPath.cpp
     src/core/DicomWorkspace.cpp
+    src/core/StructuredReport.cpp
 )
 
 set(DICOM_EDITOR_DCMTK_DICT_FILE "" CACHE FILEPATH "DCMTK dicom.dic to embed in the application")
@@ -115,6 +117,7 @@ set(DICOM_EDITOR_FLTK_HEADERS
     src/gui/fltk/EditorWindow.hpp
     src/gui/fltk/FileTreePanel.hpp
     src/gui/fltk/PixelDataPanel.hpp
+    src/gui/fltk/StructuredReportDialog.hpp
 )
 set(DICOM_EDITOR_FLTK_SOURCES
     src/gui/fltk/AttributeDialog.cpp
@@ -123,6 +126,7 @@ set(DICOM_EDITOR_FLTK_SOURCES
     src/gui/fltk/EditorWindowDialogs.cpp
     src/gui/fltk/FileTreePanel.cpp
     src/gui/fltk/PixelDataPanel.cpp
+    src/gui/fltk/StructuredReportDialog.cpp
 )
 add_library(dicom_editor_fltk STATIC)
 add_library(DicomDatasetEditor::fltk ALIAS dicom_editor_fltk)
