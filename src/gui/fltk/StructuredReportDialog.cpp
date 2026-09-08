@@ -8,6 +8,7 @@
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Choice.H>
+#include <FL/Fl_Double_Window.H>
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Menu_Button.H>
@@ -30,6 +31,23 @@
 class Fl_Widget;
 
 namespace {
+class ReportTree final : public Fl_Tree {
+  public:
+    using Fl_Tree::Fl_Tree;
+
+    int handle(int event) override {
+        if (event == FL_MOUSEWHEEL && Fl::event_dy() != 0) {
+            const auto *item = first_visible_item();
+            if (item != nullptr) {
+                const int rowHeight = item->h() + linespacing();
+                vposition(vposition() + Fl::event_dy() * rowHeight * 4);
+                return 1;
+            }
+        }
+        return Fl_Tree::handle(event);
+    }
+};
+
 class NodeCreationDialog final : public Fl_Window {
   public:
     explicit NodeCreationDialog(ReportCreateHandler create) : Fl_Window(620, 660, "New SR node"), create_(std::move(create)) {
@@ -111,17 +129,20 @@ class NodeCreationDialog final : public Fl_Window {
     Fl_Input *meaning_{};
 };
 
-class ReportDialog final : public Fl_Window {
+// Tree scrolling redraws many rows in quick succession. A double-buffered window
+// presents each repaint atomically; a plain Fl_Window draws directly to the screen
+// and can expose the intermediate erase/draw steps as visible flicker.
+class ReportDialog final : public Fl_Double_Window {
   public:
     ReportDialog(std::vector<dicom_editor::ReportNode> nodes, ReportEditHandler edit, ReportStructureHandler structure,
                  ReportReloadHandler reload, ReportInsertHandler insert)
-        : Fl_Window(1100, 720, "Structured Report"), edit_(std::move(edit)), structure_(std::move(structure)), reload_(std::move(reload)),
+        : Fl_Double_Window(1100, 720, "Structured Report"), edit_(std::move(edit)), structure_(std::move(structure)), reload_(std::move(reload)),
           insert_(std::move(insert)), nodes_(std::move(nodes)) {
         collapseAll_ = new Fl_Button(10, 10, 200, 28, "Collapse all");
         collapseAll_->callback([](Fl_Widget *, void *data) { static_cast<ReportDialog *>(data)->setAllExpanded(false); }, this);
         showAll_ = new Fl_Button(220, 10, 210, 28, "Show all");
         showAll_->callback([](Fl_Widget *, void *data) { static_cast<ReportDialog *>(data)->setAllExpanded(true); }, this);
-        tree_ = new Fl_Tree(10, 45, 420, 560);
+        tree_ = new ReportTree(10, 45, 420, 560);
         tree_->showroot(0);
         tree_->sortorder(FL_TREE_SORT_NONE);
         tree_->tooltip("Relationships to the parent appear in brackets. Right-click a node to insert a sibling or child.");
@@ -161,7 +182,7 @@ class ReportDialog final : public Fl_Window {
     }
 
     void resize(int x, int y, int width, int height) override {
-        Fl_Window::resize(x, y, width, height);
+        Fl_Double_Window::resize(x, y, width, height);
         const int split = std::clamp(static_cast<int>(static_cast<double>(width) * splitRatio_), 260, width - 460);
         collapseAll_->resize(10, 10, (split - 30) / 2, 28);
         showAll_->resize(split / 2, 10, split / 2 - 10, 28);
@@ -239,7 +260,7 @@ class ReportDialog final : public Fl_Window {
             }
             return 1;
         }
-        return Fl_Window::handle(event);
+        return Fl_Double_Window::handle(event);
     }
 
   private:
