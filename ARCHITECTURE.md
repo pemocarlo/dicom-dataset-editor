@@ -137,6 +137,11 @@ operation is rollback-safe per file rather than atomic across the workspace.
 - `DicomDocument`: DCMTK file facade and per-document behavior.
 - `DicomWorkspace`: multi-document aggregate and navigation policy.
 - `DicomEditorService`: validated element add/edit/delete operations.
+- `StructuredReport`: SR content-tree projection, validated node insertion, subtree copying/deletion, and edits to existing
+  node fields. Uses dcmsr for SOP-class recognition and coded entries, and edits
+  copies of the original items to preserve unsupported content and metadata.
+  `StructuredReportDialog` submits edits through `EditorController`; normal
+  document dirty-state and save workflows remain the persistence boundary.
 - `DicomPath`: stable address for nested sequence items and elements.
 - `DatasetViewModel`: toolkit-neutral filtering and row formatting.
 - `DicomDictionary`: embedded dictionary bootstrap and validated runtime replacement.

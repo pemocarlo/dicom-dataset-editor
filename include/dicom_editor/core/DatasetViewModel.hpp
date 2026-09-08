@@ -27,10 +27,12 @@ class DatasetViewModel {
     [[nodiscard]] std::span<const DicomNode> nodes() const;
     /// Returns indexes of rows currently visible after filtering.
     [[nodiscard]] std::span<const std::size_t> visibleIndices() const;
-    /// Expands or collapses a sequence row.
+    /// Expands or collapses a sequence, item, or dataset row.
     void toggleSequence(const DicomPath &path);
-    /// Returns whether a sequence row is collapsed.
+    /// Returns whether a branch row is collapsed.
     [[nodiscard]] bool sequenceCollapsed(const DicomPath &path) const;
+    void collapseAll();
+    void showAll();
 
     /// Builds the indented label shown in the attribute column.
     [[nodiscard]] static std::string attributeLabel(const DicomNode &node);

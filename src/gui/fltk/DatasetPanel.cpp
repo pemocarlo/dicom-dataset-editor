@@ -7,6 +7,7 @@
 
 #include <FL/Enumerations.H>
 #include <FL/Fl.H>
+#include <FL/Fl_Button.H>
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Table_Row.H>
 #include <FL/fl_draw.H>
@@ -23,6 +24,7 @@ namespace {
 constexpr int Padding = 10;
 constexpr int FilterHeight = 32;
 constexpr int FilterLabelWidth = 58;
+constexpr int TreeControlsHeight = 36;
 constexpr int ColumnCount = 5;
 constexpr std::array<const char *, ColumnCount> Headers{"Attribute", "Tag", "VR", "VM", "Value"};
 constexpr std::array<int, ColumnCount> ColumnWidths{230, 105, 50, 50, 445};
@@ -116,6 +118,28 @@ class DatasetTable final : public Fl_Table_Row {
     void restoreFirstVisibleRow(int row) { row_position(std::clamp(row, 0, std::max(0, rows() - 1))); }
 
     int handle(int event) override {
+        if (event == FL_PUSH && Fl::event_button() == FL_LEFT_MOUSE && model_ != nullptr) {
+            int row = -1;
+            int column = -1;
+            ResizeFlag resizeFlag = RESIZE_NONE;
+            if (cursor2rowcol(row, column, resizeFlag) == CONTEXT_CELL && row >= 0 && column == 0 && resizeFlag == RESIZE_NONE) {
+                const auto *node = model_->nodeAt(static_cast<std::size_t>(row));
+                if (node != nullptr && node->kind != dicom_editor::DicomNodeKind::Element) {
+                    int cellX = 0, cellY = 0, cellWidth = 0, cellHeight = 0;
+                    find_cell(CONTEXT_CELL, row, column, cellX, cellY, cellWidth, cellHeight);
+                    fl_font(FL_HELVETICA_BOLD, FL_NORMAL_SIZE);
+                    const std::string indent(static_cast<std::size_t>(node->depth) * 2, ' ');
+                    const int left = cellX + 8 + static_cast<int>(fl_width(indent.c_str()));
+                    if (Fl::event_x() >= left && Fl::event_x() <= left + static_cast<int>(fl_width("[+] "))) {
+                        select_all_rows(0);
+                        select_row(row);
+                        move_cursor(row, 0);
+                        owner_.toggleSelectedSequence();
+                        return 1;
+                    }
+                }
+            }
+        }
         if (event == FL_MOUSEWHEEL && Fl::event_dy() != 0) {
             restoreFirstVisibleRow(row_position() + Fl::event_dy() * 4);
             return 1;
@@ -132,7 +156,7 @@ class DatasetTable final : public Fl_Table_Row {
             }
             if (key == FL_Enter) {
                 const auto *node = owner_.selectedNode();
-                if (node != nullptr && node->kind == dicom_editor::DicomNodeKind::Sequence) {
+                if (node != nullptr && node->kind != dicom_editor::DicomNodeKind::Element) {
                     owner_.toggleSelectedSequence();
                 } else {
                     owner_.editSelectedValue();
@@ -141,7 +165,7 @@ class DatasetTable final : public Fl_Table_Row {
             }
             if (key == FL_Left || key == FL_Right) {
                 const auto *node = owner_.selectedNode();
-                if (node != nullptr && node->kind == dicom_editor::DicomNodeKind::Sequence &&
+                if (node != nullptr && node->kind != dicom_editor::DicomNodeKind::Element &&
                     owner_.model_.sequenceCollapsed(node->path) == (key == FL_Right)) {
                     owner_.toggleSelectedSequence();
                     return 1;
@@ -152,7 +176,7 @@ class DatasetTable final : public Fl_Table_Row {
         const int handled = Fl_Table_Row::handle(event);
         if (event == FL_PUSH && Fl::event_clicks() != 0) {
             const auto *node = owner_.selectedNode();
-            if (node != nullptr && node->kind == dicom_editor::DicomNodeKind::Sequence) {
+            if (node != nullptr && node->kind != dicom_editor::DicomNodeKind::Element) {
                 owner_.toggleSelectedSequence();
             } else {
                 owner_.editSelectedValue();
@@ -201,7 +225,7 @@ class DatasetTable final : public Fl_Table_Row {
             return;
         }
         std::string attribute = dicom_editor::DatasetViewModel::attributeLabel(*node);
-        if (node->kind == dicom_editor::DicomNodeKind::Sequence) {
+        if (node->kind != dicom_editor::DicomNodeKind::Element) {
             attribute.insert(static_cast<std::size_t>(node->depth) * 2, model_->sequenceCollapsed(node->path) ? "[+] " : "[-] ");
         }
         const std::array<std::string, ColumnCount> values{std::move(attribute), node->tag, node->vr, node->vm,
@@ -239,8 +263,15 @@ DatasetPanel::DatasetPanel(int x, int y, int width, int height) : Fl_Group(x, y,
     filter_->when(FL_WHEN_CHANGED);
     filter_->callback(filterCallback, this);
 
-    const int tableY = y + Padding + FilterHeight + Padding;
+    collapseAll_ = new Fl_Button(x + Padding, y + Padding + FilterHeight + 4, 120, 28, "Collapse all");
+    collapseAll_->tooltip("Clear the filter and collapse all sequences and items");
+    collapseAll_->callback([](Fl_Widget *, void *data) { static_cast<DatasetPanel *>(data)->setAllExpanded(false); }, this);
+    showAll_ = new Fl_Button(x + Padding + 130, y + Padding + FilterHeight + 4, 120, 28, "Show all");
+    showAll_->tooltip("Clear the filter and expand all sequences and items");
+    showAll_->callback([](Fl_Widget *, void *data) { static_cast<DatasetPanel *>(data)->setAllExpanded(true); }, this);
+    const int tableY = y + Padding + FilterHeight + Padding + TreeControlsHeight;
     table_ = new DatasetTable(x + Padding, tableY, width - 2 * Padding, height - (tableY - y) - Padding, *this);
+    table_->tooltip("Click [+]/[-] to expand/collapse a branch. Left/Right or Enter also toggle branches.");
     resizable(table_);
     end();
 }
@@ -280,13 +311,17 @@ void DatasetPanel::setFontSize(int size) {
     labelsize(size);
     filter_->labelsize(size);
     filter_->textsize(size);
+    collapseAll_->labelsize(size);
+    showAll_->labelsize(size);
     table_->setFontSize(size);
 }
 
 void DatasetPanel::resize(int x, int y, int width, int height) {
     Fl_Group::resize(x, y, width, height);
     filter_->resize(x + Padding + FilterLabelWidth, y + Padding, width - 2 * Padding - FilterLabelWidth, FilterHeight);
-    const int tableY = y + Padding + FilterHeight + Padding;
+    collapseAll_->resize(x + Padding, y + Padding + FilterHeight + 4, 120, 28);
+    showAll_->resize(x + Padding + 130, y + Padding + FilterHeight + 4, 120, 28);
+    const int tableY = y + Padding + FilterHeight + Padding + TreeControlsHeight;
     table_->resize(x + Padding, tableY, width - 2 * Padding, height - (tableY - y) - Padding);
 }
 
@@ -300,16 +335,25 @@ void DatasetPanel::rebuild() {
 }
 
 void DatasetPanel::restoreSelection(const std::string &path) {
+    table_->select_all_rows(0);
     if (path.empty()) {
         return;
     }
+    int bestRow = -1;
+    std::size_t bestLength = 0;
     for (int row = 0; row < table_->rows(); ++row) {
         const auto *node = model_.nodeAt(static_cast<std::size_t>(row));
-        if (node != nullptr && node->path.toString() == path) {
-            table_->select_row(row);
-            table_->move_cursor(row, 0);
-            return;
+        if (node != nullptr) {
+            const auto candidate = node->path.toString();
+            if (path.starts_with(candidate) && candidate.size() > bestLength) {
+                bestRow = row;
+                bestLength = candidate.size();
+            }
         }
+    }
+    if (bestRow >= 0) {
+        table_->select_row(bestRow);
+        table_->move_cursor(bestRow, 0);
     }
 }
 
@@ -321,7 +365,7 @@ void DatasetPanel::selectionChanged() {
 
 void DatasetPanel::toggleSelectedSequence() {
     const auto *selected = selectedNode();
-    if (selected == nullptr || selected->kind != dicom_editor::DicomNodeKind::Sequence) {
+    if (selected == nullptr || selected->kind == dicom_editor::DicomNodeKind::Element) {
         return;
     }
     const int firstVisibleRow = table_->firstVisibleRow();
@@ -330,6 +374,17 @@ void DatasetPanel::toggleSelectedSequence() {
     table_->setModel(&model_);
     restoreSelection(path);
     table_->restoreFirstVisibleRow(firstVisibleRow);
+    selectionChanged();
+}
+
+void DatasetPanel::setAllExpanded(bool expanded) {
+    const auto *selected = selectedNode();
+    const std::string path = selected == nullptr ? std::string{} : selected->path.toString();
+    filter_->value("");
+    model_.setFilter("");
+    expanded ? model_.showAll() : model_.collapseAll();
+    table_->setModel(&model_);
+    restoreSelection(path);
     selectionChanged();
 }
 

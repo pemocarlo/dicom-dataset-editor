@@ -3,6 +3,7 @@
 #include "dicom_editor/core/AttributeInput.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomWorkspace.hpp"
+#include "dicom_editor/core/StructuredReport.hpp"
 
 #include <cstddef>
 #include <exception>
@@ -41,6 +42,7 @@ struct ActionState {
     bool editEnabled{};
     /// Delete action enabled.
     bool deleteEnabled{};
+    bool structuredReportEnabled{};
 };
 
 /// Complete dataset-table presentation produced by the application layer.
@@ -158,6 +160,10 @@ class EditorController {
     void deleteAttribute(const DicomNode *selected);
     /// Reviews then edits one patient or study group.
     void batchEdit(const BatchEditTarget &target);
+    [[nodiscard]] std::vector<ReportNode> structuredReportNodes();
+    bool editReportNode(const DicomPath &path, const std::vector<std::string> &values);
+    bool changeReportStructure(const DicomPath &path, bool remove, DicomPath &selection);
+    bool insertReportNode(const DicomPath &anchor, ReportInsertion placement, const ReportNodeInput &input, DicomPath &selection);
     /// Changes file-leaf ordering.
     void setFileSortOrder(FileSortOrder order);
     /// Enables or disables value validation.

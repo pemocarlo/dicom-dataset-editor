@@ -1,0 +1,175 @@
+name: Conan CI
+
+# Temporarily disabled until the Artifactory service and credentials are ready.
+on: []
+
+permissions:
+  contents: read
+
+concurrency:
+  group: conan-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CONAN_VERSION: 2.31.2
+  CONAN_READ_REMOTE_NAME: conan-read
+
+jobs:
+  verify:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    env:
+      CONAN_READ_REMOTE_URL: ${{ secrets.CONAN_READ_REMOTE_URL }}
+      CONAN_READ_USERNAME: ${{ secrets.CONAN_DEV_USERNAME }}
+      CONAN_READ_TOKEN: ${{ secrets.CONAN_DEV_TOKEN }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libfontenc-dev \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev \
+            libice-dev \
+            libsm-dev \
+            libx11-dev \
+            libxaw7-dev \
+            libxcb1-dev \
+            libxcomposite-dev \
+            libxcursor-dev \
+            libxdamage-dev \
+            libxext-dev \
+            libxfixes-dev \
+            libxft-dev \
+            libxinerama-dev \
+            libxkbfile-dev \
+            libxmu-dev \
+            libxpm-dev \
+            libxrandr-dev \
+            libxrender-dev \
+            libxss-dev \
+            libxt-dev \
+            libxv-dev \
+            libxxf86vm-dev
+
+      - name: Install Conan
+        uses: conan-io/setup-conan@v1
+        with:
+          version: ${{ env.CONAN_VERSION }}
+          home: ${{ github.workspace }}/conanhome
+          cache_packages: true
+          profile_detect: true
+
+      - name: Configure read-only Artifactory access
+        run: |
+          test -n "$CONAN_READ_REMOTE_URL"
+          test -n "$CONAN_READ_USERNAME"
+          test -n "$CONAN_READ_TOKEN"
+          conan remote add "$CONAN_READ_REMOTE_NAME" "$CONAN_READ_REMOTE_URL" --force
+          conan remote login "$CONAN_READ_REMOTE_NAME" "$CONAN_READ_USERNAME" -p "$CONAN_READ_TOKEN"
+          conan config install-pkg conanconfig.yml --lockfile=conan.lock --force -s os=Linux
+          conan remote add "$CONAN_READ_REMOTE_NAME" "$CONAN_READ_REMOTE_URL" --force
+          conan remote login "$CONAN_READ_REMOTE_NAME" "$CONAN_READ_USERNAME" -p "$CONAN_READ_TOKEN"
+
+      - name: Create detected Conan profile
+        run: |
+          conan profile detect --force
+
+      - name: Build package and run tests
+        run: |
+          conan create . \
+            --build=never \
+            --lockfile=conan.lock \
+            -pr:h=default \
+            -pr:b=default \
+            -s:h build_type=Debug \
+            -s:b build_type=Release \
+            -s:h compiler.cppstd=23 \
+            -s:b compiler.cppstd=23
+
+  publish:
+    name: Publish application package
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-24.04
+    environment:
+      name: conan-publish
+    env:
+      CONAN_READ_REMOTE_URL: ${{ secrets.CONAN_READ_REMOTE_URL }}
+      CONAN_PUBLISH_REMOTE_URL: ${{ secrets.CONAN_PUBLISH_REMOTE_URL }}
+      CONAN_CI_USERNAME: ${{ secrets.CONAN_CI_USERNAME }}
+      CONAN_CI_TOKEN: ${{ secrets.CONAN_CI_TOKEN }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libfontenc-dev \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev \
+            libice-dev \
+            libsm-dev \
+            libx11-dev \
+            libxaw7-dev \
+            libxcb1-dev \
+            libxcomposite-dev \
+            libxcursor-dev \
+            libxdamage-dev \
+            libxext-dev \
+            libxfixes-dev \
+            libxft-dev \
+            libxinerama-dev \
+            libxkbfile-dev \
+            libxmu-dev \
+            libxpm-dev \
+            libxrandr-dev \
+            libxrender-dev \
+            libxss-dev \
+            libxt-dev \
+            libxv-dev \
+            libxxf86vm-dev
+
+      - name: Install Conan
+        uses: conan-io/setup-conan@v1
+        with:
+          version: ${{ env.CONAN_VERSION }}
+          home: ${{ github.workspace }}/conanhome
+          cache_packages: true
+          profile_detect: true
+
+      - name: Configure Artifactory access
+        run: |
+          test -n "$CONAN_READ_REMOTE_URL"
+          test -n "$CONAN_PUBLISH_REMOTE_URL"
+          test -n "$CONAN_CI_USERNAME"
+          test -n "$CONAN_CI_TOKEN"
+          conan remote add "$CONAN_READ_REMOTE_NAME" "$CONAN_READ_REMOTE_URL" --force
+          conan remote login "$CONAN_READ_REMOTE_NAME" "$CONAN_CI_USERNAME" -p "$CONAN_CI_TOKEN"
+          conan config install-pkg conanconfig.yml --lockfile=conan.lock --force -s os=Linux
+          conan remote add "$CONAN_READ_REMOTE_NAME" "$CONAN_READ_REMOTE_URL" --force
+          conan remote login "$CONAN_READ_REMOTE_NAME" "$CONAN_CI_USERNAME" -p "$CONAN_CI_TOKEN"
+          conan remote add conan-write "$CONAN_PUBLISH_REMOTE_URL" --force
+          conan remote login conan-write "$CONAN_CI_USERNAME" -p "$CONAN_CI_TOKEN"
+
+      - name: Create release package
+        run: |
+          conan profile detect --force
+          conan create . \
+            --build=never \
+            --lockfile=conan.lock \
+            -pr:h=default \
+            -pr:b=default \
+            -s:h build_type=Release \
+            -s:b build_type=Release \
+            -s:h compiler.cppstd=23 \
+            -s:b compiler.cppstd=23 \
+            -c:h tools.build:skip_test=True
+
+      - name: Upload only the application package
+        run: conan upload "dicom_dataset_editor/0.1.0" -r=conan-write --confirm

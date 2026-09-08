@@ -8,6 +8,7 @@
 #include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomPath.hpp"
 #include "dicom_editor/core/DicomWorkspace.hpp"
+#include "dicom_editor/core/StructuredReport.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -22,6 +23,7 @@
 #include <dcmtk/dcmdata/dctagkey.h>
 #include <dcmtk/dcmdata/dcuid.h>
 #include <dcmtk/dcmdata/dcxfer.h>
+#include <dcmtk/dcmsr/dsrcodvl.h>
 #include <dcmtk/ofstd/ofcond.h>
 #include <dcmtk/ofstd/offile.h>
 #include <dcmtk/ofstd/ofstring.h>
@@ -135,6 +137,324 @@ void seedDataset(DicomDocument &document) {
     item->putAndInsertString(DCM_ReferencedSOPInstanceUID, "1.2.826.0.1.3680043.10.543.4");
     sequence->append(item);
     dataset.insert(sequence, true);
+}
+
+void seedReport(DicomDocument &document) {
+    seedDataset(document);
+    auto &dataset = document.dataset();
+    REQUIRE(dataset.putAndInsertString(DCM_SOPClassUID, UID_ComprehensiveSRStorage).good());
+    REQUIRE(dataset.putAndInsertString(DCM_Modality, "SR").good());
+    REQUIRE(dataset.putAndInsertString(DCM_ValueType, "CONTAINER").good());
+    REQUIRE(dataset.putAndInsertString(DCM_ContinuityOfContent, "SEPARATE").good());
+    DSRCodedEntryValue title("126000", "DCM", "Imaging Measurement Report");
+    REQUIRE(title.writeSequence(dataset, DCM_ConceptNameCodeSequence).good());
+    DcmItem *child = nullptr;
+    REQUIRE(dataset.findOrCreateSequenceItem(DCM_ContentSequence, child, 0).good());
+    REQUIRE(child->putAndInsertString(DCM_ValueType, "TEXT").good());
+    REQUIRE(child->putAndInsertString(DCM_RelationshipType, "CONTAINS").good());
+    REQUIRE(child->putAndInsertString(DCM_TextValue, "Before\nSecond line").good());
+    DSRCodedEntryValue finding("121071", "DCM", "Finding");
+    REQUIRE(finding.writeSequence(*child, DCM_ConceptNameCodeSequence).good());
+    DcmItem *number = nullptr;
+    REQUIRE(child->findOrCreateSequenceItem(DCM_ContentSequence, number, 0).good());
+    REQUIRE(number->putAndInsertString(DCM_ValueType, "NUM").good());
+    REQUIRE(number->putAndInsertString(DCM_RelationshipType, "HAS PROPERTIES").good());
+    DcmItem *measurement = nullptr;
+    REQUIRE(number->findOrCreateSequenceItem(DCM_MeasuredValueSequence, measurement, 0).good());
+    REQUIRE(measurement->putAndInsertString(DCM_NumericValue, "12.5").good());
+    DSRCodedEntryValue units("mm", "UCUM", "millimeter");
+    REQUIRE(units.writeSequence(*measurement, DCM_MeasurementUnitsCodeSequence).good());
+    document.clearDirty();
+}
+
+std::vector<std::string> reportValues(const dicom_editor::ReportNode &node, const std::string &label, const std::string &replacement) {
+    std::vector<std::string> result;
+    bool found = false;
+    for (const auto &field : node.fields) {
+        result.push_back(field.label == label ? replacement : field.value);
+        found = found || field.label == label;
+    }
+    REQUIRE(found);
+    return result;
+}
+
+TEST_CASE("SR projects content hierarchy and preserves unrelated data when editing", "[core][sr]") {
+    using dicom_editor::StructuredReport;
+    DicomDocument document;
+    REQUIRE_FALSE(StructuredReport::supports(document));
+    seedReport(document);
+    const auto nodes = StructuredReport::nodes(document);
+    REQUIRE(nodes.size() == 3);
+    REQUIRE(nodes[0].label == "Imaging Measurement Report");
+    REQUIRE(nodes[1].label == "Finding");
+    REQUIRE(nodes[2].depth == 2);
+    REQUIRE(nodes[2].relationship == "HAS PROPERTIES");
+    REQUIRE_FALSE(document.dirty());
+
+    StructuredReport::edit(document, nodes[1].path, reportValues(nodes[1], "Text", "After\nSecond line"));
+    REQUIRE(document.dirty());
+    REQUIRE(document.attributeValue(DCM_PatientName) == "Before^Patient");
+    REQUIRE(stringValue(document, DicomPath::element(nodes[1].path.parents(), DCM_TextValue)) == "After\nSecond line");
+    REQUIRE(StructuredReport::nodes(document)[2].fields.front().value == "12.5");
+
+    StructuredReport::edit(document, nodes[0].path, reportValues(nodes[0], "Name meaning", "Updated report"));
+    REQUIRE(StructuredReport::nodes(document)[0].label == "Updated report");
+    REQUIRE(StructuredReport::nodes(document).size() == 3);
+    REQUIRE(document.attributeValue(DCM_SOPClassUID) == UID_ComprehensiveSRStorage);
+}
+
+TEST_CASE("SR invalid edits leave all node fields and dirty state unchanged", "[core][sr]") {
+    using dicom_editor::StructuredReport;
+    DicomDocument document;
+    seedReport(document);
+    const auto nodes = StructuredReport::nodes(document);
+    auto values = reportValues(nodes[1], "Name meaning", "Changed");
+    values.back() = "";
+    REQUIRE_THROWS_AS(StructuredReport::edit(document, nodes[1].path, values), dicom_editor::DicomError);
+    REQUIRE_FALSE(document.dirty());
+    REQUIRE(StructuredReport::nodes(document)[1].label == "Finding");
+    REQUIRE_THROWS_AS(StructuredReport::edit(document, nodes[2].path, reportValues(nodes[2], "Number", "not a number")),
+                      dicom_editor::DicomError);
+    REQUIRE_FALSE(document.dirty());
+    REQUIRE_THROWS_AS(StructuredReport::edit(document, nodes[1].path, {}), dicom_editor::DicomError);
+    REQUIRE_FALSE(document.dirty());
+}
+
+TEST_CASE("SR inserts new siblings and children at the requested positions", "[core][sr]") {
+    using dicom_editor::ReportInsertion;
+    using dicom_editor::ReportNodeInput;
+    using dicom_editor::StructuredReport;
+    DicomDocument document;
+    seedReport(document);
+    ReportNodeInput input;
+    input.nameCode = "NEW";
+    input.nameScheme = "99TEST";
+    input.nameMeaning = "New finding";
+    input.value = "New text";
+    auto anchor = StructuredReport::nodes(document)[1].path;
+    const auto before = StructuredReport::insert(document, anchor, ReportInsertion::Before, input);
+    REQUIRE(before.parents().back().itemIndex == 0);
+    auto nodes = StructuredReport::nodes(document);
+    REQUIRE(nodes[1].label == "New finding");
+    REQUIRE(nodes[2].label == "Finding");
+    input.nameMeaning = "Next finding";
+    const auto after = StructuredReport::insert(document, before, ReportInsertion::After, input);
+    REQUIRE(after.parents().back().itemIndex == 1);
+    input.valueType = "NUM";
+    input.relationship = "HAS PROPERTIES";
+    input.value = "7.5";
+    input.valueCode = "mm";
+    input.valueScheme = "UCUM";
+    input.valueMeaning = "millimeter";
+    const auto child = StructuredReport::insert(document, after, ReportInsertion::Child, input);
+    REQUIRE(child.parents().size() == 2);
+    nodes = StructuredReport::nodes(document);
+    REQUIRE(nodes[3].valueType == "NUM");
+    REQUIRE(nodes[3].fields[3].value == "7.5");
+    REQUIRE(nodes[4].label == "Finding");
+    REQUIRE(document.dirty());
+    const auto output = std::filesystem::temp_directory_path() / "dicom_editor_sr_insert_test.dcm";
+    REQUIRE(document.saveAs(output).has_value());
+    DicomDocument loaded;
+    REQUIRE(loaded.load(output).has_value());
+    REQUIRE(StructuredReport::nodes(loaded).size() == nodes.size());
+    REQUIRE(StructuredReport::nodes(loaded)[3].fields[3].value == "7.5");
+    std::filesystem::remove(output);
+}
+
+TEST_CASE("SR creates supported value types and rejects invalid new content without mutation", "[core][sr]") {
+    using dicom_editor::ReportInsertion;
+    using dicom_editor::ReportNodeInput;
+    using dicom_editor::StructuredReport;
+    DicomDocument document;
+    seedReport(document);
+    ReportNodeInput input;
+    input.nameCode = "NEW";
+    input.nameScheme = "99TEST";
+    input.nameMeaning = "New node";
+    input.valueCode = "R-00317";
+    input.valueScheme = "SRT";
+    input.valueMeaning = "Normal";
+    const std::vector<std::pair<std::string, std::string>> values{{"TEXT", "Text"},
+                                                                  {"NUM", "12.5"},
+                                                                  {"CODE", ""},
+                                                                  {"CONTAINER", ""},
+                                                                  {"DATE", "20260908"},
+                                                                  {"TIME", "123456"},
+                                                                  {"DATETIME", "20260908123456"},
+                                                                  {"PNAME", "Test^Person"},
+                                                                  {"UIDREF", "1.2.3.4"}};
+    for (const auto &[type, value] : values) {
+        input.valueType = type;
+        input.value = value;
+        const auto path = StructuredReport::insert(document, DicomPath::dataset(), ReportInsertion::Child, input);
+        REQUIRE(document.itemAt(path).tagExists(DCM_ValueType));
+    }
+    document.clearDirty();
+    const auto count = StructuredReport::nodes(document).size();
+    input.valueType = "NUM";
+    input.value = "not numeric";
+    REQUIRE_THROWS_AS(StructuredReport::insert(document, DicomPath::dataset(), ReportInsertion::Child, input), dicom_editor::DicomError);
+    input.value = "12.5";
+    REQUIRE_THROWS_AS(StructuredReport::insert(document, DicomPath::dataset(), ReportInsertion::Before, input), dicom_editor::DicomError);
+    input.relationship = "INVALID";
+    REQUIRE_THROWS_AS(StructuredReport::insert(document, DicomPath::dataset(), ReportInsertion::Child, input), dicom_editor::DicomError);
+    input.relationship = "CONTAINS";
+    REQUIRE_THROWS_AS(StructuredReport::insert(document, StructuredReport::nodes(document)[1].path, ReportInsertion::Child, input),
+                      dicom_editor::DicomError);
+    input.nameCode.clear();
+    REQUIRE_THROWS_AS(StructuredReport::insert(document, DicomPath::dataset(), ReportInsertion::Child, input), dicom_editor::DicomError);
+    REQUIRE(StructuredReport::nodes(document).size() == count);
+    REQUIRE_FALSE(document.dirty());
+}
+
+TEST_CASE("SR copies and deletes subtrees while preserving sibling values", "[core][sr]") {
+    using dicom_editor::StructuredReport;
+    DicomDocument document;
+    seedReport(document);
+    const auto original = StructuredReport::nodes(document);
+    const auto copy = StructuredReport::changeStructure(document, original[1].path, false);
+    auto nodes = StructuredReport::nodes(document);
+    REQUIRE(nodes.size() == 5);
+    REQUIRE(copy.parents().back().itemIndex == 1);
+    REQUIRE(nodes[3].label == original[1].label);
+    REQUIRE(nodes[4].fields.front().value == "12.5");
+    REQUIRE(document.dirty());
+    StructuredReport::edit(document, copy, reportValues(nodes[3], "Text", "Copied finding"));
+    const auto parent = StructuredReport::changeStructure(document, original[1].path, true);
+    REQUIRE(parent.parents().empty());
+    nodes = StructuredReport::nodes(document);
+    REQUIRE(nodes.size() == 3);
+    REQUIRE(nodes[1].fields.back().value == "Copied finding");
+    REQUIRE(nodes[1].path.parents().back().itemIndex == 0);
+    static_cast<void>(StructuredReport::changeStructure(document, nodes[1].path, true));
+    REQUIRE(StructuredReport::nodes(document).size() == 1);
+    REQUIRE_FALSE(document.dataset().tagExists(DCM_ContentSequence));
+    REQUIRE(document.attributeValue(DCM_PatientName) == "Before^Patient");
+}
+
+TEST_CASE("SR tree changes protect roots verified reports and content references", "[core][sr]") {
+    using dicom_editor::StructuredReport;
+    DicomDocument document;
+    seedReport(document);
+    const auto nodes = StructuredReport::nodes(document);
+    for (const bool remove : {false, true}) {
+        REQUIRE_THROWS_AS(StructuredReport::changeStructure(document, nodes[0].path, remove), dicom_editor::DicomError);
+    }
+    REQUIRE(document.dataset().putAndInsertString(DCM_VerificationFlag, "VERIFIED").good());
+    for (const bool remove : {false, true}) {
+        REQUIRE_THROWS_AS(StructuredReport::changeStructure(document, nodes[1].path, remove), dicom_editor::DicomError);
+    }
+    REQUIRE(document.dataset().findAndDeleteElement(DCM_VerificationFlag).good());
+    REQUIRE(document.itemAt(nodes[2].path).putAndInsertUint32(DCM_ReferencedContentItemIdentifier, 1).good());
+    for (const bool remove : {false, true}) {
+        REQUIRE_THROWS_AS(StructuredReport::changeStructure(document, nodes[1].path, remove), dicom_editor::DicomError);
+    }
+    REQUIRE_FALSE(document.dirty());
+    REQUIRE(StructuredReport::nodes(document).size() == 3);
+}
+
+TEST_CASE("SR measurements and codes survive save and reload", "[core][sr]") {
+    using dicom_editor::StructuredReport;
+    DicomDocument document;
+    seedReport(document);
+    auto nodes = StructuredReport::nodes(document);
+    StructuredReport::edit(document, nodes[2].path, reportValues(nodes[2], "Number", "24.75"));
+    nodes = StructuredReport::nodes(document);
+    StructuredReport::edit(document, nodes[2].path, reportValues(nodes[2], "Units meaning", "Millimeters"));
+    const auto output = std::filesystem::temp_directory_path() / "dicom_editor_sr_persistence_test.dcm";
+    REQUIRE(document.saveAs(output).has_value());
+    DicomDocument loaded;
+    REQUIRE(loaded.load(output).has_value());
+    const auto saved = StructuredReport::nodes(loaded);
+    REQUIRE(saved.size() == 3);
+    REQUIRE(saved[2].fields.front().value == "24.75");
+    REQUIRE(saved[2].fields.back().value == "Millimeters");
+    REQUIRE(loaded.attributeValue(DCM_PatientName) == "Before^Patient");
+    REQUIRE_FALSE(loaded.dirty());
+    std::filesystem::remove(output);
+}
+
+TEST_CASE("SR verified reports reject content changes and no-op edits stay clean", "[core][sr]") {
+    using dicom_editor::StructuredReport;
+    DicomDocument document;
+    seedReport(document);
+    const auto nodes = StructuredReport::nodes(document);
+    StructuredReport::edit(document, nodes[1].path, reportValues(nodes[1], "Text", "Before\nSecond line"));
+    REQUIRE_FALSE(document.dirty());
+    REQUIRE(document.dataset().putAndInsertString(DCM_VerificationFlag, "VERIFIED").good());
+    REQUIRE_THROWS_AS(StructuredReport::edit(document, nodes[1].path, reportValues(nodes[1], "Text", "After")), dicom_editor::DicomError);
+    REQUIRE_FALSE(document.dirty());
+    REQUIRE(stringValue(document, DicomPath::element(nodes[1].path.parents(), DCM_TextValue)) == "Before\nSecond line");
+}
+
+TEST_CASE("SR numeric edits replace alternate encodings only after validation", "[core][sr]") {
+    using dicom_editor::StructuredReport;
+    DicomDocument document;
+    seedReport(document);
+    const auto nodes = StructuredReport::nodes(document);
+    auto parents = nodes[2].path.parents();
+    parents.push_back({.sequenceTag = DCM_MeasuredValueSequence, .itemIndex = 0});
+    REQUIRE(document.itemAt(DicomPath::item(parents)).putAndInsertFloat64(DCM_FloatingPointValue, 12.5).good());
+    auto &measurement = document.itemAt(DicomPath::item(parents));
+    REQUIRE(measurement.putAndInsertSint32(DCM_RationalNumeratorValue, 25).good());
+    REQUIRE(measurement.putAndInsertUint32(DCM_RationalDenominatorValue, 2).good());
+    const auto numeric = StructuredReport::nodes(document)[2];
+    REQUIRE(numeric.fields.front().label == "Number");
+    REQUIRE(numeric.fields.front().value == "12.5");
+    StructuredReport::edit(document, numeric.path, reportValues(numeric, "Number", "12.5"));
+    REQUIRE(measurement.tagExists(DCM_FloatingPointValue));
+    REQUIRE_FALSE(document.dirty());
+    REQUIRE_THROWS_AS(StructuredReport::edit(document, numeric.path, reportValues(numeric, "Number", "invalid")), dicom_editor::DicomError);
+    REQUIRE(measurement.tagExists(DCM_RationalNumeratorValue));
+    REQUIRE_FALSE(document.dirty());
+    StructuredReport::edit(document, numeric.path, reportValues(numeric, "Number", "26.75"));
+    auto &updated = document.itemAt(DicomPath::item(parents));
+    REQUIRE_FALSE(updated.tagExists(DCM_FloatingPointValue));
+    REQUIRE_FALSE(updated.tagExists(DCM_RationalNumeratorValue));
+    REQUIRE_FALSE(updated.tagExists(DCM_RationalDenominatorValue));
+    REQUIRE(StructuredReport::nodes(document)[2].fields.front().value == "26.75");
+}
+
+TEST_CASE("SR permits entering missing text values", "[core][sr]") {
+    using dicom_editor::StructuredReport;
+    DicomDocument document;
+    seedReport(document);
+    const auto path = StructuredReport::nodes(document)[1].path;
+    REQUIRE(document.itemAt(path).findAndDeleteElement(DCM_TextValue).good());
+    const auto node = StructuredReport::nodes(document)[1];
+    REQUIRE(node.fields.back().label == "Text");
+    REQUIRE(node.fields.back().value.empty());
+    StructuredReport::edit(document, path, reportValues(node, "Text", "New finding\nMore detail"));
+    REQUIRE(StructuredReport::nodes(document)[1].fields.back().value == "New finding\nMore detail");
+}
+
+TEST_CASE("controller SR edits refresh the raw dataset and use normal saving", "[application][sr]") {
+    DicomDocument source;
+    seedReport(source);
+    const auto output = std::filesystem::temp_directory_path() / "dicom_editor_sr_controller_test.dcm";
+    REQUIRE(source.saveAs(output).has_value());
+    ControllerView view;
+    EditorController controller(view);
+    REQUIRE_FALSE(controller.actionState(nullptr).structuredReportEnabled);
+    view.chosenFiles = {output};
+    controller.openDocument();
+    REQUIRE(controller.actionState(nullptr).structuredReportEnabled);
+    const auto nodes = controller.structuredReportNodes();
+    const auto presentations = view.documentPresentations;
+    REQUIRE(controller.editReportNode(nodes[1].path, reportValues(nodes[1], "Text", "Controller edit")));
+    // The controller invokes the view through virtual presentation callbacks.
+    // cppcheck-suppress knownConditionTrueFalse
+    REQUIRE(view.documentPresentations > presentations);
+    REQUIRE(view.openFiles.front().dirty);
+    REQUIRE_FALSE(controller.editReportNode(nodes[2].path, reportValues(nodes[2], "Number", "bad")));
+    REQUIRE_FALSE(view.error.empty());
+    REQUIRE(controller.saveDocument());
+    REQUIRE_FALSE(view.openFiles.front().dirty);
+    DicomDocument loaded;
+    REQUIRE(loaded.load(output).has_value());
+    REQUIRE(stringValue(loaded, DicomPath::element(nodes[1].path.parents(), DCM_TextValue)) == "Controller edit");
+    std::filesystem::remove(output);
 }
 
 std::optional<std::size_t> previewSourceIndex(const ControllerView &view) {
@@ -323,6 +643,35 @@ TEST_CASE("dataset view model collapses sequences", "[core][view-model]") {
     REQUIRE(model.visibleIndices().size() < expandedCount);
     model.setFilter("ReferencedSOPInstanceUID");
     REQUIRE(!model.visibleIndices().empty());
+}
+
+TEST_CASE("dataset branches collapse items and root without changing document data", "[core][view-model]") {
+    DicomDocument document;
+    seedReport(document);
+    dicom_editor::DatasetViewModel model;
+    model.setNodes(document.nodes());
+    const auto total = model.visibleIndices().size();
+    const auto item = std::ranges::find_if(model.nodes(), [](const auto &node) { return node.kind == dicom_editor::DicomNodeKind::Item; });
+    REQUIRE(item != model.nodes().end());
+    const auto itemPath = item->path;
+    model.toggleSequence(itemPath);
+    REQUIRE(model.sequenceCollapsed(itemPath));
+    REQUIRE(model.visibleIndices().size() < total);
+    REQUIRE(std::ranges::any_of(model.visibleIndices(),
+                                [&](std::size_t index) { return model.nodes()[index].path.toString() == itemPath.toString(); }));
+    model.collapseAll();
+    REQUIRE(model.visibleIndices().size() == 1);
+    REQUIRE(model.nodeAt(0)->kind == dicom_editor::DicomNodeKind::Dataset);
+    model.toggleSequence(DicomPath::dataset());
+    REQUIRE(model.visibleIndices().size() > 1);
+    REQUIRE(model.sequenceCollapsed(itemPath));
+    model.setFilter("NumericValue");
+    REQUIRE_FALSE(model.visibleIndices().empty());
+    model.setFilter("");
+    model.showAll();
+    REQUIRE(model.visibleIndices().size() == total);
+    REQUIRE_FALSE(model.sequenceCollapsed(itemPath));
+    REQUIRE_FALSE(document.dirty());
 }
 
 TEST_CASE("tag parser accepts only 16-bit hexadecimal components", "[core][validation]") {

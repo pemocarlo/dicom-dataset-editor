@@ -6,6 +6,7 @@
 #include "dicom_editor/core/DicomError.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomPath.hpp"
+#include "dicom_editor/core/StructuredReport.hpp"
 
 #include <dcmtk/dcmdata/dctagkey.h>
 
@@ -373,7 +374,51 @@ ActionState EditorController::actionState(const DicomNode *selected) const {
             .saveAllEnabled = workspace_.hasDirtyDocuments(),
             .clearWorkspaceEnabled = workspace_.hasLoadedFiles() || workspace_.hasDirtyDocuments(),
             .editEnabled = editable || viewable,
-            .deleteEnabled = editable};
+            .deleteEnabled = editable,
+            .structuredReportEnabled = StructuredReport::supports(document())};
+}
+
+std::vector<ReportNode> EditorController::structuredReportNodes() {
+    try {
+        return StructuredReport::nodes(document());
+    } catch (const std::exception &error) {
+        reportError(error, false);
+        return {};
+    }
+}
+
+bool EditorController::editReportNode(const DicomPath &path, const std::vector<std::string> &values) {
+    try {
+        StructuredReport::edit(document(), path, values);
+        refreshView();
+        return true;
+    } catch (const std::exception &error) {
+        reportError(error, false);
+        return false;
+    }
+}
+
+bool EditorController::changeReportStructure(const DicomPath &path, bool remove, DicomPath &selection) {
+    try {
+        selection = StructuredReport::changeStructure(document(), path, remove);
+        refreshView();
+        return true;
+    } catch (const std::exception &error) {
+        reportError(error, false);
+        return false;
+    }
+}
+
+bool EditorController::insertReportNode(const DicomPath &anchor, ReportInsertion placement, const ReportNodeInput &input,
+                                        DicomPath &selection) {
+    try {
+        selection = StructuredReport::insert(document(), anchor, placement, input);
+        refreshView();
+        return true;
+    } catch (const std::exception &error) {
+        reportError(error, false);
+        return false;
+    }
 }
 
 bool EditorController::confirmDiscardChanges() {
