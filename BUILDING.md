@@ -379,9 +379,39 @@ Expected layout:
 - `<your-install-prefix>/bin/dicom-dataset-editor.exe` on Windows
 
 Dictionary is compiled into executable, so install has no runtime data directory.
-CMake does not bundle dependency libraries; provide them through system, Conan,
-or platform-specific deployment step.
 The Windows executable uses the GUI subsystem and does not open a separate console window.
+
+### Windows distributable
+
+For another Windows machine, use the Release build and CPack rather than copying
+the executable by itself. The packaging configuration collects the non-system
+runtime DLLs and the MSVC/UCRT runtime needed by the application.
+
+From a Windows developer prompt with Conan configured and NSIS installed:
+
+NSIS is required only on the machine creating the installer; target machines do
+not need NSIS, Conan, or CMake.
+
+```powershell
+conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release -c tools.build:skip_test=True
+cmake --preset production
+cmake --build --preset production
+cpack --config build/Release/CPackConfig.cmake -G NSIS
+```
+
+This creates a single installer such as
+`dicom-dataset-editor-0.1.0-windows-x64.exe` in the current directory. It adds
+Start Menu entries and an uninstaller, and the installed application does not
+need Conan or a development environment on `PATH`.
+
+If NSIS is not available, create a portable archive instead:
+
+```powershell
+cpack --config build/Release/CPackConfig.cmake -G ZIP
+```
+
+The ZIP contains the same installed files; extract it and run
+`bin\dicom-dataset-editor.exe`.
 
 ## Conan Package
 

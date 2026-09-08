@@ -153,7 +153,7 @@ target_sources(dicom-dataset-editor
 )
 target_link_libraries(dicom-dataset-editor PRIVATE DicomDatasetEditor::fltk)
 
-install(TARGETS dicom-dataset-editor)
+include(cmake/Packaging.cmake)
 
 if(DICOM_EDITOR_ENABLE_VALGRIND)
     if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
