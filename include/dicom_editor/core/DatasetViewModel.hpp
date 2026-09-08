@@ -3,6 +3,7 @@
 #include "dicom_editor/core/DicomNode.hpp"
 
 #include <cstddef>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -31,6 +32,14 @@ class DatasetViewModel {
     void toggleSequence(const DicomPath &path);
     /// Returns whether a branch row is collapsed.
     [[nodiscard]] bool sequenceCollapsed(const DicomPath &path) const;
+    /// Collapses a branch and every nested branch below it.
+    void collapseSubtree(const DicomPath &path);
+    /// Expands a branch and every nested branch below it.
+    void expandSubtree(const DicomPath &path);
+    /// Returns the branch represented by a node, or its nearest containing branch.
+    [[nodiscard]] std::optional<DicomPath> containingSubtree(const DicomPath &path) const;
+    /// Collapses the nearest branch containing the node, or the node itself when it is a branch.
+    [[nodiscard]] std::optional<DicomPath> collapseContainingSubtree(const DicomPath &path);
     void collapseAll();
     void showAll();
 

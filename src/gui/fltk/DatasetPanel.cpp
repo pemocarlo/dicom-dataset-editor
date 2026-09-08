@@ -93,6 +93,21 @@ class DatasetTable final : public Fl_Table_Row {
         return -1;
     }
 
+    [[nodiscard]] int rowForPath(const std::string &path) {
+        for (int row = 0; row < rows(); ++row) {
+            const auto *node = model_->nodeAt(static_cast<std::size_t>(row));
+            if (node != nullptr && node->path.toString() == path) {
+                return row;
+            }
+        }
+        return -1;
+    }
+
+    [[nodiscard]] std::string pathAtFirstVisibleRow() {
+        const auto *node = model_->nodeAt(static_cast<std::size_t>(firstVisibleRow()));
+        return node == nullptr ? std::string{} : node->path.toString();
+    }
+
     void moveSelection(int offset) {
         if (rows() == 0) {
             return;
@@ -113,7 +128,22 @@ class DatasetTable final : public Fl_Table_Row {
         redraw();
     }
 
-    [[nodiscard]] int firstVisibleRow() { return row_position(); }
+    [[nodiscard]] int firstVisibleRow() {
+        int top = 0;
+        int bottom = 0;
+        int left = 0;
+        int right = 0;
+        visible_cells(top, bottom, left, right);
+        return top;
+    }
+
+    [[nodiscard]] double verticalScrollPosition() const { return vscrollbar->value(); }
+
+    void restoreVerticalScrollPosition(double position) {
+        vscrollbar->value(vscrollbar->clamp(position));
+        table_scrolled();
+        redraw();
+    }
 
     void restoreFirstVisibleRow(int row) { row_position(std::clamp(row, 0, std::max(0, rows() - 1))); }
 
@@ -133,15 +163,14 @@ class DatasetTable final : public Fl_Table_Row {
                     if (Fl::event_x() >= left && Fl::event_x() <= left + static_cast<int>(fl_width("[+] "))) {
                         select_all_rows(0);
                         select_row(row);
-                        move_cursor(row, 0);
-                        owner_.toggleSelectedSequence();
+                        owner_.toggleSelectedSequence(verticalScrollPosition());
                         return 1;
                     }
                 }
             }
         }
         if (event == FL_MOUSEWHEEL && Fl::event_dy() != 0) {
-            restoreFirstVisibleRow(row_position() + Fl::event_dy() * 4);
+            restoreFirstVisibleRow(firstVisibleRow() + Fl::event_dy() * 4);
             return 1;
         }
         if (event == FL_KEYDOWN) {
@@ -263,12 +292,9 @@ DatasetPanel::DatasetPanel(int x, int y, int width, int height) : Fl_Group(x, y,
     filter_->when(FL_WHEN_CHANGED);
     filter_->callback(filterCallback, this);
 
-    collapseAll_ = new Fl_Button(x + Padding, y + Padding + FilterHeight + 4, 120, 28, "Collapse all");
-    collapseAll_->tooltip("Clear the filter and collapse all sequences and items");
-    collapseAll_->callback([](Fl_Widget *, void *data) { static_cast<DatasetPanel *>(data)->setAllExpanded(false); }, this);
-    showAll_ = new Fl_Button(x + Padding + 130, y + Padding + FilterHeight + 4, 120, 28, "Show all");
-    showAll_->tooltip("Clear the filter and expand all sequences and items");
-    showAll_->callback([](Fl_Widget *, void *data) { static_cast<DatasetPanel *>(data)->setAllExpanded(true); }, this);
+    collapseAll_ = new Fl_Button(x + Padding, y + Padding + FilterHeight + 4, 180, 28, "Collapse / Expand");
+    collapseAll_->tooltip("Toggle the selected branch, or the whole tree when nothing is selected");
+    collapseAll_->callback([](Fl_Widget *, void *data) { static_cast<DatasetPanel *>(data)->toggleSelectionOrAll(); }, this);
     const int tableY = y + Padding + FilterHeight + Padding + TreeControlsHeight;
     table_ = new DatasetTable(x + Padding, tableY, width - 2 * Padding, height - (tableY - y) - Padding, *this);
     table_->tooltip("Click [+]/[-] to expand/collapse a branch. Left/Right or Enter also toggle branches.");
@@ -312,15 +338,13 @@ void DatasetPanel::setFontSize(int size) {
     filter_->labelsize(size);
     filter_->textsize(size);
     collapseAll_->labelsize(size);
-    showAll_->labelsize(size);
     table_->setFontSize(size);
 }
 
 void DatasetPanel::resize(int x, int y, int width, int height) {
     Fl_Group::resize(x, y, width, height);
     filter_->resize(x + Padding + FilterLabelWidth, y + Padding, width - 2 * Padding - FilterLabelWidth, FilterHeight);
-    collapseAll_->resize(x + Padding, y + Padding + FilterHeight + 4, 120, 28);
-    showAll_->resize(x + Padding + 130, y + Padding + FilterHeight + 4, 120, 28);
+    collapseAll_->resize(x + Padding, y + Padding + FilterHeight + 4, 180, 28);
     const int tableY = y + Padding + FilterHeight + Padding + TreeControlsHeight;
     table_->resize(x + Padding, tableY, width - 2 * Padding, height - (tableY - y) - Padding);
 }
@@ -363,28 +387,73 @@ void DatasetPanel::selectionChanged() {
     }
 }
 
-void DatasetPanel::toggleSelectedSequence() {
+void DatasetPanel::toggleSelectedSequence(double preservedScrollPosition) {
     const auto *selected = selectedNode();
     if (selected == nullptr || selected->kind == dicom_editor::DicomNodeKind::Element) {
         return;
     }
-    const int firstVisibleRow = table_->firstVisibleRow();
     const std::string path = selected->path.toString();
+    const double scrollPosition = preservedScrollPosition >= 0.0 ? preservedScrollPosition : table_->verticalScrollPosition();
     model_.toggleSequence(selected->path);
     table_->setModel(&model_);
     restoreSelection(path);
-    table_->restoreFirstVisibleRow(firstVisibleRow);
+    table_->restoreVerticalScrollPosition(scrollPosition);
+    selectionChanged();
+}
+
+void DatasetPanel::toggleSelectionOrAll() {
+    const auto *selected = selectedNode();
+    if (selected == nullptr) {
+        const bool collapsed = model_.sequenceCollapsed(dicom_editor::DicomPath::dataset());
+        setAllExpanded(!collapsed);
+        return;
+    }
+
+    const std::string path = selected->path.toString();
+    const int selectedRow = table_->selectedRow();
+    const int firstVisibleRow = table_->firstVisibleRow();
+    const int selectedOffset = selectedRow >= firstVisibleRow ? selectedRow - firstVisibleRow : 0;
+    filter_->value("");
+    model_.setFilter("");
+    const auto targetPath = model_.containingSubtree(selected->path);
+    if (!targetPath) {
+        return;
+    }
+    if (model_.sequenceCollapsed(*targetPath)) {
+        model_.expandSubtree(*targetPath);
+    } else {
+        model_.collapseSubtree(*targetPath);
+    }
+    table_->setModel(&model_);
+    restoreSelection(path);
+    const int targetRow = table_->rowForPath(targetPath->toString());
+    if (targetRow >= 0) {
+        table_->restoreFirstVisibleRow(targetRow - selectedOffset);
+    }
     selectionChanged();
 }
 
 void DatasetPanel::setAllExpanded(bool expanded) {
     const auto *selected = selectedNode();
     const std::string path = selected == nullptr ? std::string{} : selected->path.toString();
+    const int firstVisibleRow = table_->firstVisibleRow();
+    const int selectedRow = table_->selectedRow();
+    const int selectedOffset = selectedRow >= firstVisibleRow ? selectedRow - firstVisibleRow : 0;
+    const std::string firstVisiblePath = table_->pathAtFirstVisibleRow();
     filter_->value("");
     model_.setFilter("");
     expanded ? model_.showAll() : model_.collapseAll();
     table_->setModel(&model_);
     restoreSelection(path);
+    if (!expanded && path.empty()) {
+        table_->restoreFirstVisibleRow(0);
+    } else if (expanded) {
+        const std::string &anchorPath = path.empty() ? firstVisiblePath : path;
+        const int anchorRow = table_->rowForPath(anchorPath);
+        if (anchorRow >= 0) {
+            table_->restoreFirstVisibleRow(anchorRow - (path.empty() ? 0 : selectedOffset));
+        }
+    }
     selectionChanged();
 }
 

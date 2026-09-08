@@ -645,6 +645,62 @@ TEST_CASE("dataset view model collapses sequences", "[core][view-model]") {
     REQUIRE(!model.visibleIndices().empty());
 }
 
+TEST_CASE("dataset view model collapses a branch and all nested branches", "[core][view-model]") {
+    DicomDocument document;
+    seedReport(document);
+    dicom_editor::DatasetViewModel model;
+    model.setNodes(document.nodes());
+    const auto target = std::ranges::find_if(model.nodes(), [](const auto &node) {
+        return node.kind == dicom_editor::DicomNodeKind::Item && !node.path.parents().empty() &&
+               node.path.parents().back().sequenceTag == DCM_ContentSequence;
+    });
+    REQUIRE(target != model.nodes().end());
+    const auto targetPath = target->path;
+    const auto targetKey = targetPath.toString();
+    std::vector<dicom_editor::DicomPath> nestedBranches;
+    for (const auto &node : model.nodes()) {
+        if (node.path.toString().starts_with(targetKey) && node.kind != dicom_editor::DicomNodeKind::Element) {
+            nestedBranches.push_back(node.path);
+        }
+    }
+    REQUIRE(nestedBranches.size() > 1);
+
+    model.collapseSubtree(targetPath);
+    for (const auto &branch : nestedBranches) {
+        REQUIRE(model.sequenceCollapsed(branch));
+    }
+    REQUIRE(std::ranges::none_of(model.visibleIndices(), [&](std::size_t index) {
+        const auto &node = model.nodes()[index];
+        return node.path.toString().starts_with(targetKey) && node.path.toString() != targetKey;
+    }));
+
+    model.toggleSequence(targetPath);
+    REQUIRE_FALSE(model.sequenceCollapsed(targetPath));
+    for (std::size_t index = 1; index < nestedBranches.size(); ++index) {
+        REQUIRE(model.sequenceCollapsed(nestedBranches[index]));
+    }
+}
+
+TEST_CASE("dataset view model collapses the branch containing a selected element", "[core][view-model]") {
+    DicomDocument document;
+    seedReport(document);
+    dicom_editor::DatasetViewModel model;
+    model.setNodes(document.nodes());
+    const auto selected = std::ranges::find_if(model.nodes(), [](const auto &node) { return node.keyword == "NumericValue"; });
+    REQUIRE(selected != model.nodes().end());
+
+    auto containing = selected;
+    while (containing != model.nodes().begin()) {
+        --containing;
+        if (containing->kind != dicom_editor::DicomNodeKind::Element && containing->depth < selected->depth) {
+            break;
+        }
+    }
+    REQUIRE(containing->kind != dicom_editor::DicomNodeKind::Element);
+    static_cast<void>(model.collapseContainingSubtree(selected->path));
+    REQUIRE(model.sequenceCollapsed(containing->path));
+}
+
 TEST_CASE("dataset branches collapse items and root without changing document data", "[core][view-model]") {
     DicomDocument document;
     seedReport(document);

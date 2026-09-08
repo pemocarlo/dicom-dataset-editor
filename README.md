@@ -22,9 +22,10 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
   dataset.
 - Edit scalar values inline by double-clicking the `Value` column.
 - Collapse sequences, individual items, or the dataset root using the `[+]`/`[-]`
-  control, Enter, or Left/Right. `Collapse all` and `Show all` above the dataset
-  table clear the filter and fold or expand every branch. Search includes
-  collapsed descendants; clearing the filter restores the previous folds.
+  control, Enter, or Left/Right. `Collapse / Expand` above the dataset table
+  clears the filter and toggles the selected branch (or its containing branch when
+  an element is selected); with no selection it toggles the whole tree. Search
+  includes collapsed descendants; clearing the filter restores the previous folds.
 - Optionally validate DICOM values and highlight invalid values in red.
 - Add, delete, save, and reload datasets.
 - Carry DCMTK data dictionary inside executable and optionally load updated
@@ -68,9 +69,9 @@ name (advanced)` when needed. The detail header shows the node relationship.
 The node name is always shown above a separate Value section. Resize the
 window to give the overview and value editor more room.
 Drag the divider between the SR tree and details to adjust their widths.
-The chosen proportion is retained when resizing the window. `Collapse all`
-and `Show all` above the SR tree fold or expand every node. Collapsing all
-selects the report root, with the usual prompt for unapplied edits.
+The chosen proportion is retained when resizing the window. `Collapse / Expand`
+above the SR tree toggles the selected branch or its containing branch; with no
+selection, it toggles the complete report tree.
 
 `Add copy` appends a copy of the selected node and all its descendants under
 the same parent, then selects the copy for editing. Review its values before

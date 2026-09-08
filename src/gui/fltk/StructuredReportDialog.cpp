@@ -36,6 +36,17 @@ class ReportTree final : public Fl_Tree {
     using Fl_Tree::Fl_Tree;
 
     int handle(int event) override {
+        if (event == FL_PUSH && Fl::event_button() == FL_LEFT_MOUSE) {
+            auto *clicked = find_clicked();
+            const int scrollPosition = vposition();
+            const bool wasOpen = clicked != nullptr && clicked->is_open() != 0;
+            const int handled = Fl_Tree::handle(event);
+            if (clicked != nullptr && (clicked->is_open() != 0) != wasOpen) {
+                vposition(scrollPosition);
+                redraw();
+            }
+            return handled;
+        }
         if (event == FL_MOUSEWHEEL && Fl::event_dy() != 0) {
             const auto *item = first_visible_item();
             if (item != nullptr) {
@@ -138,10 +149,9 @@ class ReportDialog final : public Fl_Double_Window {
                  ReportReloadHandler reload, ReportInsertHandler insert)
         : Fl_Double_Window(1100, 720, "Structured Report"), edit_(std::move(edit)), structure_(std::move(structure)), reload_(std::move(reload)),
           insert_(std::move(insert)), nodes_(std::move(nodes)) {
-        collapseAll_ = new Fl_Button(10, 10, 200, 28, "Collapse all");
-        collapseAll_->callback([](Fl_Widget *, void *data) { static_cast<ReportDialog *>(data)->setAllExpanded(false); }, this);
-        showAll_ = new Fl_Button(220, 10, 210, 28, "Show all");
-        showAll_->callback([](Fl_Widget *, void *data) { static_cast<ReportDialog *>(data)->setAllExpanded(true); }, this);
+        collapseAll_ = new Fl_Button(10, 10, 200, 28, "Collapse / Expand");
+        collapseAll_->tooltip("Toggle the selected branch, or the whole tree when nothing is selected");
+        collapseAll_->callback([](Fl_Widget *, void *data) { static_cast<ReportDialog *>(data)->toggleSelectionOrAll(); }, this);
         tree_ = new ReportTree(10, 45, 420, 560);
         tree_->showroot(0);
         tree_->sortorder(FL_TREE_SORT_NONE);
@@ -185,7 +195,6 @@ class ReportDialog final : public Fl_Double_Window {
         Fl_Double_Window::resize(x, y, width, height);
         const int split = std::clamp(static_cast<int>(static_cast<double>(width) * splitRatio_), 260, width - 460);
         collapseAll_->resize(10, 10, (split - 30) / 2, 28);
-        showAll_->resize(split / 2, 10, split / 2 - 10, 28);
         tree_->resize(10, 45, split - 20, height - 160);
         divider_->resize(split - 8, 10, 8, height - 80);
         add_->resize(10, height - 105, (split - 30) / 2, 30);
@@ -264,22 +273,40 @@ class ReportDialog final : public Fl_Double_Window {
     }
 
   private:
-    void setAllExpanded(bool expanded) {
-        if (!expanded && tree_->root()->children() > 0) {
-            auto *root = tree_->root()->child(0);
-            tree_->select_only(root);
-            if (selectedItem_ != root) {
-                return;
+    void closeSubtree(Fl_Tree_Item *item) {
+        for (int index = 0; index < item->children(); ++index) {
+            closeSubtree(item->child(index));
+        }
+        tree_->close(item, 0);
+    }
+
+    void openSubtree(Fl_Tree_Item *item) {
+        tree_->open(item, 0);
+        for (int index = 0; index < item->children(); ++index) {
+            openSubtree(item->child(index));
+        }
+    }
+
+    void toggleSelectionOrAll() {
+        const int scrollPosition = tree_->vposition();
+        Fl_Tree_Item *target = selectedItem_;
+        if (target != nullptr && target->children() == 0 && target->parent() != tree_->root()) {
+            target = target->parent();
+        }
+
+        if (target != nullptr) {
+            if (selectedItem_ != target) {
+                tree_->select_only(target);
+            }
+            target->is_close() ? openSubtree(target) : closeSubtree(target);
+        } else {
+            for (int index = 0; index < tree_->root()->children(); ++index) {
+                auto *root = tree_->root()->child(index);
+                const bool expand = root->is_close();
+                expand ? openSubtree(root) : closeSubtree(root);
             }
         }
-        for (auto *item = tree_->first(); item != nullptr; item = tree_->next(item)) {
-            if (item->user_data() != nullptr) {
-                expanded ? tree_->open(item, 0) : tree_->close(item, 0);
-            }
-        }
-        if (selectedItem_ != nullptr) {
-            tree_->show_item(selectedItem_);
-        }
+        tree_->vposition(scrollPosition);
         tree_->redraw();
     }
 
@@ -534,7 +561,6 @@ class ReportDialog final : public Fl_Double_Window {
     Fl_Button *add_{};
     Fl_Button *remove_{};
     Fl_Button *collapseAll_{};
-    Fl_Button *showAll_{};
     Fl_Box *divider_{};
     double splitRatio_{0.38};
     bool draggingDivider_{};

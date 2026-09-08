@@ -58,6 +58,73 @@ void DatasetViewModel::toggleSequence(const DicomPath &path) {
 
 bool DatasetViewModel::sequenceCollapsed(const DicomPath &path) const { return collapsedSequences_.contains(path.toString()); }
 
+void DatasetViewModel::collapseSubtree(const DicomPath &path) {
+    const auto key = path.toString();
+    const auto start = std::ranges::find_if(nodes_, [&key](const DicomNode &node) { return node.path.toString() == key; });
+    if (start == nodes_.end() || start->kind == DicomNodeKind::Element) {
+        return;
+    }
+
+    for (auto node = start; node != nodes_.end(); ++node) {
+        if (node != start && node->depth <= start->depth) {
+            break;
+        }
+        if (node->kind != DicomNodeKind::Element) {
+            collapsedSequences_.insert(node->path.toString());
+        }
+    }
+    rebuild();
+}
+
+void DatasetViewModel::expandSubtree(const DicomPath &path) {
+    const auto key = path.toString();
+    const auto start = std::ranges::find_if(nodes_, [&key](const DicomNode &node) { return node.path.toString() == key; });
+    if (start == nodes_.end() || start->kind == DicomNodeKind::Element) {
+        return;
+    }
+
+    for (auto node = start; node != nodes_.end(); ++node) {
+        if (node != start && node->depth <= start->depth) {
+            break;
+        }
+        if (node->kind != DicomNodeKind::Element) {
+            collapsedSequences_.erase(node->path.toString());
+        }
+    }
+    rebuild();
+}
+
+std::optional<DicomPath> DatasetViewModel::containingSubtree(const DicomPath &path) const {
+    const auto key = path.toString();
+    const auto selected = std::ranges::find_if(nodes_, [&key](const DicomNode &node) { return node.path.toString() == key; });
+    if (selected == nodes_.end()) {
+        return std::nullopt;
+    }
+
+    auto branch = selected;
+    if (branch->kind == DicomNodeKind::Element) {
+        while (branch != nodes_.begin()) {
+            --branch;
+            if (branch->kind != DicomNodeKind::Element && branch->depth < selected->depth) {
+                break;
+            }
+        }
+        if (branch->kind == DicomNodeKind::Element) {
+            return std::nullopt;
+        }
+    }
+    return branch->path;
+}
+
+std::optional<DicomPath> DatasetViewModel::collapseContainingSubtree(const DicomPath &path) {
+    const auto branch = containingSubtree(path);
+    if (!branch) {
+        return std::nullopt;
+    }
+    collapseSubtree(*branch);
+    return branch;
+}
+
 void DatasetViewModel::collapseAll() {
     for (const auto &node : nodes_) {
         if (node.kind != DicomNodeKind::Element) {

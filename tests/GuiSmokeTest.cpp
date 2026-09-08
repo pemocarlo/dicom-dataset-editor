@@ -238,29 +238,25 @@ TEST_CASE("SR hides concept metadata by default and selects newly copied nodes",
     REQUIRE(tree->root()->child(0)->child(1)->is_selected());
     REQUIRE(names->value() == 0);
     Fl_Button *collapse = nullptr;
-    Fl_Button *show = nullptr;
     Fl_Box *divider = nullptr;
     for (int index = 0; index < dialog->children(); ++index) {
         auto *child = dialog->child(index);
         if (auto *button = dynamic_cast<Fl_Button *>(child); button != nullptr && button->label() != nullptr) {
-            if (std::string(button->label()) == "Collapse all")
+            if (std::string(button->label()) == "Collapse / Expand")
                 collapse = button;
-            if (std::string(button->label()) == "Show all")
-                show = button;
         }
         if (auto *box = dynamic_cast<Fl_Box *>(child);
             box != nullptr && box->tooltip() != nullptr && std::string(box->tooltip()) == "Drag to resize the report tree and details")
             divider = box;
     }
     REQUIRE(collapse != nullptr);
-    REQUIRE(show != nullptr);
     REQUIRE(divider != nullptr);
-    if (!collapse || !show || !divider)
+    if (!collapse || !divider)
         return;
     collapse->do_callback();
     REQUIRE(tree->root()->child(0)->is_close());
     REQUIRE(tree->root()->child(0)->is_selected());
-    show->do_callback();
+    collapse->do_callback();
     REQUIRE(tree->root()->child(0)->is_open());
     const int treeWidth = tree->w();
     const int oldX = Fl::e_x;
@@ -295,11 +291,48 @@ TEST_CASE("dataset collapse controls retain a visible selection", "[gui][smoke]"
     panel.focusRows(2);
     REQUIRE(panel.selectedNode() != nullptr);
     REQUIRE(panel.selectedNode()->path.toString() == value.path.toString());
-    panel.setAllExpanded(false);
+    Fl_Button *collapse = nullptr;
+    for (int index = 0; index < panel.children(); ++index) {
+        if (auto *button = dynamic_cast<Fl_Button *>(panel.child(index)); button != nullptr && button->label() != nullptr &&
+            std::string(button->label()) == "Collapse / Expand") {
+            collapse = button;
+        }
+    }
+    REQUIRE(collapse != nullptr);
+    if (collapse == nullptr) {
+        return;
+    }
+    collapse->do_callback();
     REQUIRE(panel.selectedNode() != nullptr);
-    REQUIRE(panel.selectedNode()->kind == dicom_editor::DicomNodeKind::Dataset);
-    panel.setAllExpanded(true);
+    REQUIRE(panel.selectedNode()->path.toString() == item.path.toString());
+    collapse->do_callback();
     REQUIRE(panel.selectedNode() != nullptr);
+    REQUIRE(panel.selectedNode()->path.toString() == item.path.toString());
+
+    DatasetPanel noSelectionPanel(0, 0, 900, 600);
+    noSelectionPanel.setNodes({root, item, value});
+    Fl_Button *collapseWithoutSelection = nullptr;
+    for (int index = 0; index < noSelectionPanel.children(); ++index) {
+        if (auto *button = dynamic_cast<Fl_Button *>(noSelectionPanel.child(index)); button != nullptr && button->label() != nullptr &&
+            std::string(button->label()) == "Collapse / Expand") {
+            collapseWithoutSelection = button;
+        }
+    }
+    REQUIRE(collapseWithoutSelection != nullptr);
+    if (collapseWithoutSelection == nullptr) {
+        return;
+    }
+    REQUIRE(noSelectionPanel.selectedNode() == nullptr);
+    collapseWithoutSelection->do_callback();
+    REQUIRE(noSelectionPanel.selectedNode() == nullptr);
+    collapseWithoutSelection->do_callback();
+    REQUIRE(noSelectionPanel.selectedNode() == nullptr);
+    noSelectionPanel.focusRows();
+    REQUIRE(noSelectionPanel.selectedNode() != nullptr);
+    REQUIRE(noSelectionPanel.selectedNode()->kind == dicom_editor::DicomNodeKind::Dataset);
+    noSelectionPanel.focusRows(1);
+    REQUIRE(noSelectionPanel.selectedNode() != nullptr);
+    REQUIRE(noSelectionPanel.selectedNode()->kind == dicom_editor::DicomNodeKind::Item);
     panel.resize(0, 0, 1100, 750);
 }
 

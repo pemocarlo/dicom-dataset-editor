@@ -48,13 +48,13 @@ class DatasetPanel final : public Fl_Group {
     void rebuild();
     void restoreSelection(const std::string &path);
     void selectionChanged();
-    void toggleSelectedSequence();
+    void toggleSelectedSequence(double preservedScrollPosition = -1.0);
+    void toggleSelectionOrAll();
 
     static void filterCallback(Fl_Widget *widget, void *data);
 
     Fl_Input *filter_{};
     Fl_Button *collapseAll_{};
-    Fl_Button *showAll_{};
     DatasetTable *table_{};
     dicom_editor::DatasetViewModel model_;
     std::function<void()> selectionChanged_;
