@@ -273,40 +273,216 @@ class AccumulationScope:
         )
 
 
-class CTRadiationDoseReport:
-    """Build a synthetic CT Radiation Dose SR from TID-specific components.
+# ---------------------------------------------------------------------------
+# Blueprint layer
+#
+# These classes contain template identity and shape only.  They never call
+# pydicom, consume RNG state, or create ContentItems.  The ContentBuilder
+# classes below are the executable layer that turns these blueprints into a
+# DICOM content tree.
+# ---------------------------------------------------------------------------
 
-    This deliberately does not use ``highdicom.sr.MeasurementReport``: that
-    class models TID 1500, while this document is a TID 10011 RDSR. The
-    report-level classes here provide the same compositional boundary without
-    changing the dose-specific template rows.
-    """
 
-    def __init__(self, seed: int | None, options: Options) -> None:
-        self.rng = random.Random(seed)
-        self.options = options
-        self.scanner_uid = self.uid()
-        self.recorder_uid = self.uid()
+@dataclass(frozen=True)
+class TemplateBlueprint:
+    """Immutable identity for one DICOM SR template."""
 
-    def uid(self) -> str:
-        return f"2.25.{self.rng.getrandbits(128)}"
+    template_identifier: str
+    root_concept: Name
+    is_root: bool = False
+    description: str = ""
 
-    def optional(self) -> bool:
-        return self.options.optional == "all" or (
-            self.options.optional == "random" and self.rng.random() < 0.5
+
+@dataclass(frozen=True)
+class TID10011CTRadiationDoseBlueprint(TemplateBlueprint):
+    template_identifier: str = "10011"
+    root_concept: Name = "XRayRadiationDoseReport"
+    is_root: bool = True
+    description: str = "CT Radiation Dose"
+
+
+@dataclass(frozen=True)
+class TID10012CTAccumulatedDoseDataBlueprint(TemplateBlueprint):
+    template_identifier: str = "10012"
+    root_concept: Name = "CTAccumulatedDoseData"
+    description: str = "CT Accumulated Dose Data"
+
+
+@dataclass(frozen=True)
+class TID10013CTIrradiationEventDataBlueprint(TemplateBlueprint):
+    template_identifier: str = "10013"
+    root_concept: Name = "CTAcquisition"
+    description: str = "CT Irradiation Event Data"
+
+
+@dataclass(frozen=True)
+class TID10014ScanningLengthBlueprint(TemplateBlueprint):
+    template_identifier: str = "10014"
+    root_concept: Name = "ScanningLength"
+    description: str = "Scanning Length"
+
+
+@dataclass(frozen=True)
+class TID10015CTDoseCheckDetailsBlueprint(TemplateBlueprint):
+    template_identifier: str = "10015"
+    root_concept: Name = "DoseCheckAlertDetails"
+    description: str = "CT Dose Check Details"
+
+
+@dataclass(frozen=True)
+class TID10016ImageQualityReferenceParametersBlueprint(TemplateBlueprint):
+    template_identifier: str = "10016"
+    root_concept: Name = "ImageQualityReferenceParameters"
+    description: str = "Image Quality Reference Parameters"
+
+
+@dataclass(frozen=True)
+class TID1002ObserverContextBlueprint(TemplateBlueprint):
+    template_identifier: str = "1002"
+    root_concept: Name = "ObserverType"
+    description: str = "Observer Context"
+
+
+@dataclass(frozen=True)
+class TID1003PersonObserverIdentifyingAttributesBlueprint(TemplateBlueprint):
+    template_identifier: str = "1003"
+    root_concept: Name = "PersonObserverName"
+    description: str = "Person Observer Identifying Attributes"
+
+
+@dataclass(frozen=True)
+class TID1004DeviceObserverIdentifyingAttributesBlueprint(TemplateBlueprint):
+    template_identifier: str = "1004"
+    root_concept: Name = "DeviceObserverUID"
+    description: str = "Device Observer Identifying Attributes"
+
+
+@dataclass(frozen=True)
+class TID1015PersonObserverRoleBlueprint(TemplateBlueprint):
+    template_identifier: str = "1015"
+    root_concept: Name = "PersonObserverRoleInThisProcedure"
+    description: str = "Person Observer Role"
+
+
+@dataclass(frozen=True)
+class TID1020PersonParticipantBlueprint(TemplateBlueprint):
+    template_identifier: str = "1020"
+    root_concept: Name = "PersonName"
+    description: str = "Person Participant"
+
+
+@dataclass(frozen=True)
+class TID1021DeviceParticipantBlueprint(TemplateBlueprint):
+    template_identifier: str = "1021"
+    root_concept: Name = "DeviceRoleInProcedure"
+    description: str = "Device Participant"
+
+
+@dataclass(frozen=True)
+class TID1204LanguageOfContentItemAndDescendantsBlueprint(TemplateBlueprint):
+    template_identifier: str = "1204"
+    root_concept: Name = "LanguageOfContentItemAndDescendants"
+    description: str = "Language of Content Item and Descendants"
+
+
+# ---------------------------------------------------------------------------
+# Content-generation layer
+# ---------------------------------------------------------------------------
+
+
+class TID1204LanguageOfContentItemAndDescendantsContentBuilder:
+    """Generate pydicom content for the TID 1204 blueprint."""
+
+    blueprint = TID1204LanguageOfContentItemAndDescendantsBlueprint()
+
+    def __init__(self, report: CTRadiationDoseContentGenerator) -> None:
+        self.report = report
+
+    def build(self) -> Dataset | None:
+        if not self.report.optional():
+            return None
+        language: list[Dataset] = []
+        if self.report.optional():
+            language.append(
+                code_item(
+                    "CountryOfLanguage",
+                    Code("US", "ISO3166_1", "United States"),
+                    MOD,
+                ),
+            )
+        return code_item(
+            "LanguageOfContentItemAndDescendants",
+            Code("en", "RFC5646", "English"),
+            MOD,
+            language,
         )
 
-    def person(self, role: str, rel: str = "CONTAINS") -> Dataset:
-        """TID 1020: properties belong to the PNAME, not its parent."""
+
+class TID1003PersonObserverIdentifyingAttributesContentBuilder:
+    """Generate pydicom content for the TID 1003 blueprint."""
+
+    blueprint = TID1003PersonObserverIdentifyingAttributesBlueprint()
+
+    def __init__(self, report: CTRadiationDoseContentGenerator) -> None:
+        self.report = report
+
+    def build(self) -> sr.PersonObserverIdentifyingAttributes:
+        return sr.PersonObserverIdentifyingAttributes(
+            name="SYNTHETIC^Reader",
+            login_name=("synthetic-reader" if self.report.optional() else None),
+            organization_name=(
+                "Synthetic Imaging Lab" if self.report.optional() else None
+            ),
+            role_in_organization=(
+                codes.cid7452.MedicalPractitioner if self.report.optional() else None
+            ),
+        )
+
+
+class TID1004DeviceObserverIdentifyingAttributesContentBuilder:
+    """Generate pydicom content for the TID 1004 blueprint."""
+
+    blueprint = TID1004DeviceObserverIdentifyingAttributesBlueprint()
+
+    def __init__(self, report: CTRadiationDoseContentGenerator) -> None:
+        self.report = report
+
+    def build(self) -> sr.DeviceObserverIdentifyingAttributes:
+        return sr.DeviceObserverIdentifyingAttributes(
+            uid=self.report.recorder_uid,
+            name="SYNTH_RDSR" if self.report.optional() else None,
+            manufacturer_name=(
+                "Synthetic Instruments" if self.report.optional() else None
+            ),
+            model_name=("RDSR Fixture Generator" if self.report.optional() else None),
+            serial_number=("SYNTH-RDSR-001" if self.report.optional() else None),
+            physical_location=("Test Lab" if self.report.optional() else None),
+            role_in_procedure=(codes.DCM.Recording if self.report.optional() else None),
+        )
+
+
+class TID1020PersonParticipantContentBuilder:
+    """Generate pydicom content for the TID 1020 blueprint."""
+
+    blueprint = TID1020PersonParticipantBlueprint()
+
+    def __init__(self, report: CTRadiationDoseContentGenerator) -> None:
+        self.report = report
+
+    def build(
+        self,
+        role: str,
+        rel: str = "CONTAINS",
+    ) -> Dataset:
         children: list[Dataset] = [code_item("PersonRoleInProcedure", role, PROP)]
         for name, value in [
             ("PersonID", "SYNTH-OP-1"),
             ("PersonIDIssuer", "SYNTHETIC"),
             ("OrganizationName", "Synthetic Imaging Lab"),
         ]:
-            if self.optional():
+            if self.report.optional():
                 children.append(text_item(name, value, rel=PROP))
-        if self.optional():
+        if self.report.optional():
             children.append(
                 code_item(
                     "PersonRoleInOrganization",
@@ -321,10 +497,18 @@ class CTRadiationDoseReport:
             children=children,
         )
 
-    def device(self) -> Dataset:
-        """TID 1021: scanner differs from the recording workstation."""
+
+class TID1021DeviceParticipantContentBuilder:
+    """Generate pydicom content for the TID 1021 blueprint."""
+
+    blueprint = TID1021DeviceParticipantBlueprint()
+
+    def __init__(self, report: CTRadiationDoseContentGenerator) -> None:
+        self.report = report
+
+    def build(self) -> Dataset:
         children: list[Dataset] = []
-        if self.optional():
+        if self.report.optional():
             children.append(text_item("DeviceName", "SYNTH_CT", rel=PROP))
         for name, value in [
             ("DeviceManufacturer", "Synthetic Instruments"),
@@ -332,29 +516,32 @@ class CTRadiationDoseReport:
             ("DeviceSerialNumber", "SYNTH-CT-001"),
         ]:
             children.append(text_item(name, value, rel=PROP))
-        children.append(uid_item("DeviceObserverUID", self.scanner_uid, rel=PROP))
+        children.append(
+            uid_item("DeviceObserverUID", self.report.scanner_uid, rel=PROP)
+        )
         return code_item(
             "DeviceRoleInProcedure",
             "IrradiatingDevice",
             children=children,
         )
 
-    def observers(self) -> list[Dataset]:
-        """TIDs 1002, 1003, 1004 and 1015, with explicit context boundaries."""
+
+class TID1002ObserverContextContentBuilder:
+    """Generate pydicom content for TID 1002 and its includes."""
+
+    blueprint = TID1002ObserverContextBlueprint()
+
+    def __init__(self, report: CTRadiationDoseContentGenerator) -> None:
+        self.report = report
+
+    def build(self) -> list[Dataset]:
         result: list[Dataset] = []
-        if self.optional():
-            person = sr.PersonObserverIdentifyingAttributes(
-                name="SYNTHETIC^Reader",
-                login_name=("synthetic-reader" if self.optional() else None),
-                organization_name=(
-                    "Synthetic Imaging Lab" if self.optional() else None
-                ),
-                role_in_organization=(
-                    codes.cid7452.MedicalPractitioner if self.optional() else None
-                ),
-            )
+        if self.report.optional():
+            person = TID1003PersonObserverIdentifyingAttributesContentBuilder(
+                self.report
+            ).build()
             result.extend(sr.ObserverContext(codes.DCM.Person, person))
-            if self.optional():
+            if self.report.optional():
                 props = (
                     [
                         text_item(
@@ -363,7 +550,7 @@ class CTRadiationDoseReport:
                             rel=MOD,
                         ),
                     ]
-                    if self.optional()
+                    if self.report.optional()
                     else []
                 )
                 result.append(
@@ -374,7 +561,7 @@ class CTRadiationDoseReport:
                         props,
                     ),
                 )
-            if self.optional():
+            if self.report.optional():
                 result.append(
                     code_item(
                         "ReaderSpecialty",
@@ -383,30 +570,28 @@ class CTRadiationDoseReport:
                         [num(Code("C54627", "NCIt", "Experience"), 10, "a", PROP)],
                     ),
                 )
-        device = sr.DeviceObserverIdentifyingAttributes(
-            uid=self.recorder_uid,
-            name="SYNTH_RDSR" if self.optional() else None,
-            manufacturer_name=("Synthetic Instruments" if self.optional() else None),
-            model_name=("RDSR Fixture Generator" if self.optional() else None),
-            serial_number=("SYNTH-RDSR-001" if self.optional() else None),
-            physical_location=("Test Lab" if self.optional() else None),
-            role_in_procedure=(codes.DCM.Recording if self.optional() else None),
-        )
+        device = TID1004DeviceObserverIdentifyingAttributesContentBuilder(
+            self.report
+        ).build()
         result.extend(sr.ObserverContext(codes.DCM.Device, device))
-        if self.optional():
+        if self.report.optional():
             result.append(text_item("StationAETitle", "SYNTH_RDSR", rel=OBS))
-        if self.optional():
+        if self.report.optional():
             result.append(
-                uid_item("DeviceObserverManufacturerClassUID", self.uid(), rel=OBS),
+                uid_item(
+                    "DeviceObserverManufacturerClassUID",
+                    self.report.uid(),
+                    rel=OBS,
+                ),
             )
-        if self.optional():
+        if self.report.optional():
             children = [
                 text_item(
                     Code("74711-3", "LN", "Unique Device Identifier"),
                     "SYNTHETIC-NOT-REGISTERED",
                 ),
             ]
-            if self.optional():
+            if self.report.optional():
                 children.append(
                     text_item("DeviceDescription", "Synthetic recording workstation"),
                 )
@@ -415,12 +600,21 @@ class CTRadiationDoseReport:
             )
         return result
 
-    def ssde(self, ctdivol: float, series_uid: str) -> list[Dataset]:
+
+class TID10013SizeSpecificDoseEstimateContentBuilder:
+    """Generate pydicom content for TID 10013 SSDE rows."""
+
+    blueprint = TID10013CTIrradiationEventDataBlueprint()
+
+    def __init__(self, report: CTRadiationDoseContentGenerator) -> None:
+        self.report = report
+
+    def build(self, ctdivol: float, series_uid: str) -> list[Dataset]:
         result: list[Dataset] = []
         methods = (
             list(SSDE_METHODS)
-            if self.options.ssde_method == "all"
-            else [self.options.ssde_method]
+            if self.report.options.ssde_method == "all"
+            else [self.report.options.ssde_method]
         )
         for method in methods:
             children: list[Dataset] = [code_item(METHOD, SSDE_METHODS[method], MOD)]
@@ -430,15 +624,14 @@ class CTRadiationDoseReport:
                 children.append(num("MeasuredAPDimension", 240, "mm", INF))
             if method in ("lateral", "ap", "sum", "age"):
                 children.append(num("DerivedEffectiveDiameter", 277.128129, "mm", INF))
-            if method in ("water", "water-profile") and self.optional():
-                # TID 10013 specifies exactly two NUM values, both in mm.
+            if method in ("water", "water-profile") and self.report.optional():
                 children.extend(
                     [
                         num("DwConversionFactorCoefficients", 1.0, "mm", INF),
                         num("DwConversionFactorCoefficients", 0.0, "mm", INF),
                     ],
                 )
-            if self.optional():
+            if self.report.optional():
                 children.append(
                     uid_item(
                         "SeriesOrInstanceUsedForWaterEquivalentDiameterEstimation",
@@ -448,9 +641,13 @@ class CTRadiationDoseReport:
                 )
             if method in ("water", "water-profile"):
                 water: list[Dataset] = [
-                    code_item(METHOD, WATER_METHODS[self.options.water_method], MOD),
+                    code_item(
+                        METHOD,
+                        WATER_METHODS[self.report.options.water_method],
+                        MOD,
+                    ),
                 ]
-                if self.options.water_method == "representative":
+                if self.report.options.water_method == "representative":
                     water.append(num("LongitudinalPositionZ", 0, "mm", INF))
                 children.append(num("WaterEquivalentDiameter", 280, "mm", INF, water))
             if method == "water-profile":
@@ -473,21 +670,24 @@ class CTRadiationDoseReport:
                         ),
                     )
             result.append(
-                num("SizeSpecificDoseEstimate", ctdivol, "mGy", children=children),
+                num("SizeSpecificDoseEstimate", ctdivol, "mGy", children=children)
             )
         return result
 
-    def dose_checks(
-        self,
-        dlp: float,
-        ctdivol: float,
-        accumulated: float,
-    ) -> list[Dataset]:
-        """TID 10015. The selected scenario models scanner configuration."""
-        if self.options.dose_checks == "absent":
+
+class TID10015CTDoseCheckDetailsContentBuilder:
+    """Generate pydicom content for the TID 10015 blueprint."""
+
+    blueprint = TID10015CTDoseCheckDetailsBlueprint()
+
+    def __init__(self, report: CTRadiationDoseContentGenerator) -> None:
+        self.report = report
+
+    def build(self, dlp: float, ctdivol: float, accumulated: float) -> list[Dataset]:
+        if self.report.options.dose_checks == "absent":
             return []
-        configured = self.options.dose_checks != "unconfigured"
-        exceeded = self.options.dose_checks == "exceeded"
+        configured = self.report.options.dose_checks != "unconfigured"
+        exceeded = self.report.options.dose_checks == "exceeded"
         result: list[Dataset] = []
         for alert in (True, False):
             title = "Alert" if alert else "Notification"
@@ -523,21 +723,254 @@ class CTRadiationDoseReport:
                         ),
                     ],
                 )
-                if self.optional():
+                if self.report.optional():
                     children.append(
                         text_item(
                             "ReasonForProceeding",
                             "Synthetic threshold-exceedance test",
                         ),
                     )
-                if alert or self.optional():
-                    children.append(self.person("IrradiationAuthorizing"))
-            if alert and self.optional():
+                if alert or self.report.optional():
+                    children.append(
+                        TID1020PersonParticipantContentBuilder(self.report).build(
+                            "IrradiationAuthorizing"
+                        )
+                    )
+            if alert and self.report.optional():
                 children.append(code_item("AlternativeDoseAlertBehaviorActive", NO))
             result.append(container(f"DoseCheck{title}Details", children=children))
         return result
 
+
+class TID10014ScanningLengthContentBuilder:
+    """Generate pydicom content for the TID 10014 blueprint."""
+
+    blueprint = TID10014ScanningLengthBlueprint()
+
+    def __init__(self, report: CTRadiationDoseContentGenerator) -> None:
+        self.report = report
+
+    def build(
+        self,
+        length: float,
+        duration: float,
+        acquisition: str,
+        *,
+        has_dose: bool,
+        currents: list[int],
+    ) -> tuple[list[Dataset], bool]:
+        options = self.report.options
+        parameters: list[Dataset] = [
+            num("ExposureTime", duration, "s"),
+            num("ScanningLength", length, "mm"),
+        ]
+        if self.report.optional():
+            parameters.append(num("LengthOfReconstructableVolume", length, "mm"))
+        if acquisition == "spiral" and self.report.optional():
+            parameters.append(num("ExposedRange", length + 40, "mm"))
+        positions = False
+        for name, value in [
+            ("TopZLocationOfReconstructableVolume", length / 2),
+            ("BottomZLocationOfReconstructableVolume", -length / 2),
+            ("TopZLocationOfScanningLength", length / 2),
+            ("BottomZLocationOfScanningLength", -length / 2),
+        ]:
+            if self.report.optional():
+                parameters.append(num(name, value, "mm"))
+                positions = True
+        include_ssde = has_dose and self.report.optional()
+        if positions or (
+            include_ssde
+            and options.water_method == "representative"
+            and options.ssde_method in ("all", "water", "water-profile")
+        ):
+            parameters.append(uid_item("FrameOfReferenceUID", self.report.uid()))
+        parameters.extend(
+            [
+                num("NominalSingleCollimationWidth", 0.625, "mm"),
+                num("NominalTotalCollimationWidth", 40, "mm"),
+            ],
+        )
+        if acquisition in ("spiral", "sequenced"):
+            parameters.append(num("PitchFactor", 1, "{ratio}"))
+        parameters.append(
+            num("NumberOfXRaySources", options.sources, "{X-Ray sources}")
+        )
+        for source, current in enumerate(currents):
+            source_parameters: list[Dataset] = [
+                text_item("IdentificationOfTheXRaySource", str(source + 1)),
+                num("KVP", self.report.rng.choice([80, 100, 120, 140]), "kV"),
+                num("MaximumXRayTubeCurrent", current + 50, "mA"),
+                num("XRayTubeCurrent", current, "mA"),
+            ]
+            if acquisition != "constant-angle":
+                source_parameters.append(num("ExposureTimePerRotation", 0.5, "s"))
+            if self.report.optional():
+                source_parameters.append(num("XRayFilterAluminumEquivalent", 3, "mm"))
+            parameters.append(
+                container("CTXRaySourceParameters", children=source_parameters)
+            )
+        return parameters, include_ssde
+
+
+class TID10016ImageQualityReferenceParametersContentBuilder:
+    """Generate pydicom content for the TID 10016 blueprint."""
+
+    blueprint = TID10016ImageQualityReferenceParametersBlueprint()
+
+    def __init__(self, report: CTRadiationDoseContentGenerator) -> None:
+        self.report = report
+
+    def build(self) -> Dataset | None:
+        if not self.report.optional():
+            return None
+        quality: list[Dataset] = []
+        for name, value, unit in [
+            ("NoiseIndex", 12, "1"),
+            ("ReferenceMAs", 200, "mA.s"),
+        ]:
+            if self.report.options.quality_format == "num":
+                quality.append(num(name, value, unit))
+            elif self.report.options.quality_format == "text":
+                quality.append(text_item(name, f"{value} {unit}"))
+            else:
+                quality.append(
+                    code_item(
+                        name,
+                        Code(
+                            f"{name}-{value}",
+                            "99SYNTH",
+                            f"Synthetic {name} {value} {unit}",
+                        ),
+                    ),
+                )
+        return container("ImageQualityReferenceParameters", children=quality)
+
+
+class TID10013CTIrradiationEventDataContentBuilder:
+    """Generate pydicom content for a TID 10013 event."""
+
+    blueprint = TID10013CTIrradiationEventDataBlueprint()
+
+    def __init__(self, report: CTRadiationDoseContentGenerator) -> None:
+        self.report = report
+
+    def build(
+        self,
+        index: int,
+        event_uid: str,
+        previous_uid: str | None,
+        started: datetime,
+        accumulated: float,
+    ) -> tuple[Dataset, float, float, str, float]:
+        return self.report.build_event(
+            index,
+            event_uid,
+            previous_uid,
+            started,
+            accumulated,
+        )
+
+
+class TID10012CTAccumulatedDoseDataContentBuilder:
+    """Generate pydicom content for the TID 10012 blueprint."""
+
+    blueprint = TID10012CTAccumulatedDoseDataBlueprint()
+
+    def __init__(self, report: CTRadiationDoseContentGenerator) -> None:
+        self.report = report
+
+    def build(
+        self,
+        options: Options,
+        total: float,
+        effective_total: float,
+        subtotals: dict[str, float],
+    ) -> Dataset:
+        return self.report.build_accumulated_dose_data(
+            options,
+            total,
+            effective_total,
+            subtotals,
+        )
+
+
+class TID10011CTRadiationDoseContentBuilder:
+    """Generate the TID 10011 root and DICOM SR document."""
+
+    blueprint = TID10011CTRadiationDoseBlueprint()
+
+    def __init__(self, report: CTRadiationDoseContentGenerator) -> None:
+        self.report = report
+
+    def build(self) -> FileDataset:
+        return self.report.build_report()
+
+
+class CTRadiationDoseContentGenerator:
+    """Generate synthetic CT Radiation Dose SR content and DICOM metadata.
+
+    This deliberately does not use ``highdicom.sr.MeasurementReport``: that
+    class models TID 1500, while this document is a TID 10011 RDSR. The
+    report-level classes here provide the same compositional boundary without
+    changing the dose-specific template rows.
+    """
+
+    def __init__(self, seed: int | None, options: Options) -> None:
+        self.rng = random.Random(seed)
+        self.options = options
+        self.scanner_uid = self.uid()
+        self.recorder_uid = self.uid()
+
+    def uid(self) -> str:
+        return f"2.25.{self.rng.getrandbits(128)}"
+
+    def optional(self) -> bool:
+        return self.options.optional == "all" or (
+            self.options.optional == "random" and self.rng.random() < 0.5
+        )
+
+    def person(self, role: str, rel: str = "CONTAINS") -> Dataset:
+        return TID1020PersonParticipantContentBuilder(self).build(role, rel)
+
+    def device(self) -> Dataset:
+        return TID1021DeviceParticipantContentBuilder(self).build()
+
+    def observers(self) -> list[Dataset]:
+        return TID1002ObserverContextContentBuilder(self).build()
+
+    def ssde(self, ctdivol: float, series_uid: str) -> list[Dataset]:
+        return TID10013SizeSpecificDoseEstimateContentBuilder(self).build(
+            ctdivol, series_uid
+        )
+
+    def dose_checks(
+        self,
+        dlp: float,
+        ctdivol: float,
+        accumulated: float,
+    ) -> list[Dataset]:
+        return TID10015CTDoseCheckDetailsContentBuilder(self).build(
+            dlp, ctdivol, accumulated
+        )
+
     def event(
+        self,
+        index: int,
+        event_uid: str,
+        previous_uid: str | None,
+        started: datetime,
+        accumulated: float,
+    ) -> tuple[Dataset, float, float, str, float]:
+        return TID10013CTIrradiationEventDataContentBuilder(self).build(
+            index,
+            event_uid,
+            previous_uid,
+            started,
+            accumulated,
+        )
+
+    def build_event(
         self,
         index: int,
         event_uid: str,
@@ -648,56 +1081,13 @@ class CTRadiationDoseReport:
             children.append(
                 date_time("DateTimeStarted", started.strftime("%Y%m%d%H%M%S.%f")),
             )
-        parameters: list[Dataset] = [
-            num("ExposureTime", duration, "s"),
-            num("ScanningLength", length, "mm"),
-        ]
-        if self.optional():
-            parameters.append(num("LengthOfReconstructableVolume", length, "mm"))
-        if acquisition == "spiral" and self.optional():
-            parameters.append(num("ExposedRange", length + 40, "mm"))
-        positions = False
-        for name, value in [
-            ("TopZLocationOfReconstructableVolume", length / 2),
-            ("BottomZLocationOfReconstructableVolume", -length / 2),
-            ("TopZLocationOfScanningLength", length / 2),
-            ("BottomZLocationOfScanningLength", -length / 2),
-        ]:
-            if self.optional():
-                parameters.append(num(name, value, "mm"))
-                positions = True
-        include_ssde = has_dose and self.optional()
-        if positions or (
-            include_ssde
-            and options.water_method == "representative"
-            and options.ssde_method in ("all", "water", "water-profile")
-        ):
-            parameters.append(uid_item("FrameOfReferenceUID", self.uid()))
-        parameters.extend(
-            [
-                num("NominalSingleCollimationWidth", 0.625, "mm"),
-                num("NominalTotalCollimationWidth", 40, "mm"),
-            ],
+        parameters, include_ssde = TID10014ScanningLengthContentBuilder(self).build(
+            length,
+            duration,
+            acquisition,
+            has_dose=has_dose,
+            currents=currents,
         )
-        if acquisition in ("spiral", "sequenced"):
-            parameters.append(num("PitchFactor", 1, "{ratio}"))
-        parameters.append(
-            num("NumberOfXRaySources", options.sources, "{X-Ray sources}"),
-        )
-        for source, current in enumerate(currents):
-            source_parameters: list[Dataset] = [
-                text_item("IdentificationOfTheXRaySource", str(source + 1)),
-                num("KVP", self.rng.choice([80, 100, 120, 140]), "kV"),
-                num("MaximumXRayTubeCurrent", current + 50, "mA"),
-                num("XRayTubeCurrent", current, "mA"),
-            ]
-            if acquisition != "constant-angle":
-                source_parameters.append(num("ExposureTimePerRotation", 0.5, "s"))
-            if self.optional():
-                source_parameters.append(num("XRayFilterAluminumEquivalent", 3, "mm"))
-            parameters.append(
-                container("CTXRaySourceParameters", children=source_parameters),
-            )
         children.append(container("CTAcquisitionParameters", children=parameters))
         if has_dose:
             dose: list[Dataset] = [
@@ -743,30 +1133,9 @@ class CTRadiationDoseReport:
             children.append(text_item("XRayModulationType", "Longitudinal modulation"))
         if self.optional():
             children.append(code_item("XRayModulationType", "LongitudinalModulation"))
-        if self.optional():
-            quality: list[Dataset] = []
-            for name, value, unit in [
-                ("NoiseIndex", 12, "1"),
-                ("ReferenceMAs", 200, "mA.s"),
-            ]:
-                if options.quality_format == "num":
-                    quality.append(num(name, value, unit))
-                elif options.quality_format == "text":
-                    quality.append(text_item(name, f"{value} {unit}"))
-                else:
-                    quality.append(
-                        code_item(
-                            name,
-                            Code(
-                                f"{name}-{value}",
-                                "99SYNTH",
-                                f"Synthetic {name} {value} {unit}",
-                            ),
-                        ),
-                    )
-            children.append(
-                container("ImageQualityReferenceParameters", children=quality),
-            )
+        quality = TID10016ImageQualityReferenceParametersContentBuilder(self).build()
+        if quality is not None:
+            children.append(quality)
         if self.optional():
             children.append(
                 text_item("Comment", "Synthetic irradiation event; not clinical data"),
@@ -783,110 +1152,15 @@ class CTRadiationDoseReport:
         )
 
     def generate(self) -> FileDataset:
-        options = self.options
-        if options.events < 1 or options.sources < 1:
-            raise ValueError("events and sources must be positive")
-        if options.scope == "event" and options.events != 1:
-            raise ValueError("event scope requires --events 1")
-        identifiers = ReportIdentifiers(self.uid(), self.uid(), self.uid())
-        study_uid, series_uid, sop_uid = (
-            identifiers.study,
-            identifiers.series,
-            identifiers.sop,
-        )
-        event_uids = [self.uid() for _ in range(options.events)]
-        start = datetime(2025, 1, 1, 8, tzinfo=UTC) + timedelta(
-            seconds=self.rng.randrange(365 * 86400),
-        )
-        events = []
-        total = 0.0
-        effective_total = 0.0
-        subtotals: dict[str, float] = defaultdict(float)
-        end = start
-        for index, event_uid in enumerate(event_uids):
-            event, dlp, effective, phantom, duration = self.event(
-                index,
-                event_uid,
-                event_uids[index - 1] if index else None,
-                end,
-                total,
-            )
-            events.append(event)
-            total = round(total + dlp, 6)
-            effective_total = round(effective_total + effective, 8)
-            if dlp:
-                subtotals[phantom] = round(subtotals[phantom] + dlp, 6)
-            end += timedelta(seconds=duration)
-            if index < options.events - 1:
-                end += timedelta(seconds=20)
-        root: list[Dataset] = []
-        if self.optional():
-            language: list[Dataset] = []
-            if self.optional():
-                language.append(
-                    code_item(
-                        "CountryOfLanguage",
-                        Code("US", "ISO3166_1", "United States"),
-                        MOD,
-                    ),
-                )
-            root.append(
-                code_item(
-                    "LanguageOfContentItemAndDescendants",
-                    Code("en", "RFC5646", "English"),
-                    MOD,
-                    language,
-                ),
-            )
-        root.append(
-            code_item(
-                "ProcedureReported",
-                Code("77477000", "SCT", "Computed Tomography X-Ray"),
-                MOD,
-                [
-                    code_item(
-                        Code("363703001", "SCT", "Has Intent"),
-                        codes.cid3629.DiagnosticIntent,
-                        MOD,
-                    ),
-                ],
-            ),
-        )
-        root.extend(self.observers())
-        root.extend(
-            [
-                date_time(
-                    "StartOfXRayIrradiation",
-                    start.strftime("%Y%m%d%H%M%S.%f"),
-                    rel=OBS,
-                ),
-                date_time(
-                    "EndOfXRayIrradiation",
-                    end.strftime("%Y%m%d%H%M%S.%f"),
-                    rel=OBS,
-                ),
-            ],
-        )
-        accumulation_scope = AccumulationScope.for_report(
-            options.scope,
-            identifiers,
-            event_uids,
-            self.uid,
-        )
-        root.append(
-            code_item(
-                "ScopeOfAccumulation",
-                accumulation_scope.name,
-                OBS,
-                [
-                    uid_item(
-                        accumulation_scope.uid_name,
-                        accumulation_scope.uid,
-                        rel=PROP,
-                    ),
-                ],
-            ),
-        )
+        return TID10011CTRadiationDoseContentBuilder(self).build()
+
+    def build_accumulated_dose_data(
+        self,
+        options: Options,
+        total: float,
+        effective_total: float,
+        subtotals: dict[str, float],
+    ) -> Dataset:
         accumulated: list[Dataset] = [
             num("TotalNumberOfIrradiationEvents", options.events, "{events}"),
             num("CTDoseLengthProductTotal", total, "mGy.cm"),
@@ -945,7 +1219,109 @@ class CTRadiationDoseReport:
         if self.optional():
             accumulated.append(text_item("Comment", "Synthetic dose accumulation"))
         accumulated.append(self.device())
-        root.append(container("CTAccumulatedDoseData", children=accumulated))
+        return container("CTAccumulatedDoseData", children=accumulated)
+
+    def build_report(self) -> FileDataset:
+        options = self.options
+        blueprint = TID10011CTRadiationDoseContentBuilder.blueprint
+        if options.events < 1 or options.sources < 1:
+            raise ValueError("events and sources must be positive")
+        if options.scope == "event" and options.events != 1:
+            raise ValueError("event scope requires --events 1")
+        identifiers = ReportIdentifiers(self.uid(), self.uid(), self.uid())
+        study_uid, series_uid, sop_uid = (
+            identifiers.study,
+            identifiers.series,
+            identifiers.sop,
+        )
+        event_uids = [self.uid() for _ in range(options.events)]
+        start = datetime(2025, 1, 1, 8, tzinfo=UTC) + timedelta(
+            seconds=self.rng.randrange(365 * 86400),
+        )
+        events = []
+        total = 0.0
+        effective_total = 0.0
+        subtotals: dict[str, float] = defaultdict(float)
+        end = start
+        for index, event_uid in enumerate(event_uids):
+            event, dlp, effective, phantom, duration = self.event(
+                index,
+                event_uid,
+                event_uids[index - 1] if index else None,
+                end,
+                total,
+            )
+            events.append(event)
+            total = round(total + dlp, 6)
+            effective_total = round(effective_total + effective, 8)
+            if dlp:
+                subtotals[phantom] = round(subtotals[phantom] + dlp, 6)
+            end += timedelta(seconds=duration)
+            if index < options.events - 1:
+                end += timedelta(seconds=20)
+        root: list[Dataset] = []
+        language = TID1204LanguageOfContentItemAndDescendantsContentBuilder(
+            self
+        ).build()
+        if language is not None:
+            root.append(language)
+        root.append(
+            code_item(
+                "ProcedureReported",
+                Code("77477000", "SCT", "Computed Tomography X-Ray"),
+                MOD,
+                [
+                    code_item(
+                        Code("363703001", "SCT", "Has Intent"),
+                        codes.cid3629.DiagnosticIntent,
+                        MOD,
+                    ),
+                ],
+            ),
+        )
+        root.extend(self.observers())
+        root.extend(
+            [
+                date_time(
+                    "StartOfXRayIrradiation",
+                    start.strftime("%Y%m%d%H%M%S.%f"),
+                    rel=OBS,
+                ),
+                date_time(
+                    "EndOfXRayIrradiation",
+                    end.strftime("%Y%m%d%H%M%S.%f"),
+                    rel=OBS,
+                ),
+            ],
+        )
+        accumulation_scope = AccumulationScope.for_report(
+            options.scope,
+            identifiers,
+            event_uids,
+            self.uid,
+        )
+        root.append(
+            code_item(
+                "ScopeOfAccumulation",
+                accumulation_scope.name,
+                OBS,
+                [
+                    uid_item(
+                        accumulation_scope.uid_name,
+                        accumulation_scope.uid,
+                        rel=PROP,
+                    ),
+                ],
+            ),
+        )
+        root.append(
+            TID10012CTAccumulatedDoseDataContentBuilder(self).build(
+                options,
+                total,
+                effective_total,
+                subtotals,
+            )
+        )
         root.extend(events)
         if self.optional():
             root.append(
@@ -1008,9 +1384,9 @@ class CTRadiationDoseReport:
         ds.ReferencedPerformedProcedureStepSequence = DicomSequence([])
         ds.PerformedProcedureCodeSequence = DicomSequence([])
         content = sr.ContainerContentItem(
-            concept("XRayRadiationDoseReport"),
+            concept(blueprint.root_concept),
             is_content_continuous=False,
-            template_id="10011",
+            template_id=blueprint.template_identifier,
         )
         content.ContentSequence = sr.ContentSequence(
             cast("Items[sr.ContentItem]", root)
@@ -1172,8 +1548,24 @@ def main() -> None:
         print(destination)
 
 
+class CTRadiationDoseReport:
+    """Public facade that keeps report orchestration separate from generation.
+
+    ``CTRadiationDoseContentGenerator`` owns the RNG and pydicom construction.
+    This facade is intentionally small so callers do not need to know how the
+    blueprint and content-builder layers are composed.
+    """
+
+    def __init__(self, seed: int | None, options: Options) -> None:
+        self.content_generator = CTRadiationDoseContentGenerator(seed, options)
+
+    def generate(self) -> FileDataset:
+        """Generate one complete CT Radiation Dose SR document."""
+        return self.content_generator.generate()
+
+
 # Backwards-compatible name used by the focused fixture tests and by callers
-# that imported the original script before the report class was introduced.
+# that imported the original script before the report facade was introduced.
 Generator = CTRadiationDoseReport
 
 

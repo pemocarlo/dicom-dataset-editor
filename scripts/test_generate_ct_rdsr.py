@@ -2,6 +2,7 @@
 # requires-python = ">=3.13,<3.14"
 # dependencies = ["highdicom==0.28.1", "pydicom==3.0.2"]
 # ///
+# ruff: noqa: C901, COM812, CPY001, D101, D102, D103, PLC0415, PLR0912, PLR0915, PT009, PT027, S603, TC006
 """Run with uv run --python 3.13 scripts/test_generate_ct_rdsr.py.
 
 Focused template regression checks use standard code values independently of
