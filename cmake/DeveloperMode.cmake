@@ -11,6 +11,7 @@ option(DICOM_EDITOR_ENABLE_CLANG_FORMAT "Provide clang-format targets" ON)
 option(DICOM_EDITOR_ENABLE_CLANG_TIDY "Provide the clang-tidy target" OFF)
 option(DICOM_EDITOR_ENABLE_CPPCHECK "Provide the cppcheck target" OFF)
 option(DICOM_EDITOR_ENABLE_IWYU "Run include-what-you-use while compiling" OFF)
+option(DICOM_EDITOR_ENABLE_COVERAGE "Instrument project targets and provide a coverage target" OFF)
 
 function(dicom_editor_absolutize out_var)
     set(paths ${ARGN})
@@ -26,6 +27,17 @@ if(DICOM_EDITOR_ENABLE_CLANG_TIDY)
 endif()
 if(DICOM_EDITOR_ENABLE_CPPCHECK)
     find_program(DICOM_EDITOR_CPPCHECK cppcheck REQUIRED)
+endif()
+if(DICOM_EDITOR_ENABLE_COVERAGE)
+    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        message(FATAL_ERROR "DICOM_EDITOR_ENABLE_COVERAGE currently requires GCC and lcov")
+    endif()
+    if(NOT BUILD_TESTING)
+        message(FATAL_ERROR "DICOM_EDITOR_ENABLE_COVERAGE requires BUILD_TESTING=ON")
+    endif()
+    find_program(DICOM_EDITOR_LCOV lcov REQUIRED)
+    find_program(DICOM_EDITOR_GENHTML genhtml REQUIRED)
+    find_program(DICOM_EDITOR_GCOV gcov REQUIRED)
 endif()
 
 set(DICOM_EDITOR_DEVELOPER_TARGETS
@@ -53,6 +65,65 @@ if(DICOM_EDITOR_ENABLE_IWYU)
     set_property(TARGET ${DICOM_EDITOR_DEVELOPER_TARGETS}
         PROPERTY CXX_INCLUDE_WHAT_YOU_USE
             "${DICOM_EDITOR_IWYU_EXECUTABLE};${DICOM_EDITOR_IWYU_DRIVER_ARGUMENT};-Xiwyu;--error=1"
+    )
+endif()
+
+if(DICOM_EDITOR_ENABLE_COVERAGE)
+    set(DICOM_EDITOR_COVERAGE_LIBRARY_TARGETS
+        dicom_editor_core
+        dicom_editor_application
+        dicom_editor_fltk
+    )
+    set(DICOM_EDITOR_COVERAGE_EXECUTABLE_TARGETS
+        dicom-dataset-editor
+        dicom_editor_tests
+        dicom_editor_gui_smoke_test
+    )
+
+    foreach(target IN LISTS DICOM_EDITOR_COVERAGE_LIBRARY_TARGETS)
+        target_compile_options(${target} PRIVATE --coverage)
+    endforeach()
+    foreach(target IN LISTS DICOM_EDITOR_COVERAGE_EXECUTABLE_TARGETS)
+        target_compile_options(${target} PRIVATE --coverage)
+        target_link_options(${target} PRIVATE --coverage)
+    endforeach()
+
+    set(DICOM_EDITOR_COVERAGE_OUTPUT_DIR
+        "${PROJECT_BINARY_DIR}/coverage"
+        CACHE PATH "Directory for generated lcov data and HTML coverage reports"
+    )
+    add_custom_target(coverage
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${DICOM_EDITOR_COVERAGE_OUTPUT_DIR}"
+        COMMAND ${CMAKE_CTEST_COMMAND}
+            --test-dir "${PROJECT_BINARY_DIR}"
+            --output-on-failure
+            --no-tests=error
+        COMMAND ${DICOM_EDITOR_LCOV}
+            --capture
+            --directory "${PROJECT_BINARY_DIR}"
+            --gcov-tool "${DICOM_EDITOR_GCOV}"
+            --output-file "${DICOM_EDITOR_COVERAGE_OUTPUT_DIR}/coverage.raw.info"
+            --ignore-errors inconsistent
+            --rc branch_coverage=1
+        COMMAND ${DICOM_EDITOR_LCOV}
+            --remove "${DICOM_EDITOR_COVERAGE_OUTPUT_DIR}/coverage.raw.info"
+            "${PROJECT_SOURCE_DIR}/tests/*"
+            "${PROJECT_BINARY_DIR}/*"
+            "/usr/*"
+            "*/conanhome/*"
+            --output-file "${DICOM_EDITOR_COVERAGE_OUTPUT_DIR}/coverage.info"
+            --ignore-errors inconsistent
+            --rc branch_coverage=1
+        COMMAND ${DICOM_EDITOR_GENHTML}
+            "${DICOM_EDITOR_COVERAGE_OUTPUT_DIR}/coverage.info"
+            --output-directory "${DICOM_EDITOR_COVERAGE_OUTPUT_DIR}/html"
+            --branch-coverage
+            --ignore-errors inconsistent,corrupt
+            --title "DicomDatasetEditor coverage"
+        DEPENDS ${DICOM_EDITOR_COVERAGE_EXECUTABLE_TARGETS}
+        COMMENT "Running tests and generating the HTML coverage report"
+        USES_TERMINAL
+        VERBATIM
     )
 endif()
 

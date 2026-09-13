@@ -81,6 +81,7 @@ workflow:
 - `dev-check-ninja`: the above plus Ninja.
 - `quality-checks`: the above plus `clang-tidy` and cppcheck.
 - `all-checks`: the complete extended quality workflow.
+- `coverage`: GCC, Ninja, `lcov`, and `genhtml`.
 - `sanitize-checks`: Linux GCC, Ninja, and the Conan ASan profile.
 - `thread-checks`: Linux GCC, Ninja, and the Conan TSan profile.
 - `valgrind-checks`: Linux, Ninja, and a system `valgrind` executable.
@@ -165,6 +166,7 @@ cmake --build --preset check-format
 cmake --preset dev-ninja
 cmake --build --preset dev-ninja
 ctest --preset dev-ninja
+
 cmake --preset quality
 cmake --build --preset quality
 cmake --build --preset lint
@@ -172,6 +174,23 @@ cmake --build --preset cppcheck
 cmake --preset iwyu
 cmake --build --preset iwyu
 ```
+
+Generate an HTML code coverage report with the Linux GCC profile. Coverage has
+its own build folder and does not change normal Debug or Release builds:
+
+```bash
+conan install . --build=never --no-remote --lockfile=conan.lock \
+  -pr:h=linux-gcc-debug-ninja -pr:b=linux-gcc-release \
+  -c user.dicom_dataset_editor:build_folder=build/Ninja-Coverage
+cmake --workflow --preset coverage
+```
+
+The report is written to
+`build/Ninja-Coverage/coverage/html/index.html`; the filtered lcov data is
+`build/Ninja-Coverage/coverage/coverage.info`. The report includes project
+sources, excludes tests, generated files, system files, and Conan cache files,
+and can be relocated with
+`-DDICOM_EDITOR_COVERAGE_OUTPUT_DIR=/path/to/output`.
 
 ## Tests
 

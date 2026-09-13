@@ -116,6 +116,23 @@
             }
         },
         {
+            "name": "coverage",
+            "displayName": "Code coverage",
+            "description": "Linux GCC Ninja Debug build with lcov instrumentation",
+            "inherits": "dev-ninja",
+            "binaryDir": "${sourceDir}/build/Ninja-Coverage",
+            "toolchainFile": "${sourceDir}/build/Ninja-Coverage/generators/conan_toolchain.cmake",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "cacheVariables": {
+                "DICOM_EDITOR_ENABLE_COVERAGE": true,
+                "DICOM_EDITOR_DCMTK_DICT_FILE": "${sourceDir}/build/Ninja-Coverage/generators/dicom.dic"
+            }
+        },
+        {
             "name": "valgrind",
             "displayName": "Valgrind MemCheck",
             "description": "Linux Ninja Debug build configured for CTest MemCheck",
@@ -249,6 +266,14 @@
             "configuration": "Debug"
         },
         {
+            "name": "coverage",
+            "configurePreset": "coverage",
+            "configuration": "Debug",
+            "targets": [
+                "coverage"
+            ]
+        },
+        {
             "name": "valgrind-build",
             "configurePreset": "valgrind",
             "configuration": "Debug"
@@ -306,6 +331,14 @@
         {
             "name": "tsan",
             "configurePreset": "tsan",
+            "configuration": "Debug",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "coverage",
+            "configurePreset": "coverage",
             "configuration": "Debug",
             "output": {
                 "outputOnFailure": true
@@ -456,6 +489,21 @@
                 {
                     "type": "test",
                     "name": "tsan"
+                }
+            ]
+        },
+        {
+            "name": "coverage",
+            "displayName": "Code coverage",
+            "description": "Build, run, and report coverage for the Linux Debug test suite",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "coverage"
+                },
+                {
+                    "type": "build",
+                    "name": "coverage"
                 }
             ]
         },
