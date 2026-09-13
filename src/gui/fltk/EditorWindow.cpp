@@ -167,14 +167,23 @@ class PixelSplitter final : public Fl_Widget {
 
 class FileTreeSplitter final : public Fl_Widget {
   public:
-    explicit FileTreeSplitter(int x, int y, int width, int height, EditorWindow &owner) : Fl_Widget(x, y, width, height), owner_(owner) {}
+    explicit FileTreeSplitter(int x, int y, int width, int height, EditorWindow &owner) : Fl_Widget(x, y, width, height), owner_(owner) {
+        tooltip("Drag to resize the open-files panel");
+    }
 
   private:
     int handle(int event) override {
         switch (event) {
+        case FL_ENTER:
+            owner_.cursor(FL_CURSOR_WE);
+            return 1;
+        case FL_LEAVE:
+            owner_.cursor(dragging_ ? FL_CURSOR_WE : FL_CURSOR_DEFAULT);
+            return 1;
         case FL_PUSH:
             if (Fl::event_button() == FL_LEFT_MOUSE) {
                 dragging_ = true;
+                owner_.cursor(FL_CURSOR_WE);
                 dragOffset_ = Fl::event_x() - x();
                 return 1;
             }
@@ -188,6 +197,7 @@ class FileTreeSplitter final : public Fl_Widget {
         case FL_RELEASE:
             if (dragging_) {
                 dragging_ = false;
+                owner_.cursor(FL_CURSOR_DEFAULT);
                 return 1;
             }
             break;
