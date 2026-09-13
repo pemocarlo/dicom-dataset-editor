@@ -90,6 +90,21 @@ dicom_editor::SaveChangesChoice EditorWindow::confirmWorkspaceChanges(std::size_
     return answer == 2 ? dicom_editor::SaveChangesChoice::Save : dicom_editor::SaveChangesChoice::Cancel;
 }
 
+dicom_editor::SaveChangesChoice EditorWindow::confirmRemoveDataset(const std::filesystem::path &path, bool dirty) {
+    if (dirty) {
+        const auto message = std::format("Remove '{}' from the workspace?\nIt has unsaved changes. The file on disk will not be deleted.",
+                                         path.filename().string());
+        const int answer = fl_choice("%s", "Cancel", "Don't Save", "Save", message.c_str());
+        if (answer == 1) {
+            return dicom_editor::SaveChangesChoice::Discard;
+        }
+        return answer == 2 ? dicom_editor::SaveChangesChoice::Save : dicom_editor::SaveChangesChoice::Cancel;
+    }
+    const auto message = std::format("Remove '{}' from the workspace?\nThe file on disk will not be deleted.", path.filename().string());
+    return fl_choice("%s", "Cancel", "Remove", nullptr, message.c_str()) == 1 ? dicom_editor::SaveChangesChoice::Discard
+                                                                              : dicom_editor::SaveChangesChoice::Cancel;
+}
+
 bool EditorWindow::confirmDelete() { return fl_choice("Delete selected attribute?", "Cancel", "Delete", nullptr) == 1; }
 
 std::optional<dicom_editor::AttributeInput> EditorWindow::editAttribute(const std::string &title, const std::string &value) {

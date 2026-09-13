@@ -39,7 +39,8 @@ C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets throu
   the directory object to the workspace.
 - Select a leaf in the left sidebar to activate that dataset. The hierarchy uses Patient, Study, and Series DICOM attributes, with stable
   identifiers shown where available.
-- File leaves show filenames only. Right-click a file for its full path and hierarchy details. Right-click a patient or study to review
+- File leaves show filenames only. Right-click a file for its full path and hierarchy details, or choose `Remove from Workspace...` to
+  close it without deleting the file on disk. Unsaved changes can be saved or discarded first. Right-click a patient or study to review
   consistency and batch-edit supported attributes across that group.
 - Files are ordered numerically by DICOM Instance Number, with missing numbers last. Toggle `View > Sort Files by Filename` for lexical
   filename order. Previous/next controls in both main view and pixel preview follow this same visible order.

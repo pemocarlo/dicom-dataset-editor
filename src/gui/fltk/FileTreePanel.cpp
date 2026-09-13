@@ -188,6 +188,8 @@ void FileTreePanel::setFiles(const std::vector<dicom_editor::OpenDicomFile> &fil
 
 void FileTreePanel::setActivationHandler(std::function<void(std::size_t)> handler) { activationHandler_ = std::move(handler); }
 
+void FileTreePanel::setRemoveHandler(std::function<void(std::size_t)> handler) { removeHandler_ = std::move(handler); }
+
 void FileTreePanel::setBatchEditHandler(std::function<void(const dicom_editor::BatchEditTarget &)> handler) {
     batchEditHandler_ = std::move(handler);
 }
@@ -209,8 +211,14 @@ int FileTreePanel::handle(int event) {
         menu.type(Fl_Menu_Button::POPUP3);
         if (data->kind == TreeItemData::Kind::File) {
             menu.add("File Information");
+            menu.add("Remove from Workspace...");
             if (menu.popup() != nullptr) {
-                fl_message("%s", data->details.c_str());
+                const auto selected = std::string{menu.mvalue()->label()};
+                if (selected == "File Information") {
+                    fl_message("%s", data->details.c_str());
+                } else if (selected == "Remove from Workspace..." && removeHandler_) {
+                    removeHandler_(data->fileIndex);
+                }
             }
         } else {
             menu.add(data->kind == TreeItemData::Kind::Patient ? "Batch Edit Patient Attributes..." : "Batch Edit Study Attributes...");

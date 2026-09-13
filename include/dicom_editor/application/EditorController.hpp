@@ -98,6 +98,8 @@ class EditorView {
     [[nodiscard]] virtual SaveChangesChoice confirmSaveChanges() = 0;
     /// Resolves multiple unsaved datasets as one operation.
     [[nodiscard]] virtual SaveChangesChoice confirmWorkspaceChanges(std::size_t dirtyCount) = 0;
+    /// Confirms removing a dataset from the workspace; the file remains on disk.
+    [[nodiscard]] virtual SaveChangesChoice confirmRemoveDataset(const std::filesystem::path &path, bool dirty) = 0;
     /// Confirms deletion of the current selection.
     [[nodiscard]] virtual bool confirmDelete() = 0;
     /// Collects a replacement value for an existing attribute.
@@ -144,6 +146,8 @@ class EditorController {
     void showPreviousDocument();
     /// Moves to the next open file.
     void showNextDocument();
+    /// Removes an open dataset from the workspace without deleting its file.
+    void removeDocument(std::size_t index);
     /// Saves the document.
     bool saveDocument();
     /// Saves the document to a new file.

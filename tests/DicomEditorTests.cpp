@@ -62,7 +62,9 @@ class ControllerView final : public dicom_editor::EditorView {
     std::optional<dicom_editor::PixelDataPreview> pixelPreview;
     std::optional<dicom_editor::AttributeInput> batchInput;
     dicom_editor::SaveChangesChoice workspaceChoice{dicom_editor::SaveChangesChoice::Discard};
+    dicom_editor::SaveChangesChoice removeChoice{dicom_editor::SaveChangesChoice::Discard};
     std::size_t workspaceConfirmations{};
+    std::size_t removeConfirmations{};
     bool hasLoadedFiles{};
     std::string error;
     std::string status;
@@ -82,6 +84,10 @@ class ControllerView final : public dicom_editor::EditorView {
     dicom_editor::SaveChangesChoice confirmWorkspaceChanges(std::size_t) override {
         ++workspaceConfirmations;
         return workspaceChoice;
+    }
+    dicom_editor::SaveChangesChoice confirmRemoveDataset(const std::filesystem::path &, bool) override {
+        ++removeConfirmations;
+        return removeChoice;
     }
     bool confirmDelete() override { return false; }
     std::optional<dicom_editor::AttributeInput> editAttribute(const std::string &, const std::string &) override { return std::nullopt; }
@@ -727,6 +733,15 @@ TEST_CASE("controller opens and navigates multiple files", "[application][worksp
     REQUIRE(view.pixelPreview.has_value());
     REQUIRE(previewSourceIndex(view) == 0);
 
+    const auto removedPath = view.openFiles[0].path;
+    controller.removeDocument(view.openFiles[0].index);
+    REQUIRE(view.removeConfirmations == 1);
+    REQUIRE(view.openFiles.size() == 1);
+    REQUIRE(view.openFiles[0].active);
+    REQUIRE(view.openFiles[0].path == firstPath);
+    REQUIRE(view.status.find("was not changed") != std::string::npos);
+    REQUIRE(std::filesystem::exists(removedPath));
+
     std::filesystem::remove(firstPath);
     std::filesystem::remove(secondPath);
 }
@@ -778,6 +793,12 @@ TEST_CASE("workspace sorts by instance number or filename", "[core][workspace]")
     REQUIRE(workspace.active().filePath() == secondPath);
     REQUIRE(workspace.activatePrevious());
     REQUIRE(workspace.active().filePath() == firstPath);
+    REQUIRE(workspace.remove(workspace.activeIndex()));
+    REQUIRE(workspace.size() == 1);
+    REQUIRE(workspace.active().filePath() == secondPath);
+    REQUIRE(workspace.remove(workspace.activeIndex()));
+    REQUIRE(workspace.size() == 1);
+    REQUIRE(!workspace.hasLoadedFiles());
 
     std::filesystem::remove(firstPath);
     std::filesystem::remove(secondPath);

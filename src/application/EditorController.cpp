@@ -147,6 +147,32 @@ void EditorController::showNextDocument() {
     }
 }
 
+void EditorController::removeDocument(std::size_t index) {
+    if (index >= workspace_.size() || !workspace_.at(index).hasFilePath()) {
+        return;
+    }
+
+    const auto path = workspace_.at(index).filePath();
+    using enum SaveChangesChoice;
+    const auto choice = view_.confirmRemoveDataset(path, workspace_.at(index).dirty());
+    if (choice == Cancel) {
+        return;
+    }
+    if (choice == Save) {
+        static_cast<void>(workspace_.activate(index));
+        refreshView();
+        if (!saveDocument()) {
+            return;
+        }
+    }
+    if (!workspace_.remove(index, fileSortOrder_)) {
+        return;
+    }
+    pixelFrame_ = 0;
+    refreshView();
+    view_.setStatus(std::format("Removed {} from workspace. The file on disk was not changed.", path.filename().string()));
+}
+
 bool EditorController::saveDocument() { return document().hasFilePath() ? saveTo(std::nullopt) : saveDocumentAs(); }
 
 bool EditorController::saveDocumentAs() {

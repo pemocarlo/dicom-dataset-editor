@@ -25,6 +25,7 @@ class FileTreePanel final : public Fl_Group {
 
     void setFiles(const std::vector<dicom_editor::OpenDicomFile> &files);
     void setActivationHandler(std::function<void(std::size_t)> handler);
+    void setRemoveHandler(std::function<void(std::size_t)> handler);
     void setBatchEditHandler(std::function<void(const dicom_editor::BatchEditTarget &)> handler);
     void setFontSize(int size);
     int handle(int event) override;
@@ -41,6 +42,7 @@ class FileTreePanel final : public Fl_Group {
     Fl_Tree *tree_{};
     std::vector<std::unique_ptr<TreeItemData>> itemData_;
     std::function<void(std::size_t)> activationHandler_;
+    std::function<void(std::size_t)> removeHandler_;
     std::function<void(const dicom_editor::BatchEditTarget &)> batchEditHandler_;
     std::optional<std::size_t> activeFileIndex_;
     std::optional<std::size_t> pendingActivationIndex_;

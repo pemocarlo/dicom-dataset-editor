@@ -93,6 +93,8 @@ class DicomWorkspace {
     [[nodiscard]] bool activatePrevious(FileSortOrder order = FileSortOrder::InstanceNumber);
     /// Activates next document when available.
     [[nodiscard]] bool activateNext(FileSortOrder order = FileSortOrder::InstanceNumber);
+    /// Removes a file-backed dataset without touching its on-disk file.
+    [[nodiscard]] bool remove(std::size_t index, FileSortOrder order = FileSortOrder::InstanceNumber);
     /// Replaces all open documents with one empty dataset.
     void clear();
     /// Projects workspace state for file-tree views.

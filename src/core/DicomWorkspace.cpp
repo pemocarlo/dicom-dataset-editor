@@ -207,6 +207,39 @@ bool DicomWorkspace::activateNext(FileSortOrder order) {
     return current != ordered.end() && std::next(current) != ordered.end() && activate(std::next(current)->index);
 }
 
+bool DicomWorkspace::remove(std::size_t index, FileSortOrder order) {
+    if (index >= documents_.size() || !documents_[index].hasFilePath()) {
+        return false;
+    }
+
+    const bool removingActive = index == activeIndex_;
+    std::optional<std::size_t> replacement;
+    if (removingActive) {
+        const auto ordered = files(order);
+        const auto current = std::ranges::find_if(ordered, [index](const OpenDicomFile &file) { return file.index == index; });
+        if (current != ordered.end()) {
+            const auto next = std::next(current);
+            replacement = next != ordered.end()        ? std::optional<std::size_t>{next->index}
+                          : current != ordered.begin() ? std::optional<std::size_t>{std::prev(current)->index}
+                                                       : std::nullopt;
+        }
+    }
+
+    documents_.erase(documents_.begin() + static_cast<std::ptrdiff_t>(index));
+    if (documents_.empty()) {
+        documents_.emplace_back();
+        activeIndex_ = 0;
+        return true;
+    }
+
+    if (removingActive) {
+        activeIndex_ = replacement ? (*replacement > index ? *replacement - 1 : *replacement) : 0;
+    } else if (activeIndex_ > index) {
+        --activeIndex_;
+    }
+    return true;
+}
+
 void DicomWorkspace::clear() {
     documents_.clear();
     documents_.emplace_back();
