@@ -14,7 +14,7 @@ Read this first if you are an agent working in this repo.
 
 - Always use `rtk` for shell commands.
 - Use `linux-gcc-debug` as host and `linux-gcc-release` as build profile for daily development.
-- Use `linux-gcc-debug-ninja` as host for Ninja, quality, and IWYU presets.
+- Use `linux-gcc-debug-ninja` as host for Ninja and quality presets. The standalone `iwyu` preset is optional.
 - Use both `linux-gcc-release` profiles for the `production` preset and packaging.
 - On Windows use equivalent `windows-msvc-*` profiles; keep Release as build context.
 - Do not remove user changes outside task scope.

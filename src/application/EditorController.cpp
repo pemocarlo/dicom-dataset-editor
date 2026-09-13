@@ -173,6 +173,81 @@ void EditorController::removeDocument(std::size_t index) {
     view_.setStatus(std::format("Removed {} from workspace. The file on disk was not changed.", path.filename().string()));
 }
 
+void EditorController::removeDocuments(const std::vector<std::size_t> &indices) {
+    if (indices.empty()) {
+        return;
+    }
+    auto selected = indices;
+    std::ranges::sort(selected);
+    const auto duplicates = std::ranges::unique(selected);
+    selected.erase(duplicates.begin(), duplicates.end());
+    if (std::ranges::any_of(selected,
+                            [this](std::size_t index) { return index >= workspace_.size() || !workspace_.at(index).hasFilePath(); })) {
+        return;
+    }
+    const auto dirtyCount =
+        static_cast<std::size_t>(std::ranges::count_if(selected, [this](std::size_t index) { return workspace_.at(index).dirty(); }));
+
+    using enum SaveChangesChoice;
+    const auto choice = view_.confirmRemoveDatasets(selected.size(), dirtyCount);
+    if (choice == Cancel) {
+        return;
+    }
+    if (choice == Save) {
+        for (const auto index : selected) {
+            if (!workspace_.at(index).dirty()) {
+                continue;
+            }
+            static_cast<void>(workspace_.activate(index));
+            refreshView();
+            if (!saveDocument()) {
+                return;
+            }
+        }
+    }
+    if (!workspace_.remove(selected, fileSortOrder_)) {
+        return;
+    }
+    pixelFrame_ = 0;
+    refreshView();
+    view_.setStatus(std::format("Removed {} selected dataset(s) from workspace. The files on disk were not changed.", selected.size()));
+}
+
+void EditorController::removeGroup(const FileGroupTarget &target) {
+    const auto indices = workspace_.indicesForGroup(target);
+    if (indices.empty()) {
+        return;
+    }
+    const auto dirtyCount =
+        static_cast<std::size_t>(std::ranges::count_if(indices, [this](std::size_t index) { return workspace_.at(index).dirty(); }));
+
+    using enum SaveChangesChoice;
+    const auto choice = view_.confirmRemoveGroup(target, indices.size(), dirtyCount);
+    if (choice == Cancel) {
+        return;
+    }
+    if (choice == Save) {
+        for (const auto index : indices) {
+            if (!workspace_.at(index).dirty()) {
+                continue;
+            }
+            static_cast<void>(workspace_.activate(index));
+            refreshView();
+            if (!saveDocument()) {
+                return;
+            }
+        }
+    }
+    if (!workspace_.remove(indices, fileSortOrder_)) {
+        return;
+    }
+    pixelFrame_ = 0;
+    refreshView();
+    const auto groupName = target.level == FileGroupLevel::Patient ? "patient" : target.level == FileGroupLevel::Study ? "study" : "series";
+    view_.setStatus(
+        std::format("Removed {} dataset(s) from {} '{}'. The files on disk were not changed.", indices.size(), groupName, target.label));
+}
+
 bool EditorController::saveDocument() { return document().hasFilePath() ? saveTo(std::nullopt) : saveDocumentAs(); }
 
 bool EditorController::saveDocumentAs() {

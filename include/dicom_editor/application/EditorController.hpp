@@ -100,6 +100,11 @@ class EditorView {
     [[nodiscard]] virtual SaveChangesChoice confirmWorkspaceChanges(std::size_t dirtyCount) = 0;
     /// Confirms removing a dataset from the workspace; the file remains on disk.
     [[nodiscard]] virtual SaveChangesChoice confirmRemoveDataset(const std::filesystem::path &path, bool dirty) = 0;
+    /// Confirms removing manually selected datasets from the workspace.
+    [[nodiscard]] virtual SaveChangesChoice confirmRemoveDatasets(std::size_t datasetCount, std::size_t dirtyCount) = 0;
+    /// Confirms removing a patient, study, or series from the workspace.
+    [[nodiscard]] virtual SaveChangesChoice confirmRemoveGroup(const FileGroupTarget &target, std::size_t datasetCount,
+                                                               std::size_t dirtyCount) = 0;
     /// Confirms deletion of the current selection.
     [[nodiscard]] virtual bool confirmDelete() = 0;
     /// Collects a replacement value for an existing attribute.
@@ -148,6 +153,10 @@ class EditorController {
     void showNextDocument();
     /// Removes an open dataset from the workspace without deleting its file.
     void removeDocument(std::size_t index);
+    /// Removes manually selected open datasets from the workspace without deleting their files.
+    void removeDocuments(const std::vector<std::size_t> &indices);
+    /// Removes all open datasets in a patient, study, or series group.
+    void removeGroup(const FileGroupTarget &target);
     /// Saves the document.
     bool saveDocument();
     /// Saves the document to a new file.

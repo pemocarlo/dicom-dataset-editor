@@ -62,8 +62,12 @@ class ControllerView final : public dicom_editor::EditorView {
     std::optional<dicom_editor::AttributeInput> batchInput;
     dicom_editor::SaveChangesChoice workspaceChoice{dicom_editor::SaveChangesChoice::Discard};
     dicom_editor::SaveChangesChoice removeChoice{dicom_editor::SaveChangesChoice::Discard};
+    dicom_editor::SaveChangesChoice removeDatasetsChoice{dicom_editor::SaveChangesChoice::Discard};
+    dicom_editor::SaveChangesChoice removeGroupChoice{dicom_editor::SaveChangesChoice::Discard};
     std::size_t workspaceConfirmations{};
     std::size_t removeConfirmations{};
+    std::size_t removeDatasetsConfirmations{};
+    std::size_t removeGroupConfirmations{};
     bool hasLoadedFiles{};
     std::string error;
     std::string status;
@@ -87,6 +91,14 @@ class ControllerView final : public dicom_editor::EditorView {
     dicom_editor::SaveChangesChoice confirmRemoveDataset(const std::filesystem::path &, bool) override {
         ++removeConfirmations;
         return removeChoice;
+    }
+    dicom_editor::SaveChangesChoice confirmRemoveDatasets(std::size_t, std::size_t) override {
+        ++removeDatasetsConfirmations;
+        return removeDatasetsChoice;
+    }
+    dicom_editor::SaveChangesChoice confirmRemoveGroup(const dicom_editor::FileGroupTarget &, std::size_t, std::size_t) override {
+        ++removeGroupConfirmations;
+        return removeGroupChoice;
     }
     bool confirmDelete() override { return false; }
     std::optional<dicom_editor::AttributeInput> editAttribute(const std::string &, const std::string &) override { return std::nullopt; }
@@ -719,6 +731,17 @@ TEST_CASE("controller opens and navigates multiple files", "[application][worksp
     REQUIRE(view.openFiles[0].hierarchy.patientId == "PATIENT-1");
     REQUIRE(view.openFiles[0].hierarchy.studyLabel == "Workspace study");
 
+    controller.removeDocuments({view.openFiles[0].index, view.openFiles[1].index});
+    REQUIRE(view.removeDatasetsConfirmations == 1);
+    REQUIRE(!view.hasLoadedFiles);
+    REQUIRE(view.openFiles.size() == 1);
+    REQUIRE(std::filesystem::exists(firstPath));
+    REQUIRE(std::filesystem::exists(secondPath));
+
+    view.chosenFiles = {firstPath, secondPath};
+    controller.openDocument();
+    REQUIRE(view.openFiles.size() == 2);
+
     controller.setPixelDataVisible(true);
     REQUIRE(view.pixelPreview.has_value());
     REQUIRE(previewSourceIndex(view) == 0);
@@ -740,6 +763,13 @@ TEST_CASE("controller opens and navigates multiple files", "[application][worksp
     REQUIRE(view.openFiles[0].path == firstPath);
     REQUIRE(view.status.find("was not changed") != std::string::npos);
     REQUIRE(std::filesystem::exists(removedPath));
+
+    const auto remaining = view.openFiles[0].hierarchy;
+    controller.removeGroup({.level = dicom_editor::FileGroupLevel::Series, .id = remaining.seriesId, .label = remaining.seriesLabel});
+    REQUIRE(view.removeGroupConfirmations == 1);
+    REQUIRE(!view.hasLoadedFiles);
+    REQUIRE(view.openFiles.size() == 1);
+    REQUIRE(std::filesystem::exists(firstPath));
 
     std::filesystem::remove(firstPath);
     std::filesystem::remove(secondPath);
@@ -798,6 +828,17 @@ TEST_CASE("workspace sorts by instance number or filename", "[core][workspace]")
     REQUIRE(workspace.remove(workspace.activeIndex()));
     REQUIRE(workspace.size() == 1);
     REQUIRE(!workspace.hasLoadedFiles());
+
+    DicomWorkspace groupedWorkspace;
+    REQUIRE(groupedWorkspace.open({secondPath, firstPath}).opened == 2);
+    const auto groupedFiles = groupedWorkspace.files();
+    const auto &series = groupedFiles.front().hierarchy;
+    const dicom_editor::FileGroupTarget target{
+        .level = dicom_editor::FileGroupLevel::Series, .id = series.seriesId, .label = series.seriesLabel};
+    const auto groupedIndices = groupedWorkspace.indicesForGroup(target);
+    REQUIRE(groupedIndices.size() == 2);
+    REQUIRE(groupedWorkspace.remove(groupedIndices));
+    REQUIRE(!groupedWorkspace.hasLoadedFiles());
 
     std::filesystem::remove(firstPath);
     std::filesystem::remove(secondPath);

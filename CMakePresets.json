@@ -81,8 +81,8 @@
         },
         {
             "name": "iwyu",
-            "displayName": "All checks with IWYU",
-            "description": "Extended quality build with include-what-you-use enabled",
+            "displayName": "Optional IWYU check",
+            "description": "Separate Ninja Debug build with include-what-you-use enabled",
             "inherits": "quality",
             "binaryDir": "${sourceDir}/build/Ninja-Debug-IWYU",
             "cacheVariables": {

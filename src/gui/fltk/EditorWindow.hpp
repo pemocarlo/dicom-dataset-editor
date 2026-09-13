@@ -45,6 +45,9 @@ class EditorWindow final : public Fl_Double_Window, private dicom_editor::Editor
     [[nodiscard]] dicom_editor::SaveChangesChoice confirmSaveChanges() override;
     [[nodiscard]] dicom_editor::SaveChangesChoice confirmWorkspaceChanges(std::size_t dirtyCount) override;
     [[nodiscard]] dicom_editor::SaveChangesChoice confirmRemoveDataset(const std::filesystem::path &path, bool dirty) override;
+    [[nodiscard]] dicom_editor::SaveChangesChoice confirmRemoveDatasets(std::size_t datasetCount, std::size_t dirtyCount) override;
+    [[nodiscard]] dicom_editor::SaveChangesChoice confirmRemoveGroup(const dicom_editor::FileGroupTarget &target, std::size_t datasetCount,
+                                                                     std::size_t dirtyCount) override;
     [[nodiscard]] bool confirmDelete() override;
     [[nodiscard]] std::optional<dicom_editor::AttributeInput> editAttribute(const std::string &title, const std::string &value) override;
     void viewAttribute(const std::string &title, const std::string &value) override;

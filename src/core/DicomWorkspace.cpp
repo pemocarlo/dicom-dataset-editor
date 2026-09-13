@@ -66,6 +66,18 @@ bool matches(const DicomHierarchy &hierarchy, const BatchEditTarget &target) {
     return target.id.empty() ? hierarchy.studyLabel == target.label : hierarchy.studyId == target.id;
 }
 
+bool matches(const DicomHierarchy &hierarchy, const FileGroupTarget &target) {
+    switch (target.level) {
+    case FileGroupLevel::Patient:
+        return target.id.empty() ? hierarchy.patientLabel == target.label : hierarchy.patientId == target.id;
+    case FileGroupLevel::Study:
+        return target.id.empty() ? hierarchy.studyLabel == target.label : hierarchy.studyId == target.id;
+    case FileGroupLevel::Series:
+        return target.id.empty() ? hierarchy.seriesLabel == target.label : hierarchy.seriesId == target.id;
+    }
+    std::unreachable();
+}
+
 std::vector<std::pair<DcmTagKey, std::string>> attributesFor(BatchEditLevel level) {
     if (level == BatchEditLevel::Patient) {
         return {{DCM_PatientName, "Patient Name"},
@@ -207,25 +219,50 @@ bool DicomWorkspace::activateNext(FileSortOrder order) {
     return current != ordered.end() && std::next(current) != ordered.end() && activate(std::next(current)->index);
 }
 
-bool DicomWorkspace::remove(std::size_t index, FileSortOrder order) {
-    if (index >= documents_.size() || !documents_[index].hasFilePath()) {
+bool DicomWorkspace::remove(std::size_t index, FileSortOrder order) { return remove(std::vector<std::size_t>{index}, order); }
+
+bool DicomWorkspace::remove(const std::vector<std::size_t> &indices, FileSortOrder order) {
+    if (indices.empty()) {
         return false;
     }
 
-    const bool removingActive = index == activeIndex_;
+    auto selected = indices;
+    std::ranges::sort(selected);
+    const auto duplicates = std::ranges::unique(selected);
+    selected.erase(duplicates.begin(), duplicates.end());
+    if (std::ranges::any_of(selected,
+                            [this](std::size_t index) { return index >= documents_.size() || !documents_[index].hasFilePath(); })) {
+        return false;
+    }
+
+    const auto isSelected = [&selected](std::size_t index) { return std::ranges::binary_search(selected, index); };
+    const bool removingActive = isSelected(activeIndex_);
     std::optional<std::size_t> replacement;
     if (removingActive) {
         const auto ordered = files(order);
-        const auto current = std::ranges::find_if(ordered, [index](const OpenDicomFile &file) { return file.index == index; });
+        const auto current = std::ranges::find_if(ordered, [this](const OpenDicomFile &file) { return file.index == activeIndex_; });
         if (current != ordered.end()) {
-            const auto next = std::next(current);
-            replacement = next != ordered.end()        ? std::optional<std::size_t>{next->index}
-                          : current != ordered.begin() ? std::optional<std::size_t>{std::prev(current)->index}
-                                                       : std::nullopt;
+            for (auto next = std::next(current); next != ordered.end(); ++next) {
+                if (!isSelected(next->index)) {
+                    replacement = next->index;
+                    break;
+                }
+            }
+            if (!replacement) {
+                for (auto previous = current; previous != ordered.begin();) {
+                    --previous;
+                    if (!isSelected(previous->index)) {
+                        replacement = previous->index;
+                        break;
+                    }
+                }
+            }
         }
     }
 
-    documents_.erase(documents_.begin() + static_cast<std::ptrdiff_t>(index));
+    for (auto iterator = selected.rbegin(); iterator != selected.rend(); ++iterator) {
+        documents_.erase(documents_.begin() + static_cast<std::ptrdiff_t>(*iterator));
+    }
     if (documents_.empty()) {
         documents_.emplace_back();
         activeIndex_ = 0;
@@ -233,9 +270,12 @@ bool DicomWorkspace::remove(std::size_t index, FileSortOrder order) {
     }
 
     if (removingActive) {
-        activeIndex_ = replacement ? (*replacement > index ? *replacement - 1 : *replacement) : 0;
-    } else if (activeIndex_ > index) {
-        --activeIndex_;
+        const auto removedBefore = static_cast<std::size_t>(
+            std::ranges::count_if(selected, [replacement](std::size_t index) { return replacement && index < *replacement; }));
+        activeIndex_ = replacement ? *replacement - removedBefore : 0;
+    } else {
+        activeIndex_ -=
+            static_cast<std::size_t>(std::ranges::count_if(selected, [this](std::size_t index) { return index < activeIndex_; }));
     }
     return true;
 }
@@ -272,6 +312,17 @@ std::vector<OpenDicomFile> DicomWorkspace::files(FileSortOrder order) const {
         const long instanceB = b.instanceNumber.value_or(std::numeric_limits<long>::max());
         return instanceA == instanceB ? left.path.filename().string() < right.path.filename().string() : instanceA < instanceB;
     });
+    return result;
+}
+
+std::vector<std::size_t> DicomWorkspace::indicesForGroup(const FileGroupTarget &target) const {
+    std::vector<std::size_t> result;
+    for (std::size_t index = 0; index < documents_.size(); ++index) {
+        const auto &document = documents_[index];
+        if (document.hasFilePath() && matches(document.hierarchy(), target)) {
+            result.push_back(index);
+        }
+    }
     return result;
 }
 

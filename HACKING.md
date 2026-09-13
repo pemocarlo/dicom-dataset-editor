@@ -35,7 +35,7 @@ conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-debug -pr:b=
 conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-debug -pr:b=windows-msvc-release
 ```
 
-Install the separate Ninja toolchain before `dev-ninja`, `quality`, or `iwyu`:
+Install the separate Ninja toolchain before `dev-ninja`, `quality`, or the optional `iwyu` preset:
 
 ```bash
 # Linux
@@ -51,7 +51,7 @@ The checked-in presets separate build intent and tool cost:
 - `dev-ninja` is the same daily configuration using Ninja and a compilation database.
 - `production` is the optimized Release configuration used for the final executable.
 - `quality` adds clang-tidy and cppcheck in a separate Ninja Debug build tree.
-- `iwyu` adds include-what-you-use to the extended checks in another clean build tree.
+- `iwyu` is an optional standalone include-what-you-use check in another clean build tree.
 - `asan` uses the Conan ASan+UBSan dependency graph in its own Ninja Debug tree.
 - `tsan` uses the Conan TSan+UBSan dependency graph in its own Ninja Debug tree.
 - `valgrind` runs CTest MemCheck against a separate, unsanitized Ninja Debug tree.
@@ -80,7 +80,7 @@ workflow:
 - `dev-check`: compiler, CMake, and `clang-format`.
 - `dev-check-ninja`: the above plus Ninja.
 - `quality-checks`: the above plus `clang-tidy` and cppcheck.
-- `all-checks`: the complete extended quality workflow without requiring IWYU.
+- `all-checks`: the complete extended quality workflow.
 - `sanitize-checks`: Linux GCC, Ninja, and the Conan ASan profile.
 - `thread-checks`: Linux GCC, Ninja, and the Conan TSan profile.
 - `valgrind-checks`: Linux, Ninja, and a system `valgrind` executable.
@@ -293,7 +293,7 @@ Why not every GCC warning:
 
 ## Clang-Tidy
 
-The `quality` and `iwyu` presets provide the `lint` target. Enabled groups focus
+The `quality` preset and optional `iwyu` preset provide the `lint` target. Enabled groups focus
 on defects with high signal:
 
 - `clang-analyzer-*`
@@ -316,7 +316,7 @@ Explicit exclusions:
 
 ## Cppcheck
 
-The `quality` and `iwyu` presets provide the `cppcheck` target. It analyzes that
+The `quality` preset and optional `iwyu` preset provide the `cppcheck` target. It analyzes that
 build tree's `compile_commands.json` with warning, style, performance, and
 portability checks. Findings fail the target.
 

@@ -317,6 +317,8 @@ EditorWindow::EditorWindow() : Fl_Double_Window(1280, 820, "DICOM Dataset Editor
     fileTreePanel_ = new FileTreePanel(0, ContentTop, fileTreePanelExtent_, h() - ContentTop - StatusHeight);
     fileTreePanel_->setActivationHandler([this](std::size_t index) { controller_.activateDocument(index); });
     fileTreePanel_->setRemoveHandler([this](std::size_t index) { controller_.removeDocument(index); });
+    fileTreePanel_->setRemoveDocumentsHandler([this](const std::vector<std::size_t> &indices) { controller_.removeDocuments(indices); });
+    fileTreePanel_->setRemoveGroupHandler([this](const dicom_editor::FileGroupTarget &target) { controller_.removeGroup(target); });
     fileTreePanel_->setBatchEditHandler([this](const dicom_editor::BatchEditTarget &target) { controller_.batchEdit(target); });
     fileTreePanel_->hide();
 

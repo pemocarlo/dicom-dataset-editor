@@ -14,6 +14,7 @@ class Fl_Widget;
 
 namespace dicom_editor {
 struct BatchEditTarget;
+struct FileGroupTarget;
 struct OpenDicomFile;
 } // namespace dicom_editor
 
@@ -26,6 +27,8 @@ class FileTreePanel final : public Fl_Group {
     void setFiles(const std::vector<dicom_editor::OpenDicomFile> &files);
     void setActivationHandler(std::function<void(std::size_t)> handler);
     void setRemoveHandler(std::function<void(std::size_t)> handler);
+    void setRemoveDocumentsHandler(std::function<void(const std::vector<std::size_t> &)> handler);
+    void setRemoveGroupHandler(std::function<void(const dicom_editor::FileGroupTarget &)> handler);
     void setBatchEditHandler(std::function<void(const dicom_editor::BatchEditTarget &)> handler);
     void setFontSize(int size);
     int handle(int event) override;
@@ -43,6 +46,8 @@ class FileTreePanel final : public Fl_Group {
     std::vector<std::unique_ptr<TreeItemData>> itemData_;
     std::function<void(std::size_t)> activationHandler_;
     std::function<void(std::size_t)> removeHandler_;
+    std::function<void(const std::vector<std::size_t> &)> removeDocumentsHandler_;
+    std::function<void(const dicom_editor::FileGroupTarget &)> removeGroupHandler_;
     std::function<void(const dicom_editor::BatchEditTarget &)> batchEditHandler_;
     std::optional<std::size_t> activeFileIndex_;
     std::optional<std::size_t> pendingActivationIndex_;

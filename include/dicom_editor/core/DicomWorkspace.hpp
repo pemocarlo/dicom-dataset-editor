@@ -46,6 +46,14 @@ struct BatchEditTarget {
     std::string label;
 };
 
+enum class FileGroupLevel { Patient, Study, Series };
+
+struct FileGroupTarget {
+    FileGroupLevel level{};
+    std::string id;
+    std::string label;
+};
+
 struct BatchAttributeState {
     DcmTagKey tag;
     std::string name;
@@ -95,10 +103,14 @@ class DicomWorkspace {
     [[nodiscard]] bool activateNext(FileSortOrder order = FileSortOrder::InstanceNumber);
     /// Removes a file-backed dataset without touching its on-disk file.
     [[nodiscard]] bool remove(std::size_t index, FileSortOrder order = FileSortOrder::InstanceNumber);
+    /// Removes file-backed datasets without touching their on-disk files.
+    [[nodiscard]] bool remove(const std::vector<std::size_t> &indices, FileSortOrder order = FileSortOrder::InstanceNumber);
     /// Replaces all open documents with one empty dataset.
     void clear();
     /// Projects workspace state for file-tree views.
     [[nodiscard]] std::vector<OpenDicomFile> files(FileSortOrder order = FileSortOrder::InstanceNumber) const;
+    /// Returns document indices belonging to a patient, study, or series group.
+    [[nodiscard]] std::vector<std::size_t> indicesForGroup(const FileGroupTarget &target) const;
     /// Builds consistency information for one patient or study group.
     [[nodiscard]] BatchEditReport batchEditReport(const BatchEditTarget &target) const;
     /// Applies one root attribute to every document in a patient or study group.

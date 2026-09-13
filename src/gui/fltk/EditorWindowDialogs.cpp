@@ -105,6 +105,46 @@ dicom_editor::SaveChangesChoice EditorWindow::confirmRemoveDataset(const std::fi
                                                                               : dicom_editor::SaveChangesChoice::Cancel;
 }
 
+dicom_editor::SaveChangesChoice EditorWindow::confirmRemoveDatasets(std::size_t datasetCount, std::size_t dirtyCount) {
+    const auto message =
+        dirtyCount == 0
+            ? std::format("Remove {} selected dataset(s) from the workspace?\nThe files on disk will not be deleted.", datasetCount)
+            : std::format("Remove {} selected dataset(s) from the workspace?\n{} dataset(s) have unsaved changes. The files on disk will "
+                          "not be deleted.",
+                          datasetCount, dirtyCount);
+    if (dirtyCount == 0) {
+        return fl_choice("%s", "Cancel", "Remove", nullptr, message.c_str()) == 1 ? dicom_editor::SaveChangesChoice::Discard
+                                                                                  : dicom_editor::SaveChangesChoice::Cancel;
+    }
+    const int answer = fl_choice("%s", "Cancel", "Don't Save", "Save", message.c_str());
+    if (answer == 1) {
+        return dicom_editor::SaveChangesChoice::Discard;
+    }
+    return answer == 2 ? dicom_editor::SaveChangesChoice::Save : dicom_editor::SaveChangesChoice::Cancel;
+}
+
+dicom_editor::SaveChangesChoice EditorWindow::confirmRemoveGroup(const dicom_editor::FileGroupTarget &target, std::size_t datasetCount,
+                                                                 std::size_t dirtyCount) {
+    const auto groupName = target.level == dicom_editor::FileGroupLevel::Patient ? "patient"
+                           : target.level == dicom_editor::FileGroupLevel::Study ? "study"
+                                                                                 : "series";
+    const auto message =
+        dirtyCount == 0
+            ? std::format("Remove {} dataset(s) from {} '{}'?\nThe files on disk will not be deleted.", datasetCount, groupName,
+                          target.label)
+            : std::format("Remove {} dataset(s) from {} '{}'?\n{} dataset(s) have unsaved changes. The files on disk will not be deleted.",
+                          datasetCount, groupName, target.label, dirtyCount);
+    if (dirtyCount == 0) {
+        return fl_choice("%s", "Cancel", "Remove", nullptr, message.c_str()) == 1 ? dicom_editor::SaveChangesChoice::Discard
+                                                                                  : dicom_editor::SaveChangesChoice::Cancel;
+    }
+    const int answer = fl_choice("%s", "Cancel", "Don't Save", "Save", message.c_str());
+    if (answer == 1) {
+        return dicom_editor::SaveChangesChoice::Discard;
+    }
+    return answer == 2 ? dicom_editor::SaveChangesChoice::Save : dicom_editor::SaveChangesChoice::Cancel;
+}
+
 bool EditorWindow::confirmDelete() { return fl_choice("Delete selected attribute?", "Cancel", "Delete", nullptr) == 1; }
 
 std::optional<dicom_editor::AttributeInput> EditorWindow::editAttribute(const std::string &title, const std::string &value) {
