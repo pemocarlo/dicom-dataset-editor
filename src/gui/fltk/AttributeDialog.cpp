@@ -3,8 +3,6 @@
 #include "dicom_editor/core/AttributeInput.hpp"
 #include "dicom_editor/core/DicomWorkspace.hpp"
 
-#include <dcmtk/dcmdata/dctagkey.h>
-
 #include <FL/Fl.H>
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Choice.H>
@@ -17,7 +15,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <optional>
-#include <ranges>
 #include <string>
 #include <utility>
 #include <vector>

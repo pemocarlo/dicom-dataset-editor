@@ -2,7 +2,9 @@
 
 #include "dicom_editor/core/DicomDocument.hpp"
 #include "dicom_editor/core/DicomError.hpp"
+#include "dicom_editor/core/DicomPath.hpp"
 
+#include <cstddef>
 #include <dcmtk/dcmdata/dcdatset.h>
 #include <dcmtk/dcmdata/dcdeftag.h>
 #include <dcmtk/dcmdata/dcelem.h>
@@ -17,6 +19,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <ofstd/oftypes.h>
 #include <optional>
 #include <string>
 #include <utility>

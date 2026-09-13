@@ -13,6 +13,7 @@
 
 #include <format>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace dicom_editor {

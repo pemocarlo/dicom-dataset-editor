@@ -6,9 +6,10 @@
 #include "dicom_editor/core/DicomError.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomPath.hpp"
+#include "dicom_editor/core/DicomWorkspace.hpp"
 #include "dicom_editor/core/StructuredReport.hpp"
 
-#include <dcmtk/dcmdata/dctagkey.h>
+#include <cstddef>
 
 #include <algorithm>
 #include <exception>
@@ -17,7 +18,6 @@
 #include <format>
 #include <iterator>
 #include <optional>
-#include <ranges>
 #include <stop_token>
 #include <string>
 #include <utility>

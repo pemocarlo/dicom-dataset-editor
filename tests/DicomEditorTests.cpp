@@ -36,7 +36,6 @@
 #include <fstream>
 #include <functional>
 #include <optional>
-#include <ranges>
 #include <span>
 #include <stop_token>
 #include <string>

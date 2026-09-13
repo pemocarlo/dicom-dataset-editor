@@ -1,14 +1,17 @@
 #include "dicom_editor/core/DatasetViewModel.hpp"
 
+#include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomPath.hpp"
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace dicom_editor {
 

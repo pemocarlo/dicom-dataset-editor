@@ -80,7 +80,7 @@ workflow:
 - `dev-check`: compiler, CMake, and `clang-format`.
 - `dev-check-ninja`: the above plus Ninja.
 - `quality-checks`: the above plus `clang-tidy` and cppcheck.
-- `all-checks`: the above plus `include-what-you-use`.
+- `all-checks`: the complete extended quality workflow without requiring IWYU.
 - `sanitize-checks`: Linux GCC, Ninja, and the Conan ASan profile.
 - `thread-checks`: Linux GCC, Ninja, and the Conan TSan profile.
 - `valgrind-checks`: Linux, Ninja, and a system `valgrind` executable.
@@ -93,7 +93,7 @@ Use this tested LLVM/IWYU pairing on both platforms:
 On Windows, install the official
 [LLVM 22.1.6 x64 package](https://github.com/llvm/llvm-project/releases/tag/llvmorg-22.1.6)
 and add its `bin` directory to `PATH`; it provides `clang-format`, `clang-tidy`,
-and `clangd`. IWYU 0.26 publishes source only. For `all-checks`, build the
+and `clangd`. IWYU 0.26 publishes source only. For the optional `iwyu` preset, build the
 [`clang_22` branch](https://github.com/include-what-you-use/include-what-you-use/tree/clang_22)
 against the full LLVM x64 archive and add the resulting
 `include-what-you-use.exe` to `PATH`. The
@@ -147,7 +147,7 @@ Run slower clang-tidy and cppcheck analysis when preparing substantial changes:
 cmake --workflow --preset quality-checks
 ```
 
-Run every check, including a clean IWYU build, after changing headers or include
+Run the complete extended quality workflow after changing headers or include
 sets:
 
 ```bash
@@ -300,6 +300,7 @@ on defects with high signal:
 - `bugprone-*`
 - `performance-*`
 - `portability-*`
+- `misc-include-cleaner` for unused and missing direct includes
 - selected `readability-*`
 - `modernize-use-nullptr`
 

@@ -8,16 +8,20 @@
 #include <FL/Enumerations.H>
 #include <FL/Fl.H>
 #include <FL/Fl_Button.H>
+#include <FL/Fl_Group.H>
 #include <FL/Fl_Input.H>
+#include <FL/Fl_Table.H>
 #include <FL/Fl_Table_Row.H>
 #include <FL/fl_draw.H>
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <functional>
 #include <span>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace {
 

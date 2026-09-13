@@ -4,6 +4,7 @@
 #include "dicom_editor/core/DicomEditorService.hpp"
 #include "dicom_editor/core/DicomError.hpp"
 
+#include <cstddef>
 #include <dcmtk/dcmdata/dcdeftag.h>
 #include <dcmtk/dcmdata/dcdicdir.h>
 #include <dcmtk/dcmdata/dcdirrec.h>
@@ -13,7 +14,6 @@
 #include <dcmtk/ofstd/ofstring.h>
 
 #include <algorithm>
-#include <compare>
 #include <expected>
 #include <filesystem>
 #include <format>

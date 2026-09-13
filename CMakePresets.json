@@ -392,32 +392,32 @@
         },
         {
             "name": "all-checks",
-            "displayName": "Full verification with IWYU",
-            "description": "Run a clean IWYU build plus every extended quality check",
+            "displayName": "Full verification",
+            "description": "Run every extended quality check",
             "steps": [
                 {
                     "type": "configure",
-                    "name": "iwyu"
+                    "name": "quality"
                 },
                 {
                     "type": "build",
-                    "name": "iwyu"
+                    "name": "quality"
                 },
                 {
                     "type": "build",
-                    "name": "check-format-iwyu"
+                    "name": "check-format-quality"
                 },
                 {
                     "type": "build",
-                    "name": "lint-iwyu"
+                    "name": "lint"
                 },
                 {
                     "type": "build",
-                    "name": "cppcheck-iwyu"
+                    "name": "cppcheck"
                 },
                 {
                     "type": "test",
-                    "name": "iwyu"
+                    "name": "quality"
                 }
             ]
         },

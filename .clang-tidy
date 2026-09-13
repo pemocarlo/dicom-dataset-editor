@@ -10,6 +10,7 @@ Checks: >
   performance-*,
   portability-*,
   -portability-avoid-pragma-once,
+  misc-include-cleaner,
   readability-container-size-empty,
   readability-duplicate-include,
   readability-misleading-indentation,

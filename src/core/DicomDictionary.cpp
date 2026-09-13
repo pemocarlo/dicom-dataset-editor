@@ -1,8 +1,10 @@
 #include "dicom_editor/core/DicomDictionary.hpp"
 
 #include "EmbeddedDictionary.hpp"
+#include "dicom_editor/core/DicomError.hpp"
 
 #include <dcmtk/dcmdata/dcdict.h>
+#include <ios>
 #include <ofstd/oftypes.h>
 
 #include <atomic>

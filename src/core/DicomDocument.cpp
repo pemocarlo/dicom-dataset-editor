@@ -2,6 +2,7 @@
 
 #include "dicom_editor/core/DicomDictionary.hpp"
 #include "dicom_editor/core/DicomError.hpp"
+#include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomPath.hpp"
 
 #include <dcmtk/dcmdata/dcdatset.h>
@@ -26,6 +27,8 @@
 #include <dcmtk/ofstd/ofcond.h>
 #include <dcmtk/ofstd/offile.h>
 #include <dcmtk/ofstd/ofstring.h>
+#include <filesystem>
+#include <memory>
 #include <ofstd/oftypes.h>
 
 #include <algorithm>

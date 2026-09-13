@@ -6,7 +6,7 @@
 - Use `cmake --workflow --preset dev-check` during daily development. It builds Debug with strict warnings, checks formatting, and runs tests.
 - Install the platform's `*-debug-ninja` host profile before `dev-check-ninja`, `quality-checks`, or `all-checks`.
 - Run `cmake --workflow --preset quality-checks` before sending changes that warrant the slower clang-tidy and cppcheck pass.
-- Use `cmake --workflow --preset all-checks` if you touched headers or include sets.
+- Use `cmake --workflow --preset all-checks` if you touched headers or include sets. The standalone `iwyu` preset is optional for manual include analysis.
 - On Linux, run `cmake --workflow --preset sanitize-checks` for memory-safety or ownership changes.
 - Run `cmake --workflow --preset thread-checks` for concurrency changes and `valgrind-checks` when independent memory analysis is useful.
 
@@ -32,4 +32,4 @@
 
 - Keep changes focused.
 - Mention if you changed install behavior, developer tooling, or Conan profiles.
-- If you add new headers or dependencies, run IWYU and update mappings if needed.
+- If you add new headers or dependencies, optionally run the standalone IWYU preset and update mappings if needed.

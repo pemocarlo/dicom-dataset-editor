@@ -4,8 +4,10 @@
 
 #include <format>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace dicom_editor {
 

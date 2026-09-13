@@ -26,7 +26,7 @@ Read this first if you are an agent working in this repo.
 
 - `cmake --workflow --preset dev-check`
 - `cmake --workflow --preset quality-checks` for extended static analysis
-- `cmake --workflow --preset all-checks` when headers or include sets change
+- `cmake --workflow --preset all-checks` when headers or include sets change; the standalone `iwyu` preset is optional
 - `cmake --build --preset production` and `cmake --install build/Release --prefix "$HOME/tmp" --config Release` for relocatable install checks
 
 ## Current Architecture

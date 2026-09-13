@@ -6,13 +6,14 @@
 #include "StructuredReportDialog.hpp"
 #include "dicom_editor/application/EditorController.hpp"
 #include "dicom_editor/core/DicomDocument.hpp"
-#include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomWorkspace.hpp"
+#include "dicom_editor/core/StructuredReport.hpp"
 
 #include <FL/Enumerations.H>
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Button.H>
+#include <FL/Fl_Double_Window.H>
 #include <FL/Fl_Menu_Bar.H>
 #include <FL/Fl_Menu_Item.H>
 #include <FL/Fl_Toggle_Button.H>
@@ -26,7 +27,6 @@
 #include <initializer_list>
 #include <iterator>
 #include <optional>
-#include <ranges>
 #include <string>
 #include <utility>
 #include <vector>

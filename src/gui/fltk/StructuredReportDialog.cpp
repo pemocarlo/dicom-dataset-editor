@@ -11,10 +11,12 @@
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Menu_Button.H>
+#include <FL/Fl_Menu_Item.H>
 #include <FL/Fl_Multiline_Input.H>
 #include <FL/Fl_Scroll.H>
 #include <FL/Fl_Tree.H>
 #include <FL/Fl_Tree_Item.H>
+#include <FL/Fl_Tree_Prefs.H>
 #include <FL/Fl_Window.H>
 #include <FL/fl_ask.H>
 

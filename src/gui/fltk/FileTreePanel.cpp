@@ -6,6 +6,7 @@
 #include <FL/Enumerations.H>
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
+#include <FL/Fl_Group.H>
 #include <FL/Fl_Menu_Button.H>
 #include <FL/Fl_Tree.H>
 #include <FL/Fl_Tree_Item.H>
@@ -14,14 +15,17 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <format>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <set>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace {
 
