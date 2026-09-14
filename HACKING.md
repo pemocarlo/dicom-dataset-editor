@@ -35,6 +35,69 @@ conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-debug -pr:b=
 conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-debug -pr:b=windows-msvc-release
 ```
 
+### Windows clang-cl and Visual Studio projects
+
+The configuration package also provides `windows-clang-cl-debug` and
+`windows-clang-cl-release`. These profiles use Conan's `clang` compiler setting
+with the MSVC runtime; the Visual Studio generator selects the installed
+`clang-cl` component and emits `.sln` and `.vcxproj` files using the `ClangCL`
+toolset.
+They are separate Conan configurations because compiler and runtime settings
+are part of dependency package IDs.
+
+The profiles currently target the Visual Studio 18/2026 Community LLVM
+component. Install the Desktop C++ workload and LLVM/Clang component first,
+then run from an x64 Native Tools Command Prompt:
+
+```batch
+conan install . --build=missing --lockfile=conan.lock -pr:h=windows-clang-cl-debug -pr:b=windows-msvc-release
+call build\Debug\generators\conanbuild.bat
+cmake --preset dev
+cmake --build --preset dev
+ctest --preset dev
+```
+
+The Visual Studio generator can find `clang-cl.exe` through the `ClangCL`
+toolset, but CMake's developer checks find `clang-format` through `PATH`.
+Add the Visual Studio LLVM `bin` directory in the same x64 Native Tools
+Command Prompt before configuring:
+
+```batch
+set "LLVM_BIN=%ProgramFiles%\Microsoft Visual Studio\18\Community\VC\Tools\Llvm\x64\bin"
+set "PATH=%LLVM_BIN%;%PATH%"
+call build\Debug\generators\conanbuild.bat
+cmake --preset dev
+```
+
+The same setup in PowerShell is session-local:
+
+```powershell
+$llvmBin = Join-Path ${env:ProgramFiles} 'Microsoft Visual Studio\18\Community\VC\Tools\Llvm\x64\bin'
+$env:Path = "$llvmBin;$env:Path"
+cmake --preset dev
+```
+
+If changing `PATH` is undesirable, configure the formatter explicitly:
+
+```powershell
+cmake --preset dev -DDICOM_EDITOR_CLANG_FORMAT="$llvmBin\clang-format.exe"
+```
+
+The same LLVM directory supplies `clang-tidy` for the `quality` preset. The
+PowerShell `PATH` setup also makes it available to that preset.
+
+For the optimized project build:
+
+```batch
+conan install . --build=missing --lockfile=conan.lock -pr:h=windows-clang-cl-release -pr:b=windows-msvc-release -c tools.build:skip_test=True
+call build\Release\generators\conanbuild.bat
+cmake --preset production
+cmake --build --preset production
+```
+
+Verify the generated configure output contains `CMAKE_GENERATOR_TOOLSET=ClangCL`
+and identifies the Visual Studio `clang-cl.exe` as the C and C++ compiler.
+
 Install the separate Ninja toolchain before `dev-ninja`, `quality`, or the optional `iwyu` preset:
 
 ```bash

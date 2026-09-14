@@ -285,6 +285,50 @@ conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-release -
 conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-debug -pr:b=windows-msvc-release
 ```
 
+For Visual Studio project builds with the LLVM `clang-cl` frontend, use the
+dedicated profiles from the configuration package. They select the MSVC
+runtime ABI, the Visual Studio generator, and the `ClangCL` toolset, so Conan
+and CMake generate `.sln`/`.vcxproj` files rather than Ninja files:
+
+```batch
+conan install . --build=missing --lockfile=conan.lock -pr:h=windows-clang-cl-debug -pr:b=windows-msvc-release
+call build\Debug\generators\conanbuild.bat
+cmake --preset dev
+cmake --build --preset dev
+ctest --preset dev
+```
+
+The Visual Studio generator can locate `clang-cl.exe` through the `ClangCL`
+toolset without adding the LLVM directory to `PATH`. Developer Mode also
+looks up `clang-format` (and the quality presets look up `clang-tidy`) through
+`PATH`, so add the Visual Studio LLVM `bin` directory before configuring:
+
+```batch
+set "LLVM_BIN=%ProgramFiles%\Microsoft Visual Studio\18\Community\VC\Tools\Llvm\x64\bin"
+set "PATH=%LLVM_BIN%;%PATH%"
+call build\Debug\generators\conanbuild.bat
+cmake --preset dev
+```
+
+In PowerShell, use the equivalent session-local setup:
+
+```powershell
+$llvmBin = Join-Path ${env:ProgramFiles} 'Microsoft Visual Studio\18\Community\VC\Tools\Llvm\x64\bin'
+$env:Path = "$llvmBin;$env:Path"
+cmake --preset dev
+```
+
+As a one-off alternative, pass the formatter explicitly:
+
+```powershell
+cmake --preset dev -DDICOM_EDITOR_CLANG_FORMAT="$llvmBin\clang-format.exe"
+```
+
+Use `windows-clang-cl-release` with `-c tools.build:skip_test=True` and the
+`production` preset for an optimized build. The Visual Studio generator selects
+the installed LLVM component, so the profiles do not hard-code a
+`clang-cl.exe` path. The Visual Studio Clang component must be installed.
+
 Default Debug uses Unix Makefiles on Linux and Visual Studio on Windows. Install
 the optional Ninja Debug profile for `dev-ninja`, `quality-checks`, and
 `all-checks`:

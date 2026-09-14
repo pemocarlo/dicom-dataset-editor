@@ -129,4 +129,6 @@ cmake --build --preset production
 
 `production` uses CMake's standard Release configuration. Daily development
 uses a separate Debug profile and the `dev` preset; see [HACKING.md](HACKING.md).
+Windows Visual Studio project builds with `clang-cl` use the dedicated Conan
+profiles documented in [HACKING.md](HACKING.md#windows-clang-cl-and-visual-studio-projects).
 Use [BUILDING.md](BUILDING.md) for installation and Conan package creation.

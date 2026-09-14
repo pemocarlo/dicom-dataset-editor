@@ -187,8 +187,8 @@ dicom_editor::SaveAllReport EditorWindow::runSaveAllJob(dicom_editor::SaveAllTas
     dialog.set_modal();
     dialog.end();
 
-    std::jthread worker([&state, task = std::move(task)](std::stop_token stop) {
-        auto report = task(std::move(stop), [&state](const dicom_editor::SaveAllProgress &value) {
+    std::jthread worker([&state, saveTask = std::move(task)](std::stop_token stop) {
+        auto report = saveTask(std::move(stop), [&state](const dicom_editor::SaveAllProgress &value) {
             {
                 const std::scoped_lock lock(state.mutex);
                 state.progress = value;

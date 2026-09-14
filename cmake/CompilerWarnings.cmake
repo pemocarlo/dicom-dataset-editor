@@ -60,6 +60,16 @@ function(dicom_editor_enable_strict_warnings)
             -Wundef
             -Wzero-as-null-pointer-constant
         )
+        if(CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+            # The Visual Studio generator enables clang-cl's /Wall. Restore
+            # the normal warning level before applying the project's strict
+            # warning policy; /Wall also enables padding and experimental
+            # unsafe-buffer diagnostics that are not enabled for the regular
+            # Clang frontend.
+            list(REMOVE_ITEM warnings -Wall)
+            list(PREPEND warnings /W4)
+            list(APPEND warnings -Wno-unsafe-buffer-usage)
+        endif()
     elseif(MSVC)
         set(warnings /W4 /WX /permissive-)
     else()

@@ -89,6 +89,14 @@ target_sources(dicom_editor_core
         FILES
             ${DICOM_EDITOR_PUBLIC_HEADERS}
 )
+set_source_files_properties(
+    ${PROJECT_BINARY_DIR}/generated/EmbeddedDictionary.cpp
+    PROPERTIES
+        # The embedded dictionary is intentionally larger than Clang's
+        # portable string-literal limit; keep this exception local to the
+        # generated translation unit.
+        COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:Clang>:-Wno-overlength-strings>"
+)
 target_include_directories(dicom_editor_core PRIVATE src/core)
 target_link_libraries(dicom_editor_core PUBLIC dcmtk::dcmtk)
 
