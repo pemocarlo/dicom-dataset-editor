@@ -41,13 +41,20 @@ if(DICOM_EDITOR_ENABLE_COVERAGE)
 endif()
 
 set(DICOM_EDITOR_DEVELOPER_TARGETS
-    dicom_editor_core
+    dicom_viewer_operations
     dicom_editor_application
-    dicom_editor_fltk
-    dicom-dataset-editor
 )
+if(DICOM_EDITOR_BUILD_FLTK)
+    list(APPEND DICOM_EDITOR_DEVELOPER_TARGETS dicom_editor_fltk dicom-dataset-editor)
+endif()
 if(BUILD_TESTING)
-    list(APPEND DICOM_EDITOR_DEVELOPER_TARGETS dicom_editor_tests dicom_editor_gui_smoke_test)
+    list(APPEND DICOM_EDITOR_DEVELOPER_TARGETS
+        dicom_editor_tests
+        dicom_viewer_operations_smoke_test
+    )
+    if(DICOM_EDITOR_BUILD_FLTK)
+        list(APPEND DICOM_EDITOR_DEVELOPER_TARGETS dicom_editor_gui_smoke_test)
+    endif()
 endif()
 
 if(DICOM_EDITOR_ENABLE_STRICT_WARNINGS)
@@ -70,15 +77,19 @@ endif()
 
 if(DICOM_EDITOR_ENABLE_COVERAGE)
     set(DICOM_EDITOR_COVERAGE_LIBRARY_TARGETS
-        dicom_editor_core
+        dicom_viewer_operations
         dicom_editor_application
-        dicom_editor_fltk
     )
+    if(DICOM_EDITOR_BUILD_FLTK)
+        list(APPEND DICOM_EDITOR_COVERAGE_LIBRARY_TARGETS dicom_editor_fltk)
+    endif()
     set(DICOM_EDITOR_COVERAGE_EXECUTABLE_TARGETS
-        dicom-dataset-editor
         dicom_editor_tests
-        dicom_editor_gui_smoke_test
+        dicom_viewer_operations_smoke_test
     )
+    if(DICOM_EDITOR_BUILD_FLTK)
+        list(APPEND DICOM_EDITOR_COVERAGE_EXECUTABLE_TARGETS dicom-dataset-editor dicom_editor_gui_smoke_test)
+    endif()
 
     foreach(target IN LISTS DICOM_EDITOR_COVERAGE_LIBRARY_TARGETS)
         target_compile_options(${target} PRIVATE --coverage)
@@ -129,19 +140,20 @@ endif()
 
 dicom_editor_absolutize(
     DICOM_EDITOR_FORMAT_FILES
-    ${DICOM_EDITOR_PUBLIC_HEADERS}
-    ${DICOM_EDITOR_CORE_SOURCES}
+    ${DICOM_VIEWER_OPERATIONS_PUBLIC_HEADERS}
+    ${DICOM_VIEWER_OPERATIONS_SOURCES}
     ${DICOM_EDITOR_APPLICATION_HEADERS}
     ${DICOM_EDITOR_APPLICATION_SOURCES}
     ${DICOM_EDITOR_FLTK_HEADERS}
     ${DICOM_EDITOR_FLTK_SOURCES}
     ${DICOM_EDITOR_APP_SOURCES}
     ${DICOM_EDITOR_TEST_SOURCES}
+    tests/DicomViewerOperationsSmoke.cpp
     ${DICOM_EDITOR_GUI_SMOKE_TEST_SOURCES}
 )
 dicom_editor_absolutize(
     DICOM_EDITOR_LINT_FILES
-    ${DICOM_EDITOR_CORE_SOURCES}
+    ${DICOM_VIEWER_OPERATIONS_SOURCES}
     ${DICOM_EDITOR_APPLICATION_SOURCES}
     ${DICOM_EDITOR_FLTK_SOURCES}
     ${DICOM_EDITOR_APP_SOURCES}
@@ -190,6 +202,10 @@ if(DICOM_EDITOR_ENABLE_CPPCHECK)
 endif()
 
 if(DICOM_EDITOR_ENABLE_VALGRIND)
+    set(DICOM_EDITOR_VALGRIND_DEPENDENCIES dicom_editor_tests)
+    if(DICOM_EDITOR_BUILD_FLTK)
+        list(APPEND DICOM_EDITOR_VALGRIND_DEPENDENCIES dicom_editor_gui_smoke_test)
+    endif()
     add_custom_target(valgrind
         COMMAND ${CMAKE_CTEST_COMMAND}
             --test-dir "${PROJECT_BINARY_DIR}"
@@ -197,7 +213,7 @@ if(DICOM_EDITOR_ENABLE_VALGRIND)
             --test-action memcheck
             --output-on-failure
             --no-tests=error
-        DEPENDS dicom_editor_tests dicom_editor_gui_smoke_test
+        DEPENDS ${DICOM_EDITOR_VALGRIND_DEPENDENCIES}
         COMMENT "Running tests with Valgrind through CTest MemCheck"
         USES_TERMINAL
         VERBATIM

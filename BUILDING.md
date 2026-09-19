@@ -2,6 +2,22 @@
 
 This project uses Conan profiles from the installed `dicom-dataset-editor-conf` package.
 
+## Reusing the DICOM operations library
+
+The reusable DICOM layer is installed as the `DicomViewer::operations` CMake
+target. A separate UI can consume it without linking FLTK:
+
+```cmake
+find_package(DicomViewer CONFIG REQUIRED)
+target_link_libraries(my_viewer PRIVATE DicomViewer::operations)
+```
+
+The public umbrella header is `dicom_viewer/operations.hpp`. DCMTK is loaded
+automatically by the installed package configuration.
+
+For a source-tree build that produces only the reusable library and
+toolkit-neutral tests, configure with `-DDICOM_EDITOR_BUILD_FLTK=OFF`.
+
 ## Project Conan Home
 
 The checked-in [`.conanrc`](https://docs.conan.io/2/reference/config_files/conanrc.html)

@@ -2,6 +2,11 @@
 
 C++23 FLTK GUI for opening, inspecting, editing, and saving DICOM datasets through DCMTK.
 
+The DICOM behavior is provided by the reusable `DicomViewer::operations`
+library. The FLTK executable is one UI adapter over that library; other UIs can
+link the library without depending on FLTK. Its public include entry point is
+`dicom_viewer/operations.hpp`.
+
 ## Start Here
 
 - Build and install: [BUILDING.md](BUILDING.md)

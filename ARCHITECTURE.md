@@ -7,12 +7,12 @@ dependency direction, not whether code eventually serves a GUI.
 flowchart LR
     App[App.cpp<br/>composition root] --> Fltk[dicom_editor_fltk<br/>FLTK adapter]
     Fltk --> Application[dicom_editor_application<br/>use-case coordination]
-    Application --> Core[dicom_editor_core<br/>DICOM model and operations]
+    Application --> Operations[dicom_viewer_operations<br/>reusable DICOM viewer operations]
     Fltk --> FLTK[FLTK]
-    Core --> DCMTK[DCMTK]
+    Operations --> DCMTK[DCMTK]
 ```
 
-Dependencies point inward. Core knows nothing about windows, menus, file
+Dependencies point inward. The operations library knows nothing about windows, menus, file
 choosers, or FLTK. Application knows only the abstract `EditorView` port. FLTK
 implements that port and translates widget events into controller calls.
 
@@ -20,14 +20,14 @@ implements that port and translates widget events into controller calls.
 
 | Path | CMake target | Responsibility |
 | --- | --- | --- |
-| `include/dicom_editor/core`, `src/core` | `DicomDatasetEditor::core` | DICOM ownership, editing, loading, hierarchy, preview rendering, dictionary management |
+| `include/dicom_editor/core`, `src/core` | `DicomViewer::operations` | Reusable DICOM ownership, editing, loading, hierarchy, preview rendering, dictionary management |
 | `include/dicom_editor/application`, `src/application` | `DicomDatasetEditor::application` | User workflows, presentation state, save/close policy, view updates |
 | `src/gui/fltk` except `App.cpp` | `DicomDatasetEditor::fltk` | Widgets, layout, dialogs, native file choosers, event adaptation |
 | `src/gui/fltk/App.cpp` | `dicom-dataset-editor` | Constructs main window and starts FLTK event loop |
 
 `EditorController` belongs to application layer, not FLTK layer. It coordinates
-GUI use cases, but has no GUI toolkit dependency. Moving it into core would make
-core own dialog policy and presentation state; moving it into FLTK would prevent
+GUI use cases, but has no GUI toolkit dependency. Moving it into the operations
+library would make that library own dialog policy and presentation state; moving it into FLTK would prevent
 reuse by another UI adapter or headless workflow.
 
 For a first code-reading pass, follow one action end to end: a callback in
@@ -65,7 +65,7 @@ is a material memory problem.
 sequenceDiagram
     participant W as FLTK widget
     participant C as EditorController
-    participant M as Core model/service
+    participant M as Operations model/service
     participant V as EditorView
 
     W->>C: typed action
@@ -80,7 +80,7 @@ sequenceDiagram
 Most controller methods are synchronous. Save All is the deliberate exception:
 the application supplies a toolkit-neutral save task to `EditorView`, and the
 FLTK adapter runs it on a `std::jthread` behind a modal progress window. The
-worker updates only core state. Progress wakes the FLTK event loop with
+worker updates only operations state. Progress wakes the FLTK event loop with
 `Fl::awake`; only the FLTK thread reads progress and touches widgets. Cancellation
 uses a stop token and is observed between files, so an in-progress DCMTK write is
 allowed to finish before the worker joins and the progress window closes.
@@ -132,7 +132,7 @@ continues after individual failures; and returns whether cancellation occurred.
 Completed files remain saved when later files fail or the user cancels, so the
 operation is rollback-safe per file rather than atomic across the workspace.
 
-## Core Roles
+## DICOM Viewer Operations Roles
 
 - `DicomDocument`: DCMTK file facade and per-document behavior.
 - `DicomWorkspace`: multi-document aggregate and navigation policy.
@@ -146,7 +146,14 @@ operation is rollback-safe per file rather than atomic across the workspace.
 - `DatasetViewModel`: toolkit-neutral filtering and row formatting.
 - `DicomDictionary`: embedded dictionary bootstrap and validated runtime replacement.
 
-DCMTK types remain visible inside core API because this application directly
+`DicomViewer::operations` is a standalone static library. It has no dependency
+on FLTK or on `EditorController`, and its public entry point is
+`dicom_viewer/operations.hpp`. A second UI can link `DicomViewer::operations`
+directly, or implement `EditorView` and also reuse the application controller.
+The installed CMake package exports `DicomViewer::operations` and requires only
+DCMTK as its external dependency.
+
+DCMTK types remain visible inside the operations API because this library directly
 edits DCMTK datasets. Hiding every DCMTK type would add a large mirror model with
 little isolation benefit. Toolkit types are different: they stop at FLTK adapter
 boundary.
@@ -154,7 +161,7 @@ boundary.
 ## Dictionary Lifecycle
 
 Build configuration reads Conan-provided `dicom.dic` and generates a C++
-resource compiled into `dicom_editor_core`. No dictionary file is installed.
+resource compiled into `dicom_viewer_operations`. No dictionary file is installed.
 
 On first `DicomDocument` construction:
 
@@ -171,11 +178,11 @@ silently shadowing dictionary shipped with a newer app.
 
 ## Change Rules
 
-- New DICOM behavior goes in core and gets core-level tests.
+- New DICOM behavior goes in the operations library and gets operations-level tests.
 - New user workflow goes through `EditorController` and `EditorView`.
 - New FLTK widget behavior stays under `src/gui/fltk`.
-- Core and application headers must not include FLTK headers.
+- Operations and application headers must not include FLTK headers.
 - Panels emit semantic callbacks such as activate file or batch edit, not raw
   FLTK events.
 - Keep `App.cpp` free of policy; it is only composition root.
-- Add another GUI by implementing `EditorView`; do not fork core workflows.
+- Add another GUI by implementing `EditorView`; do not fork operations workflows.
