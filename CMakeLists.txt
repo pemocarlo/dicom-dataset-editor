@@ -8,6 +8,14 @@ project(
     LANGUAGES CXX
 )
 
+# Only the Conan ClangCL profile needs this Visual Studio IntelliSense bridge.
+if(
+    CMAKE_GENERATOR_TOOLSET STREQUAL "ClangCL"
+    AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+)
+    include(cmake/VisualStudioClangIntelliSense.cmake)
+endif()
+
 option(DICOM_EDITOR_DEVELOPER_MODE "Enable developer tooling targets" OFF)
 option(DICOM_EDITOR_BUILD_BENCHMARKS "Build synthetic performance benchmarks" OFF)
 option(DICOM_EDITOR_ENABLE_VALGRIND "Provide a Valgrind CTest MemCheck target" OFF)

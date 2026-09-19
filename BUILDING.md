@@ -53,9 +53,10 @@ conan remote add myartifactory "%CONAN_ARTIFACTORY_URL%" --force
 
 Authenticate with the Artifactory credentials provided for this project. The
 configuration package installs the Release, Debug, and optional Ninja Debug
-profiles for both Linux/GCC and Windows/MSVC, plus Linux/GCC ASan and TSan
-profiles. The second `remote add` restores the user-local Artifactory remote if
-the configuration package replaces the Conan remote list.
+profiles for Linux/GCC and Windows/MSVC, plus Windows clang-cl/Visual Studio
+profiles and Linux/GCC ASan and TSan profiles. The second `remote add` restores
+the user-local Artifactory remote if the configuration package replaces the
+Conan remote list.
 
 After changing the configuration recipe or its exported files, publish the new
 package to `myartifactory`, update the lock, then run `config install-pkg`:
@@ -118,12 +119,15 @@ Cache archive transfer is experimental; use the same Conan version on both
 sides. Configuration files are not part of that archive, so the configuration
 package must also be present in the local Conan cache.
 
-### Rebuild the configuration package locally
+### Refresh or rebuild the configuration package locally
 
-If the configuration package is not cached but the sibling
-`dicom-dataset-editor-conf` repository is available, create and install a local
-copy without contacting a remote. Use a temporary lockfile so the checked-in
-Artifactory lock remains unchanged.
+If the sibling `dicom-dataset-editor-conf` repository contains changed profiles
+or other exported configuration files, use this workflow to refresh the
+project-local Conan home before the new package is published to Artifactory.
+It creates a local configuration-package revision, writes a temporary
+`build/offline-conan.lock`, and activates that revision in this checkout's
+`conanhome`. It does not modify the checked-in `conan.lock`; use the Artifactory
+workflow above for the shared lockfile.
 
 On Linux:
 
@@ -142,6 +146,25 @@ conan lock upgrade-config . --no-remote --lockfile=conan.lock --lockfile-out=bui
 conan config install-pkg conanconfig.yml --lockfile=build\offline-conan.lock --force -s os=Windows
 conan remote disable "*"
 ```
+
+After the refresh, always use the temporary lockfile for dependency
+installation in this checkout. Do not omit `--lockfile`: Conan otherwise picks
+the checked-in `conan.lock`, which still points to the previous configuration
+package revision.
+
+For Windows, choose the host profile you want:
+
+```batch
+REM MSVC cl.exe
+conan install . --build=missing --lockfile=build\offline-conan.lock -pr:h=windows-msvc-debug -pr:b=windows-msvc-release
+
+REM Visual Studio clang-cl
+conan install . --build=missing --lockfile=build\offline-conan.lock -pr:h=windows-clang-cl-debug -pr:b=windows-msvc-release
+```
+
+The profile's `user.dicom_dataset_editor:build_folder` setting is installed
+together with the refreshed configuration package, so a separate
+`-c user.dicom_dataset_editor:build_folder=...` override is not needed.
 
 Do not commit the temporary offline lockfile. It can point to a local recipe
 revision that is not available to other checkouts.
@@ -278,7 +301,9 @@ conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-debug -pr:b=
 ```
 
 Windows uses the equivalent host profiles while retaining the Release build
-profile. Run these from an x64 Native Tools Command Prompt:
+profile. Run these from an x64 Native Tools Command Prompt. These commands use
+the checked-in lockfile and therefore apply after the configuration package has
+been published and the lockfile has been updated:
 
 ```batch
 conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release -c tools.build:skip_test=True
@@ -292,11 +317,25 @@ and CMake generate `.sln`/`.vcxproj` files rather than Ninja files:
 
 ```batch
 conan install . --build=missing --lockfile=conan.lock -pr:h=windows-clang-cl-debug -pr:b=windows-msvc-release
-call build\Debug\generators\conanbuild.bat
-cmake --preset dev
-cmake --build --preset dev
-ctest --preset dev
+call build\Debug-ClangCL\generators\conanbuild.bat
+cmake --preset dev-clang-cl
+cmake --build --preset dev-clang-cl
+ctest --preset dev-clang-cl
 ```
+
+The ordinary MSVC `cl.exe` profile continues to use `build\Debug` and the
+`dev` preset. The clang-cl profile uses `build\Debug-ClangCL` and the
+`dev-clang-cl` preset, so both Visual Studio project trees can coexist. Switch
+between them by installing the matching host profile and selecting its preset;
+do not reuse a configured CMake build directory with a different toolset.
+
+After configuring the clang-cl preset, open
+`build\Debug-ClangCL\DicomDatasetEditor.slnx` directly in Visual Studio. CMake
+also generates `build\Debug-ClangCL\Directory.Build.props`. That generated file
+only supplies the exact requested C++ standard to Visual Studio's design-time
+IntelliSense; the real compiler still uses CMake's clang-cl flags. Do not edit
+it by hand. Re-run the preset after changing `compiler.cppstd` or the CMake
+C++ standard.
 
 The Visual Studio generator can locate `clang-cl.exe` through the `ClangCL`
 toolset without adding the LLVM directory to `PATH`. Developer Mode also
@@ -306,8 +345,8 @@ looks up `clang-format` (and the quality presets look up `clang-tidy`) through
 ```batch
 set "LLVM_BIN=%ProgramFiles%\Microsoft Visual Studio\18\Community\VC\Tools\Llvm\x64\bin"
 set "PATH=%LLVM_BIN%;%PATH%"
-call build\Debug\generators\conanbuild.bat
-cmake --preset dev
+call build\Debug-ClangCL\generators\conanbuild.bat
+cmake --preset dev-clang-cl
 ```
 
 In PowerShell, use the equivalent session-local setup:
@@ -315,19 +354,21 @@ In PowerShell, use the equivalent session-local setup:
 ```powershell
 $llvmBin = Join-Path ${env:ProgramFiles} 'Microsoft Visual Studio\18\Community\VC\Tools\Llvm\x64\bin'
 $env:Path = "$llvmBin;$env:Path"
-cmake --preset dev
+cmake --preset dev-clang-cl
 ```
 
 As a one-off alternative, pass the formatter explicitly:
 
 ```powershell
-cmake --preset dev -DDICOM_EDITOR_CLANG_FORMAT="$llvmBin\clang-format.exe"
+cmake --preset dev-clang-cl -DDICOM_EDITOR_CLANG_FORMAT="$llvmBin\clang-format.exe"
 ```
 
 Use `windows-clang-cl-release` with `-c tools.build:skip_test=True` and the
-`production` preset for an optimized build. The Visual Studio generator selects
-the installed LLVM component, so the profiles do not hard-code a
-`clang-cl.exe` path. The Visual Studio Clang component must be installed.
+`production-clang-cl` preset for an optimized build. It uses
+`build\Release-ClangCL`, while the ordinary MSVC `production` preset remains in
+`build\Release`. The Visual Studio generator selects the installed LLVM
+component, so the profiles do not hard-code a `clang-cl.exe` path. The Visual
+Studio Clang component must be installed.
 
 Default Debug uses Unix Makefiles on Linux and Visual Studio on Windows. Install
 the optional Ninja Debug profile for `dev-ninja`, `quality-checks`, and

@@ -53,6 +53,29 @@
             }
         },
         {
+            "name": "dev-clang-cl",
+            "displayName": "Daily development with Visual Studio clang-cl",
+            "description": "Debug build with tests using the Visual Studio ClangCL toolset",
+            "inherits": "dev",
+            "generator": "Visual Studio 18 2026",
+            "toolset": "ClangCL",
+            "binaryDir": "${sourceDir}/build/Debug-ClangCL",
+            "toolchainFile": "${sourceDir}/build/Debug-ClangCL/generators/conan_toolchain.cmake",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "vendor": {
+                "microsoft.com/VisualStudioSettings/CMake/1.0": {
+                    "intelliSenseMode": "windows-clang-x64"
+                }
+            },
+            "cacheVariables": {
+                "DICOM_EDITOR_DCMTK_DICT_FILE": "${sourceDir}/build/Debug-ClangCL/generators/dicom.dic"
+            }
+        },
+        {
             "name": "dev-ninja",
             "displayName": "Daily development with Ninja",
             "description": "Debug development build with a compilation database on every platform",
@@ -67,6 +90,29 @@
             "displayName": "Production executable",
             "description": "Optimized Release build used for the final executable",
             "inherits": "conan-release-base"
+        },
+        {
+            "name": "production-clang-cl",
+            "displayName": "Production executable with Visual Studio clang-cl",
+            "description": "Optimized Release build using the Visual Studio ClangCL toolset",
+            "inherits": "production",
+            "generator": "Visual Studio 18 2026",
+            "toolset": "ClangCL",
+            "binaryDir": "${sourceDir}/build/Release-ClangCL",
+            "toolchainFile": "${sourceDir}/build/Release-ClangCL/generators/conan_toolchain.cmake",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "vendor": {
+                "microsoft.com/VisualStudioSettings/CMake/1.0": {
+                    "intelliSenseMode": "windows-clang-x64"
+                }
+            },
+            "cacheVariables": {
+                "DICOM_EDITOR_DCMTK_DICT_FILE": "${sourceDir}/build/Release-ClangCL/generators/dicom.dic"
+            }
         },
         {
             "name": "quality",
@@ -155,8 +201,18 @@
             "configuration": "Debug"
         },
         {
+            "name": "dev-clang-cl",
+            "configurePreset": "dev-clang-cl",
+            "configuration": "Debug"
+        },
+        {
             "name": "production",
             "configurePreset": "production",
+            "configuration": "Release"
+        },
+        {
+            "name": "production-clang-cl",
+            "configurePreset": "production-clang-cl",
             "configuration": "Release"
         },
         {
@@ -291,6 +347,14 @@
         {
             "name": "dev",
             "configurePreset": "dev",
+            "configuration": "Debug",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "dev-clang-cl",
+            "configurePreset": "dev-clang-cl",
             "configuration": "Debug",
             "output": {
                 "outputOnFailure": true

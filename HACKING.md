@@ -51,11 +51,23 @@ then run from an x64 Native Tools Command Prompt:
 
 ```batch
 conan install . --build=missing --lockfile=conan.lock -pr:h=windows-clang-cl-debug -pr:b=windows-msvc-release
-call build\Debug\generators\conanbuild.bat
-cmake --preset dev
-cmake --build --preset dev
-ctest --preset dev
+call build\Debug-ClangCL\generators\conanbuild.bat
+cmake --preset dev-clang-cl
+cmake --build --preset dev-clang-cl
+ctest --preset dev-clang-cl
 ```
+
+The matching MSVC `cl.exe` workflow remains `windows-msvc-debug` with the
+`dev` preset in `build\Debug`. The clang-cl workflow is isolated in
+`build\Debug-ClangCL` and uses `dev-clang-cl`, so switching toolsets only
+requires installing the other host profile and selecting its preset. Keep the
+two CMake build directories separate because a configured CMake tree cannot be
+reused with a different compiler toolset.
+
+After configuring, the generated solution can be opened directly at
+`build\Debug-ClangCL\DicomDatasetEditor.slnx`. CMake generates a matching
+`Directory.Build.props` there so Visual Studio IntelliSense uses the exact C++
+standard requested by Conan; reconfigure after changing that standard.
 
 The Visual Studio generator can find `clang-cl.exe` through the `ClangCL`
 toolset, but CMake's developer checks find `clang-format` through `PATH`.
@@ -65,8 +77,8 @@ Command Prompt before configuring:
 ```batch
 set "LLVM_BIN=%ProgramFiles%\Microsoft Visual Studio\18\Community\VC\Tools\Llvm\x64\bin"
 set "PATH=%LLVM_BIN%;%PATH%"
-call build\Debug\generators\conanbuild.bat
-cmake --preset dev
+call build\Debug-ClangCL\generators\conanbuild.bat
+cmake --preset dev-clang-cl
 ```
 
 The same setup in PowerShell is session-local:
@@ -74,13 +86,13 @@ The same setup in PowerShell is session-local:
 ```powershell
 $llvmBin = Join-Path ${env:ProgramFiles} 'Microsoft Visual Studio\18\Community\VC\Tools\Llvm\x64\bin'
 $env:Path = "$llvmBin;$env:Path"
-cmake --preset dev
+cmake --preset dev-clang-cl
 ```
 
 If changing `PATH` is undesirable, configure the formatter explicitly:
 
 ```powershell
-cmake --preset dev -DDICOM_EDITOR_CLANG_FORMAT="$llvmBin\clang-format.exe"
+cmake --preset dev-clang-cl -DDICOM_EDITOR_CLANG_FORMAT="$llvmBin\clang-format.exe"
 ```
 
 The same LLVM directory supplies `clang-tidy` for the `quality` preset. The
@@ -90,9 +102,9 @@ For the optimized project build:
 
 ```batch
 conan install . --build=missing --lockfile=conan.lock -pr:h=windows-clang-cl-release -pr:b=windows-msvc-release -c tools.build:skip_test=True
-call build\Release\generators\conanbuild.bat
-cmake --preset production
-cmake --build --preset production
+call build\Release-ClangCL\generators\conanbuild.bat
+cmake --preset production-clang-cl
+cmake --build --preset production-clang-cl
 ```
 
 Verify the generated configure output contains `CMAKE_GENERATOR_TOOLSET=ClangCL`
