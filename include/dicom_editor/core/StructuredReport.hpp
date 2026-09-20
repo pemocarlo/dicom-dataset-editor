@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dicom_editor/core/DicomPath.hpp"
+#include "dicom_viewer/export.hpp"
 
 #include <cstddef>
 #include <string>
@@ -40,7 +41,7 @@ struct ReportNodeInput {
 };
 
 /// Projects SR content without rewriting unsupported content or private attributes.
-class StructuredReport {
+class DICOM_VIEWER_OPERATIONS_EXPORT StructuredReport {
   public:
     [[nodiscard]] static bool supports(const DicomDocument &document);
     [[nodiscard]] static std::vector<ReportNode> nodes(DicomDocument &document);

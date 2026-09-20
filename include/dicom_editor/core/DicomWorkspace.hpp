@@ -2,6 +2,7 @@
 
 #include "dicom_editor/core/DicomDocument.hpp"
 #include "dicom_editor/core/DicomError.hpp"
+#include "dicom_viewer/export.hpp"
 
 #include <dcmtk/dcmdata/dctagkey.h>
 
@@ -67,7 +68,7 @@ struct BatchEditReport {
 };
 
 /// Owns open DICOM datasets and active-file navigation.
-class DicomWorkspace {
+class DICOM_VIEWER_OPERATIONS_EXPORT DicomWorkspace {
   public:
     DicomWorkspace();
 

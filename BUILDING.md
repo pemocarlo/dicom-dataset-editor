@@ -15,6 +15,10 @@ target_link_libraries(my_viewer PRIVATE DicomViewer::operations)
 The public umbrella header is `dicom_viewer/operations.hpp`. DCMTK is loaded
 automatically by the installed package configuration.
 
+Conan consumers can require `dicom_viewer/0.1.0`. The default package contains
+the static operations library only; set `shared=True` for a shared library and
+`with_gui=True` to additionally package the `dicom-dataset-editor` demo app.
+
 For a source-tree build that produces only the reusable library and
 toolkit-neutral tests, configure with `-DDICOM_EDITOR_BUILD_FLTK=OFF`.
 
@@ -172,10 +176,10 @@ For Windows, choose the host profile you want:
 
 ```batch
 REM MSVC cl.exe
-conan install . --build=missing --lockfile=build\offline-conan.lock -pr:h=windows-msvc-debug -pr:b=windows-msvc-release
+conan install . --build=missing --lockfile=build\offline-conan.lock -pr:h=windows-msvc-debug -pr:b=windows-msvc-release -o:h=dicom_viewer/*:with_gui=True
 
 REM Visual Studio clang-cl
-conan install . --build=missing --lockfile=build\offline-conan.lock -pr:h=windows-clang-cl-debug -pr:b=windows-msvc-release
+conan install . --build=missing --lockfile=build\offline-conan.lock -pr:h=windows-clang-cl-debug -pr:b=windows-msvc-release -o:h=dicom_viewer/*:with_gui=True
 ```
 
 The profile's `user.dicom_dataset_editor:build_folder` setting is installed
@@ -198,10 +202,10 @@ restore the event triggers in the workflow files and configure the variables,
 secrets, and protected environment described below.
 
 The repository workflow in [`.github/workflows/conan-ci.yml`](.github/workflows/conan-ci.yml)
-is designed to build and test the application on pull requests and pushes to
-`main`. Normal CI uses `--build=never`: dependencies must already be available
-in Artifactory.
-Only the trusted `main` job publishes the application package.
+is designed to build and test all static/shared and library-only/GUI package
+variants on pull requests and pushes to `main`. Dependencies must already be
+available in Artifactory; only the root `dicom_viewer` package is built.
+Only the trusted `main` job publishes the library package variants.
 
 The separate, manually dispatched
 [`.github/workflows/conan-package-update.yml`](.github/workflows/conan-package-update.yml)
@@ -307,13 +311,13 @@ in Release.
 For the final optimized Linux executable:
 
 ```bash
-conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release -c tools.build:skip_test=True
+conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release -o:h=dicom_viewer/*:with_gui=True -c tools.build:skip_test=True
 ```
 
 For daily Linux development with assertions and debug information:
 
 ```bash
-conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-debug -pr:b=linux-gcc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-debug -pr:b=linux-gcc-release -o:h=dicom_viewer/*:with_gui=True
 ```
 
 Windows uses the equivalent host profiles while retaining the Release build
@@ -322,8 +326,8 @@ the checked-in lockfile and therefore apply after the configuration package has
 been published and the lockfile has been updated:
 
 ```batch
-conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release -c tools.build:skip_test=True
-conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-debug -pr:b=windows-msvc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release -o:h=dicom_viewer/*:with_gui=True -c tools.build:skip_test=True
+conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-debug -pr:b=windows-msvc-release -o:h=dicom_viewer/*:with_gui=True
 ```
 
 For Visual Studio project builds with the LLVM `clang-cl` frontend, use the
@@ -332,7 +336,7 @@ runtime ABI, the Visual Studio generator, and the `ClangCL` toolset, so Conan
 and CMake generate `.sln`/`.vcxproj` files rather than Ninja files:
 
 ```batch
-conan install . --build=missing --lockfile=conan.lock -pr:h=windows-clang-cl-debug -pr:b=windows-msvc-release
+conan install . --build=missing --lockfile=conan.lock -pr:h=windows-clang-cl-debug -pr:b=windows-msvc-release -o:h=dicom_viewer/*:with_gui=True
 call build\Debug-ClangCL\generators\conanbuild.bat
 cmake --preset dev-clang-cl
 cmake --build --preset dev-clang-cl
@@ -392,10 +396,10 @@ the optional Ninja Debug profile for `dev-ninja`, `quality-checks`, and
 
 ```bash
 # Linux
-conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-debug-ninja -pr:b=linux-gcc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-debug-ninja -pr:b=linux-gcc-release -o:h=dicom_viewer/*:with_gui=True
 
 # Windows x64 Native Tools Command Prompt
-conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-debug-ninja -pr:b=windows-msvc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-debug-ninja -pr:b=windows-msvc-release -o:h=dicom_viewer/*:with_gui=True
 ```
 
 Linux sanitizer builds use dedicated Ninja profiles. The sanitizer is a Conan
@@ -403,8 +407,8 @@ compiler setting, so sanitized dependencies have distinct package IDs and are
 rebuilt as needed instead of being mixed with ordinary Debug binaries:
 
 ```bash
-conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-asan-ninja -pr:b=linux-gcc-release
-conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-tsan-ninja -pr:b=linux-gcc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-asan-ninja -pr:b=linux-gcc-release -o:h=dicom_viewer/*:with_gui=True
+conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-tsan-ninja -pr:b=linux-gcc-release -o:h=dicom_viewer/*:with_gui=True
 ```
 
 The first install enables AddressSanitizer and UndefinedBehaviorSanitizer; the
@@ -474,22 +478,25 @@ cmake --install build/Release --prefix build/install --config Release
 .\build\install\bin\dicom-dataset-editor.exe
 ```
 
-Expected layout:
+For a GUI-enabled build, the expected executable layout is:
 
 - `<your-install-prefix>/bin/dicom-dataset-editor`
 - `<your-install-prefix>/bin/dicom-dataset-editor.exe` on Windows
 
-Dictionary is compiled into executable, so install has no runtime data directory.
+The dictionary is compiled into the operations library, so install has no runtime data directory.
 CMake does not bundle dependency libraries; provide them through system, Conan,
 or platform-specific deployment step.
 The Windows executable uses the GUI subsystem and does not open a separate console window.
 
 ## Conan Package
 
-Build, test, and package the application with:
+Build, test, and package the default static operations library with:
 
 ```bash
-conan create . --build=never --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release -c tools.build:skip_test=False
+conan create . --build=dicom_viewer/* --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release -c tools.build:skip_test=False
 ```
 
-Use `-c tools.build:skip_test=True` when package creation should skip tests.
+Add `-o:h=dicom_viewer/*:shared=True` for the shared library, or
+`-o:h=dicom_viewer/*:with_gui=True` to include the FLTK demo application. The
+options can be combined. Use `-c tools.build:skip_test=True` when package
+creation should skip tests.

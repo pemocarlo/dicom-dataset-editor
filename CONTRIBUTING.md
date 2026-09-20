@@ -26,7 +26,7 @@
 - `cmake --workflow --preset sanitize-checks` on Linux for memory-safety changes
 - `cmake --workflow --preset thread-checks` on Linux for concurrency changes
 - `cmake --build --preset production` for final executable or install changes
-- `conan create . --build=never --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release -c tools.build:skip_test=False` when changing CMake, Conan, or install behavior
+- `conan create . --build=dicom_viewer/* --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release -o:h=dicom_viewer/*:with_gui=True -c tools.build:skip_test=False` when changing CMake, Conan, or install behavior
 
 ## Pull Requests
 

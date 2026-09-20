@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dicom_editor/core/DicomError.hpp"
+#include "dicom_viewer/export.hpp"
 
 #include <expected>
 #include <filesystem>
@@ -17,12 +18,13 @@ struct DicomDictionaryInfo {
 };
 
 /// Loads the dictionary embedded in the application once per process.
-void ensureEmbeddedDicomDictionary();
+DICOM_VIEWER_OPERATIONS_EXPORT void ensureEmbeddedDicomDictionary();
 
 /// Validates and replaces the active dictionary with a DCMTK-format file.
-[[nodiscard]] std::expected<DicomDictionaryInfo, DicomError> loadDicomDictionary(const std::filesystem::path &path);
+[[nodiscard]] DICOM_VIEWER_OPERATIONS_EXPORT std::expected<DicomDictionaryInfo, DicomError>
+loadDicomDictionary(const std::filesystem::path &path);
 
 /// Describes the dictionary currently used by DCMTK.
-[[nodiscard]] std::string dicomDictionarySource();
+[[nodiscard]] DICOM_VIEWER_OPERATIONS_EXPORT std::string dicomDictionarySource();
 
 } // namespace dicom_editor

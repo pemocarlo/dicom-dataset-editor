@@ -7,13 +7,23 @@ from conan.tools.build import check_min_cppstd
 from conan.tools.cmake import CMake, CMakeConfigDeps, CMakeToolchain, cmake_layout
 
 
-class DicomDatasetEditorRecipe(ConanFile):
+class DicomViewerRecipe(ConanFile):
     required_conan_version = ">=2.28"
-    name = "dicom_dataset_editor"
+    name = "dicom_viewer"
     version = "0.1.0"
-    package_type = "application"
+    package_type = "library"
 
     settings = "os", "arch", "compiler", "build_type"
+    options = {
+        "shared": [True, False],
+        "fPIC": [True, False],
+        "with_gui": [True, False],
+    }
+    default_options = {
+        "shared": False,
+        "fPIC": True,
+        "with_gui": False,
+    }
     exports_sources = (
         "CMakeLists.txt",
         "CMakePresets.json",
@@ -23,7 +33,20 @@ class DicomDatasetEditorRecipe(ConanFile):
         "tests/*",
     )
 
-    requires = ("dcmtk/3.7.0", "fltk/1.4.5")
+    def config_options(self):
+        if self.settings.os == "Windows":
+            self.options.rm_safe("fPIC")
+
+    def configure(self):
+        if self.options.shared:
+            self.options.rm_safe("fPIC")
+
+    def requirements(self):
+        # DCMTK types are intentionally part of the public operations API, so
+        # consumers need its headers and libraries even when this package is shared.
+        self.requires("dcmtk/3.7.0", transitive_headers=True, transitive_libs=True)
+        if self.options.with_gui:
+            self.requires("fltk/1.4.5")
 
     def build_requirements(self):
         if not self.conf.get("tools.build:skip_test", default=False):
@@ -53,6 +76,8 @@ class DicomDatasetEditorRecipe(ConanFile):
         toolchain = CMakeToolchain(self)
         toolchain.user_presets_path = False
         toolchain.cache_variables["BUILD_TESTING"] = not self.conf.get("tools.build:skip_test", default=False)
+        toolchain.cache_variables["BUILD_SHARED_LIBS"] = bool(self.options.shared)
+        toolchain.cache_variables["DICOM_EDITOR_BUILD_FLTK"] = bool(self.options.with_gui)
         dcmtk = self.dependencies["dcmtk"]
         dict_file = os.path.join(
             dcmtk.package_folder,
@@ -79,3 +104,12 @@ class DicomDatasetEditorRecipe(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
+
+    def package_info(self):
+        self.cpp_info.set_property("cmake_file_name", "DicomViewer")
+        self.cpp_info.set_property("cmake_target_name", "DicomViewer::operations")
+        self.cpp_info.libs = ["dicom_viewer_operations"]
+        self.cpp_info.requires = ["dcmtk::dcmtk"]
+        if self.options.with_gui:
+            # FLTK is linked only into the packaged executable, not the public library.
+            self.cpp_info.ignored_requires = ["fltk"]

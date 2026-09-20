@@ -29,10 +29,10 @@ tools stay in Release so Conan does not rebuild them as Debug packages:
 
 ```bash
 # Linux
-conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-debug -pr:b=linux-gcc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-debug -pr:b=linux-gcc-release -o:h=dicom_viewer/*:with_gui=True
 
 # Windows x64 Native Tools Command Prompt
-conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-debug -pr:b=windows-msvc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-debug -pr:b=windows-msvc-release -o:h=dicom_viewer/*:with_gui=True
 ```
 
 ### Windows clang-cl and Visual Studio projects
@@ -50,7 +50,7 @@ component. Install the Desktop C++ workload and LLVM/Clang component first,
 then run from an x64 Native Tools Command Prompt:
 
 ```batch
-conan install . --build=missing --lockfile=conan.lock -pr:h=windows-clang-cl-debug -pr:b=windows-msvc-release
+conan install . --build=missing --lockfile=conan.lock -pr:h=windows-clang-cl-debug -pr:b=windows-msvc-release -o:h=dicom_viewer/*:with_gui=True
 call build\Debug-ClangCL\generators\conanbuild.bat
 cmake --preset dev-clang-cl
 cmake --build --preset dev-clang-cl
@@ -101,7 +101,7 @@ PowerShell `PATH` setup also makes it available to that preset.
 For the optimized project build:
 
 ```batch
-conan install . --build=missing --lockfile=conan.lock -pr:h=windows-clang-cl-release -pr:b=windows-msvc-release -c tools.build:skip_test=True
+conan install . --build=missing --lockfile=conan.lock -pr:h=windows-clang-cl-release -pr:b=windows-msvc-release -o:h=dicom_viewer/*:with_gui=True -c tools.build:skip_test=True
 call build\Release-ClangCL\generators\conanbuild.bat
 cmake --preset production-clang-cl
 cmake --build --preset production-clang-cl
@@ -114,10 +114,10 @@ Install the separate Ninja toolchain before `dev-ninja`, `quality`, or the optio
 
 ```bash
 # Linux
-conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-debug-ninja -pr:b=linux-gcc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-debug-ninja -pr:b=linux-gcc-release -o:h=dicom_viewer/*:with_gui=True
 
 # Windows x64 Native Tools Command Prompt
-conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-debug-ninja -pr:b=windows-msvc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-debug-ninja -pr:b=windows-msvc-release -o:h=dicom_viewer/*:with_gui=True
 ```
 
 The checked-in presets separate build intent and tool cost:
@@ -256,6 +256,7 @@ its own build folder and does not change normal Debug or Release builds:
 ```bash
 conan install . --build=never --no-remote --lockfile=conan.lock \
   -pr:h=linux-gcc-debug-ninja -pr:b=linux-gcc-release \
+  -o:h=dicom_viewer/*:with_gui=True \
   -c user.dicom_dataset_editor:build_folder=build/Ninja-Coverage
 cmake --workflow --preset coverage
 ```
@@ -308,8 +309,8 @@ Install both profiles once, or repeat after dependency, recipe, lockfile, or
 profile changes:
 
 ```bash
-conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-asan-ninja -pr:b=linux-gcc-release
-conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-tsan-ninja -pr:b=linux-gcc-release
+conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-asan-ninja -pr:b=linux-gcc-release -o:h=dicom_viewer/*:with_gui=True
+conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-tsan-ninja -pr:b=linux-gcc-release -o:h=dicom_viewer/*:with_gui=True
 ```
 
 Activate both the build environment and the profile's runtime environment, then

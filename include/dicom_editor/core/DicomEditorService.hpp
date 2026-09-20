@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dicom_editor/core/DicomPath.hpp"
+#include "dicom_viewer/export.hpp"
 
 #include <dcmtk/dcmdata/dctagkey.h>
 
@@ -33,7 +34,7 @@ struct AddAttributeRequest {
 };
 
 /// Validated add, edit, and delete helpers for the document model.
-class DicomEditorService {
+class DICOM_VIEWER_OPERATIONS_EXPORT DicomEditorService {
   public:
     /// Replaces an existing element value.
     static void editValue(DicomDocument &document, const EditRequest &request);

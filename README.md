@@ -119,7 +119,7 @@ with the Release Conan profile and the `production` CMake preset.
 Linux:
 
 ```bash
-conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release -c tools.build:skip_test=True
+conan install . --build=never --lockfile=conan.lock -pr:h=linux-gcc-release -pr:b=linux-gcc-release -o:h=dicom_viewer/*:with_gui=True -c tools.build:skip_test=True
 cmake --preset production
 cmake --build --preset production
 ```
@@ -127,7 +127,7 @@ cmake --build --preset production
 Windows:
 
 ```powershell
-conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release -c tools.build:skip_test=True
+conan install . --build=never --lockfile=conan.lock -pr:h=windows-msvc-release -pr:b=windows-msvc-release -o:h=dicom_viewer/*:with_gui=True -c tools.build:skip_test=True
 cmake --preset production
 cmake --build --preset production
 ```

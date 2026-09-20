@@ -146,7 +146,7 @@ operation is rollback-safe per file rather than atomic across the workspace.
 - `DatasetViewModel`: toolkit-neutral filtering and row formatting.
 - `DicomDictionary`: embedded dictionary bootstrap and validated runtime replacement.
 
-`DicomViewer::operations` is a standalone static library. It has no dependency
+`DicomViewer::operations` is a standalone static or shared library. It has no dependency
 on FLTK or on `EditorController`, and its public entry point is
 `dicom_viewer/operations.hpp`. A second UI can link `DicomViewer::operations`
 directly, or implement `EditorView` and also reuse the application controller.

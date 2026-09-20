@@ -1,6 +1,6 @@
 name: Conan CI
 
-# Temporarily disabled until the Artifactory service and credentials are ready.
+# GitHub Actions is disabled for now until the Artifactory service and credentials are ready.
 on: []
 
 permissions:
@@ -16,8 +16,18 @@ env:
 
 jobs:
   verify:
-    name: Build and test
+    name: Build and test (${{ matrix.linkage }}, GUI ${{ matrix.gui }})
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        linkage: [static, shared]
+        gui: [False, True]
+        include:
+          - linkage: static
+            shared: False
+          - linkage: shared
+            shared: True
     env:
       CONAN_READ_REMOTE_URL: ${{ secrets.CONAN_READ_REMOTE_URL }}
       CONAN_READ_USERNAME: ${{ secrets.CONAN_DEV_USERNAME }}
@@ -81,17 +91,19 @@ jobs:
       - name: Build package and run tests
         run: |
           conan create . \
-            --build=never \
+            --build="dicom_viewer/*" \
             --lockfile=conan.lock \
             -pr:h=default \
             -pr:b=default \
             -s:h build_type=Debug \
             -s:b build_type=Release \
             -s:h compiler.cppstd=23 \
-            -s:b compiler.cppstd=23
+            -s:b compiler.cppstd=23 \
+            -o:h=dicom_viewer/*:shared=${{ matrix.shared }} \
+            -o:h=dicom_viewer/*:with_gui=${{ matrix.gui }}
 
   publish:
-    name: Publish application package
+    name: Publish library packages
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: verify
     runs-on: ubuntu-24.04
@@ -157,19 +169,25 @@ jobs:
           conan remote add conan-write "$CONAN_PUBLISH_REMOTE_URL" --force
           conan remote login conan-write "$CONAN_CI_USERNAME" -p "$CONAN_CI_TOKEN"
 
-      - name: Create release package
+      - name: Create release package variants
         run: |
           conan profile detect --force
-          conan create . \
-            --build=never \
-            --lockfile=conan.lock \
-            -pr:h=default \
-            -pr:b=default \
-            -s:h build_type=Release \
-            -s:b build_type=Release \
-            -s:h compiler.cppstd=23 \
-            -s:b compiler.cppstd=23 \
-            -c:h tools.build:skip_test=True
+          for shared in False True; do
+            for gui in False True; do
+              conan create . \
+                --build="dicom_viewer/*" \
+                --lockfile=conan.lock \
+                -pr:h=default \
+                -pr:b=default \
+                -s:h build_type=Release \
+                -s:b build_type=Release \
+                -s:h compiler.cppstd=23 \
+                -s:b compiler.cppstd=23 \
+                -o:h=dicom_viewer/*:shared="$shared" \
+                -o:h=dicom_viewer/*:with_gui="$gui" \
+                -c:h tools.build:skip_test=True
+            done
+          done
 
-      - name: Upload only the application package
-        run: conan upload "dicom_dataset_editor/0.1.0" -r=conan-write --confirm
+      - name: Upload library package variants
+        run: conan upload "dicom_viewer/0.1.0" -r=conan-write --confirm

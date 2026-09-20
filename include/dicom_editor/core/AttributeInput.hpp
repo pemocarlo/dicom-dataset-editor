@@ -1,5 +1,7 @@
 #pragma once
 
+#include "dicom_viewer/export.hpp"
+
 #include <dcmtk/dcmdata/dctagkey.h>
 
 #include <optional>
@@ -17,6 +19,6 @@ struct AttributeInput {
 };
 
 /// Parses a hexadecimal DICOM tag from group and element fields.
-[[nodiscard]] std::optional<DcmTagKey> parseTagKey(std::string_view group, std::string_view element);
+[[nodiscard]] DICOM_VIEWER_OPERATIONS_EXPORT std::optional<DcmTagKey> parseTagKey(std::string_view group, std::string_view element);
 
 } // namespace dicom_editor

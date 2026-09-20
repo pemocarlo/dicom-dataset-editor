@@ -10,6 +10,8 @@ project(
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+include(GenerateExportHeader)
+include(CTest)
 
 # Only the Conan ClangCL profile needs this Visual Studio IntelliSense bridge.
 if(
@@ -91,11 +93,27 @@ configure_file(
     @ONLY
 )
 
-add_library(dicom_viewer_operations STATIC)
+add_library(dicom_viewer_operations)
 add_library(DicomViewer::operations ALIAS dicom_viewer_operations)
-# Keep the old name available to source consumers while they migrate.
-add_library(DicomDatasetEditor::core ALIAS dicom_viewer_operations)
-set_target_properties(dicom_viewer_operations PROPERTIES EXPORT_NAME operations)
+set_target_properties(dicom_viewer_operations PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    EXPORT_NAME operations
+    SOVERSION ${PROJECT_VERSION_MAJOR}
+    VERSION ${PROJECT_VERSION}
+    VISIBILITY_INLINES_HIDDEN YES
+)
+file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/generated/include/dicom_viewer)
+generate_export_header(dicom_viewer_operations
+    EXPORT_FILE_NAME ${PROJECT_BINARY_DIR}/generated/include/dicom_viewer/export.hpp
+    EXPORT_MACRO_NAME DICOM_VIEWER_OPERATIONS_EXPORT
+    STATIC_DEFINE DICOM_VIEWER_OPERATIONS_STATIC_DEFINE
+)
+get_target_property(DICOM_VIEWER_OPERATIONS_TYPE dicom_viewer_operations TYPE)
+if(DICOM_VIEWER_OPERATIONS_TYPE STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(dicom_viewer_operations
+        PUBLIC DICOM_VIEWER_OPERATIONS_STATIC_DEFINE
+    )
+endif()
 target_sources(dicom_viewer_operations
     PRIVATE
         ${DICOM_VIEWER_OPERATIONS_SOURCES}
@@ -103,9 +121,12 @@ target_sources(dicom_viewer_operations
         ${PROJECT_BINARY_DIR}/generated/EmbeddedDictionary.cpp
     PUBLIC
         FILE_SET HEADERS
-        BASE_DIRS include
+        BASE_DIRS
+            include
+            ${PROJECT_BINARY_DIR}/generated/include
         FILES
             ${DICOM_VIEWER_OPERATIONS_PUBLIC_HEADERS}
+            ${PROJECT_BINARY_DIR}/generated/include/dicom_viewer/export.hpp
 )
 set_source_files_properties(
     ${PROJECT_BINARY_DIR}/generated/EmbeddedDictionary.cpp
@@ -118,6 +139,7 @@ set_source_files_properties(
 target_include_directories(dicom_viewer_operations
     PUBLIC
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/generated/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE
         src/core
@@ -130,18 +152,20 @@ set(DICOM_EDITOR_APPLICATION_HEADERS
 set(DICOM_EDITOR_APPLICATION_SOURCES
     src/application/EditorController.cpp
 )
-add_library(dicom_editor_application STATIC)
-add_library(DicomDatasetEditor::application ALIAS dicom_editor_application)
-target_sources(dicom_editor_application
-    PRIVATE
-        ${DICOM_EDITOR_APPLICATION_SOURCES}
-    PUBLIC
-        FILE_SET HEADERS
-        BASE_DIRS include
-        FILES
-            ${DICOM_EDITOR_APPLICATION_HEADERS}
-)
-target_link_libraries(dicom_editor_application PUBLIC DicomViewer::operations)
+if(DICOM_EDITOR_BUILD_FLTK OR BUILD_TESTING)
+    add_library(dicom_editor_application STATIC)
+    add_library(DicomDatasetEditor::application ALIAS dicom_editor_application)
+    target_sources(dicom_editor_application
+        PRIVATE
+            ${DICOM_EDITOR_APPLICATION_SOURCES}
+        PUBLIC
+            FILE_SET HEADERS
+            BASE_DIRS include
+            FILES
+                ${DICOM_EDITOR_APPLICATION_HEADERS}
+    )
+    target_link_libraries(dicom_editor_application PUBLIC DicomViewer::operations)
+endif()
 
 if(DICOM_EDITOR_BUILD_FLTK)
     set(DICOM_EDITOR_FLTK_HEADERS
@@ -185,6 +209,15 @@ if(DICOM_EDITOR_BUILD_FLTK)
             ${DICOM_EDITOR_APP_SOURCES}
     )
     target_link_libraries(dicom-dataset-editor PRIVATE DicomDatasetEditor::fltk)
+    if(APPLE)
+        set_target_properties(dicom-dataset-editor PROPERTIES
+            INSTALL_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}"
+        )
+    elseif(UNIX)
+        set_target_properties(dicom-dataset-editor PROPERTIES
+            INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+        )
+    endif()
 endif()
 
 install(TARGETS dicom_viewer_operations
@@ -231,7 +264,6 @@ if(DICOM_EDITOR_ENABLE_VALGRIND)
     )
 endif()
 
-include(CTest)
 if(BUILD_TESTING)
     find_package(Catch2 3 CONFIG REQUIRED)
     set(DICOM_EDITOR_TEST_SOURCES tests/DicomEditorTests.cpp)

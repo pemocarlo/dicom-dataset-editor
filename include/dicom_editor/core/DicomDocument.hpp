@@ -2,6 +2,7 @@
 
 #include "dicom_editor/core/DicomError.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
+#include "dicom_viewer/export.hpp"
 
 #include <dcmtk/dcmdata/dcfilefo.h>
 
@@ -59,7 +60,7 @@ struct DicomHierarchy {
 };
 
 /// Owns the loaded DICOM file and exposes tree, edit, and preview operations.
-class DicomDocument {
+class DICOM_VIEWER_OPERATIONS_EXPORT DicomDocument {
   public:
     /// Creates an empty in-memory dataset.
     DicomDocument();

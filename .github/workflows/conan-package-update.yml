@@ -1,6 +1,6 @@
 name: Conan Package Update
 
-# Temporarily disabled until the Artifactory service and credentials are ready.
+# GitHub Actions is disabled for now until the Artifactory service and credentials are ready.
 on: []
 
 permissions:
@@ -98,6 +98,8 @@ jobs:
             -s:b build_type=Release \
             -s:h compiler.cppstd=23 \
             -s:b compiler.cppstd=23 \
+            -o:h=dicom_viewer/*:shared=True \
+            -o:h=dicom_viewer/*:with_gui=True \
             -c:h tools.build:skip_test=True
 
       - name: Collect binaries built by this run

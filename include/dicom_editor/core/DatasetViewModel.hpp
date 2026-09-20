@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dicom_editor/core/DicomNode.hpp"
+#include "dicom_viewer/export.hpp"
 
 #include <cstddef>
 #include <span>
@@ -14,7 +15,7 @@ namespace dicom_editor {
 class DicomPath;
 
 /// Prepares the flattened dataset tree for the table view.
-class DatasetViewModel {
+class DICOM_VIEWER_OPERATIONS_EXPORT DatasetViewModel {
   public:
     /// Replaces the node list and reapplies the current filter.
     void setNodes(std::vector<DicomNode> newNodes);

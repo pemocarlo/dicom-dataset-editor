@@ -1,5 +1,7 @@
 #pragma once
 
+#include "dicom_viewer/export.hpp"
+
 #include <dcmtk/dcmdata/dctagkey.h>
 
 #include <optional>
@@ -20,7 +22,7 @@ struct SequenceItemRef {
 };
 
 /// Stable path to a dataset item or element.
-class DicomPath {
+class DICOM_VIEWER_OPERATIONS_EXPORT DicomPath {
   public:
     /// Creates the root dataset path.
     DicomPath() = default;
