@@ -1,6 +1,8 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
+# DCMTK is not part of the public header API, but the exported operations target
+# may need it at final link time (notably for static packages).
 find_dependency(DCMTK CONFIG REQUIRED)
 
 include("${CMAKE_CURRENT_LIST_DIR}/DicomViewerOperationsTargets.cmake")

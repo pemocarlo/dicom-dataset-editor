@@ -3,8 +3,6 @@
 #include "dicom_editor/core/DicomPath.hpp"
 #include "dicom_viewer/export.hpp"
 
-#include <dcmtk/dcmdata/dctagkey.h>
-
 #include <string>
 
 namespace dicom_editor {
@@ -26,7 +24,7 @@ struct AddAttributeRequest {
     /// Path to the owning item.
     DicomPath parentItemPath;
     /// Tag of the attribute to create.
-    DcmTagKey tag;
+    DicomTag tag;
     /// Initial value to store.
     std::string value;
     /// Validate the value before writing it.
@@ -39,7 +37,7 @@ class DICOM_VIEWER_OPERATIONS_EXPORT DicomEditorService {
     /// Replaces an existing element value.
     static void editValue(DicomDocument &document, const EditRequest &request);
     /// Inserts or replaces a root-dataset attribute.
-    static void setAttribute(DicomDocument &document, const DcmTagKey &tag, const std::string &value, bool validate = true);
+    static void setAttribute(DicomDocument &document, const DicomTag &tag, const std::string &value, bool validate = true);
     /// Inserts a new attribute into a dataset item.
     static void addAttribute(DicomDocument &document, const AddAttributeRequest &request);
     /// Removes a scalar attribute.

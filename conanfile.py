@@ -18,11 +18,13 @@ class DicomViewerRecipe(ConanFile):
         "shared": [True, False],
         "fPIC": [True, False],
         "with_gui": [True, False],
+        "with_c_api": [True, False],
     }
     default_options = {
         "shared": False,
         "fPIC": True,
         "with_gui": False,
+        "with_c_api": False,
     }
     exports_sources = (
         "CMakeLists.txt",
@@ -42,9 +44,9 @@ class DicomViewerRecipe(ConanFile):
             self.options.rm_safe("fPIC")
 
     def requirements(self):
-        # DCMTK types are intentionally part of the public operations API, so
-        # consumers need its headers and libraries even when this package is shared.
-        self.requires("dcmtk/3.7.0", transitive_headers=True, transitive_libs=True)
+        # DCMTK is an implementation dependency. Its link requirement remains
+        # available for static consumers, but its headers are not propagated.
+        self.requires("dcmtk/3.7.0", transitive_headers=False, transitive_libs=True)
         if self.options.with_gui:
             self.requires("fltk/1.4.5")
 
@@ -78,6 +80,7 @@ class DicomViewerRecipe(ConanFile):
         toolchain.cache_variables["BUILD_TESTING"] = not self.conf.get("tools.build:skip_test", default=False)
         toolchain.cache_variables["BUILD_SHARED_LIBS"] = bool(self.options.shared)
         toolchain.cache_variables["DICOM_EDITOR_BUILD_FLTK"] = bool(self.options.with_gui)
+        toolchain.cache_variables["DICOM_EDITOR_BUILD_C_API"] = bool(self.options.with_c_api)
         dcmtk = self.dependencies["dcmtk"]
         dict_file = os.path.join(
             dcmtk.package_folder,
@@ -110,6 +113,8 @@ class DicomViewerRecipe(ConanFile):
         self.cpp_info.set_property("cmake_target_name", "DicomViewer::operations")
         self.cpp_info.libs = ["dicom_viewer_operations"]
         self.cpp_info.requires = ["dcmtk::dcmtk"]
+        if self.options.with_c_api:
+            self.cpp_info.libs.append("dicom_viewer_operations_c")
         if self.options.with_gui:
             # FLTK is linked only into the packaged executable, not the public library.
             self.cpp_info.ignored_requires = ["fltk"]

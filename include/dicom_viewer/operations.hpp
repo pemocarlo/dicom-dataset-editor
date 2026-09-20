@@ -14,5 +14,6 @@
 #include "dicom_editor/core/DicomError.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomPath.hpp"
+#include "dicom_editor/core/DicomTag.hpp"
 #include "dicom_editor/core/DicomWorkspace.hpp"
 #include "dicom_editor/core/StructuredReport.hpp"

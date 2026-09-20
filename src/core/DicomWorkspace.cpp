@@ -3,6 +3,7 @@
 #include "dicom_editor/core/DicomDocument.hpp"
 #include "dicom_editor/core/DicomEditorService.hpp"
 #include "dicom_editor/core/DicomError.hpp"
+#include "dicom_editor/core/DicomTag.hpp"
 
 #include <cstddef>
 #include <dcmtk/dcmdata/dcdeftag.h>
@@ -96,6 +97,8 @@ std::vector<std::pair<DcmTagKey, std::string>> attributesFor(BatchEditLevel leve
 bool tagAllowed(BatchEditLevel level, const DcmTagKey &tag) {
     return std::ranges::any_of(attributesFor(level), [&tag](const auto &attribute) { return attribute.first == tag; });
 }
+
+DicomTag publicTag(const DcmTagKey &tag) { return {.group = tag.getGroup(), .element = tag.getElement()}; }
 
 } // namespace
 
@@ -331,7 +334,7 @@ BatchEditReport DicomWorkspace::batchEditReport(const BatchEditTarget &target) c
     const auto attributes = attributesFor(target.level);
     report.attributes.reserve(attributes.size());
     for (const auto &[tag, name] : attributes) {
-        report.attributes.push_back({.tag = tag, .name = name, .values = {}});
+        report.attributes.push_back({.tag = publicTag(tag), .name = name, .values = {}});
     }
     for (const auto &document : documents_) {
         if (!document.hasFilePath() || !matches(document.hierarchy(), target)) {
@@ -339,7 +342,9 @@ BatchEditReport DicomWorkspace::batchEditReport(const BatchEditTarget &target) c
         }
         ++report.documentCount;
         for (auto &attribute : report.attributes) {
-            const auto value = document.attributeValue(attribute.tag).value_or("<missing>");
+            const auto nativeTag = DcmTagKey{attribute.tag.group, attribute.tag.element};
+            const auto value =
+                document.attributeValue({.group = nativeTag.getGroup(), .element = nativeTag.getElement()}).value_or("<missing>");
             if (std::ranges::find(attribute.values, value) == attribute.values.end()) {
                 attribute.values.push_back(value);
             }
@@ -348,8 +353,9 @@ BatchEditReport DicomWorkspace::batchEditReport(const BatchEditTarget &target) c
     return report;
 }
 
-std::size_t DicomWorkspace::batchEdit(const BatchEditTarget &target, const DcmTagKey &tag, const std::string &value, bool validate) {
-    if (!tagAllowed(target.level, tag)) {
+std::size_t DicomWorkspace::batchEdit(const BatchEditTarget &target, const DicomTag &tag, const std::string &value, bool validate) {
+    const DcmTagKey nativeTag{tag.group, tag.element};
+    if (!tagAllowed(target.level, nativeTag)) {
         throw DicomError("Attribute is not valid for selected batch-edit level");
     }
     std::size_t selected{};

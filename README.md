@@ -7,6 +7,10 @@ library. The FLTK executable is one UI adapter over that library; other UIs can
 link the library without depending on FLTK. Its public include entry point is
 `dicom_viewer/operations.hpp`.
 
+The operations headers use project-owned value types and do not expose DCMTK
+classes. An optional opaque-handle C ABI is available as
+`dicom_viewer/operations_c.h`.
+
 ## Start Here
 
 - Build and install: [BUILDING.md](BUILDING.md)

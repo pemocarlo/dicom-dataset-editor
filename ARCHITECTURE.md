@@ -150,13 +150,17 @@ operation is rollback-safe per file rather than atomic across the workspace.
 on FLTK or on `EditorController`, and its public entry point is
 `dicom_viewer/operations.hpp`. A second UI can link `DicomViewer::operations`
 directly, or implement `EditorView` and also reuse the application controller.
-The installed CMake package exports `DicomViewer::operations` and requires only
-DCMTK as its external dependency.
+The installed CMake package exports `DicomViewer::operations`; with the Conan
+`with_c_api` option it also exports `DicomViewer::operations_c`, an opaque-handle
+C ABI. With the `with_gui` option the build includes `DicomViewer::fltk_demo`,
+the optional FLTK application composition target.
 
-DCMTK types remain visible inside the operations API because this library directly
-edits DCMTK datasets. Hiding every DCMTK type would add a large mirror model with
-little isolation benefit. Toolkit types are different: they stop at FLTK adapter
-boundary.
+The installed C++ headers expose project-owned types such as `DicomTag`,
+`DicomPath`, and `DicomNode`; DCMTK classes are confined to the implementation
+and a source-only `DicomDocumentDetail.hpp` bridge used by operations internals
+and tests. DCMTK remains a private implementation dependency. The package
+configuration still locates it because static-library consumers need its link
+objects, but they do not need to include its headers to use the public API.
 
 ## Dictionary Lifecycle
 

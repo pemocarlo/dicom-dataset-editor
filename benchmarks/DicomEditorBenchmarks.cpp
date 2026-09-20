@@ -1,3 +1,4 @@
+#include "DicomDocumentDetail.hpp"
 #include "dicom_editor/core/DicomDocument.hpp"
 #include "dicom_editor/core/DicomWorkspace.hpp"
 
@@ -26,8 +27,7 @@ using Clock = std::chrono::steady_clock;
 class TemporaryDirectory {
   public:
     TemporaryDirectory() {
-        path_ = std::filesystem::temp_directory_path() /
-                std::format("dicom_editor_benchmark_{}", Clock::now().time_since_epoch().count());
+        path_ = std::filesystem::temp_directory_path() / std::format("dicom_editor_benchmark_{}", Clock::now().time_since_epoch().count());
         std::filesystem::create_directories(path_);
     }
 
@@ -55,7 +55,7 @@ std::size_t parseCount(int argc, char **argv) {
 
 void createSyntheticFile(const std::filesystem::path &path, std::size_t index) {
     dicom_editor::DicomDocument document;
-    auto &dataset = document.dataset();
+    auto &dataset = dicom_editor::detail::DocumentAccess::dataset(document);
     const auto suffix = std::to_string(index + 1);
     dataset.putAndInsertString(DCM_SOPClassUID, UID_SecondaryCaptureImageStorage);
     dataset.putAndInsertString(DCM_SOPInstanceUID, std::format("1.2.826.0.1.3680043.10.543.1.{}", suffix).c_str());

@@ -1,9 +1,9 @@
 #include "dicom_editor/core/AttributeInput.hpp"
 
-#include <dcmtk/dcmdata/dctagkey.h>
-#include <dcmtk/ofstd/oftypes.h>
+#include "dicom_editor/core/DicomTag.hpp"
 
 #include <charconv>
+#include <cstdint>
 #include <optional>
 #include <string_view>
 #include <system_error>
@@ -23,13 +23,13 @@ std::optional<unsigned int> parseHex(std::string_view text) {
 
 } // namespace
 
-std::optional<DcmTagKey> parseTagKey(std::string_view group, std::string_view element) {
+std::optional<DicomTag> parseTagKey(std::string_view group, std::string_view element) {
     const auto groupValue = parseHex(group);
     const auto elementValue = parseHex(element);
     if (!groupValue || !elementValue) {
         return std::nullopt;
     }
-    return DcmTagKey(static_cast<Uint16>(*groupValue), static_cast<Uint16>(*elementValue));
+    return DicomTag{.group = static_cast<std::uint16_t>(*groupValue), .element = static_cast<std::uint16_t>(*elementValue)};
 }
 
 } // namespace dicom_editor

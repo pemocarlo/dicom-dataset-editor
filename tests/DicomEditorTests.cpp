@@ -1,3 +1,4 @@
+#include "DicomDocumentDetail.hpp"
 #include "dicom_editor/application/EditorController.hpp"
 #include "dicom_editor/core/AttributeInput.hpp"
 #include "dicom_editor/core/DatasetViewModel.hpp"
@@ -7,6 +8,7 @@
 #include "dicom_editor/core/DicomError.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomPath.hpp"
+#include "dicom_editor/core/DicomTag.hpp"
 #include "dicom_editor/core/DicomWorkspace.hpp"
 #include "dicom_editor/core/StructuredReport.hpp"
 
@@ -53,6 +55,16 @@ using dicom_editor::EditRequest;
 using dicom_editor::SequenceItemRef;
 
 namespace {
+
+DcmDataset &dataset(DicomDocument &document) { return dicom_editor::detail::DocumentAccess::dataset(document); }
+DcmItem &itemAt(DicomDocument &document, const DicomPath &path) { return dicom_editor::detail::DocumentAccess::item(document, path); }
+DcmElement &elementAt(DicomDocument &document, const DicomPath &path) {
+    return dicom_editor::detail::DocumentAccess::element(document, path);
+}
+dicom_editor::DicomTag publicTag(const DcmTagKey &tag) { return {.group = tag.getGroup(), .element = tag.getElement()}; }
+std::optional<std::string> attributeValue(const DicomDocument &document, const DcmTagKey &tag) {
+    return document.attributeValue(publicTag(tag));
+}
 
 class ControllerView final : public dicom_editor::EditorView {
   public:
@@ -133,40 +145,40 @@ class ControllerView final : public dicom_editor::EditorView {
 
 std::string stringValue(DicomDocument &document, const DicomPath &path) {
     OFString value;
-    const auto condition = document.elementAt(path).getOFStringArray(value);
+    const auto condition = elementAt(document, path).getOFStringArray(value);
     REQUIRE(condition.good());
     return value;
 }
 
 void seedDataset(DicomDocument &document) {
-    auto &dataset = document.dataset();
-    dataset.putAndInsertString(DCM_SpecificCharacterSet, "ISO_IR 100");
-    dataset.putAndInsertString(DCM_SOPClassUID, UID_SecondaryCaptureImageStorage);
-    dataset.putAndInsertString(DCM_SOPInstanceUID, "1.2.826.0.1.3680043.10.543.1");
-    dataset.putAndInsertString(DCM_StudyInstanceUID, "1.2.826.0.1.3680043.10.543.2");
-    dataset.putAndInsertString(DCM_SeriesInstanceUID, "1.2.826.0.1.3680043.10.543.3");
-    dataset.putAndInsertString(DCM_Modality, "OT");
-    dataset.putAndInsertString(DCM_PatientName, "Before^Patient");
+    auto &datasetValue = ::dataset(document);
+    datasetValue.putAndInsertString(DCM_SpecificCharacterSet, "ISO_IR 100");
+    datasetValue.putAndInsertString(DCM_SOPClassUID, UID_SecondaryCaptureImageStorage);
+    datasetValue.putAndInsertString(DCM_SOPInstanceUID, "1.2.826.0.1.3680043.10.543.1");
+    datasetValue.putAndInsertString(DCM_StudyInstanceUID, "1.2.826.0.1.3680043.10.543.2");
+    datasetValue.putAndInsertString(DCM_SeriesInstanceUID, "1.2.826.0.1.3680043.10.543.3");
+    datasetValue.putAndInsertString(DCM_Modality, "OT");
+    datasetValue.putAndInsertString(DCM_PatientName, "Before^Patient");
 
     auto *sequence = new DcmSequenceOfItems(DCM_ReferencedStudySequence);
     auto *item = new DcmItem();
     item->putAndInsertString(DCM_ReferencedSOPClassUID, UID_SecondaryCaptureImageStorage);
     item->putAndInsertString(DCM_ReferencedSOPInstanceUID, "1.2.826.0.1.3680043.10.543.4");
     sequence->append(item);
-    dataset.insert(sequence, true);
+    datasetValue.insert(sequence, true);
 }
 
 void seedReport(DicomDocument &document) {
     seedDataset(document);
-    auto &dataset = document.dataset();
-    REQUIRE(dataset.putAndInsertString(DCM_SOPClassUID, UID_ComprehensiveSRStorage).good());
-    REQUIRE(dataset.putAndInsertString(DCM_Modality, "SR").good());
-    REQUIRE(dataset.putAndInsertString(DCM_ValueType, "CONTAINER").good());
-    REQUIRE(dataset.putAndInsertString(DCM_ContinuityOfContent, "SEPARATE").good());
+    auto &datasetValue = ::dataset(document);
+    REQUIRE(datasetValue.putAndInsertString(DCM_SOPClassUID, UID_ComprehensiveSRStorage).good());
+    REQUIRE(datasetValue.putAndInsertString(DCM_Modality, "SR").good());
+    REQUIRE(datasetValue.putAndInsertString(DCM_ValueType, "CONTAINER").good());
+    REQUIRE(datasetValue.putAndInsertString(DCM_ContinuityOfContent, "SEPARATE").good());
     DSRCodedEntryValue title("126000", "DCM", "Imaging Measurement Report");
-    REQUIRE(title.writeSequence(dataset, DCM_ConceptNameCodeSequence).good());
+    REQUIRE(title.writeSequence(datasetValue, DCM_ConceptNameCodeSequence).good());
     DcmItem *child = nullptr;
-    REQUIRE(dataset.findOrCreateSequenceItem(DCM_ContentSequence, child, 0).good());
+    REQUIRE(datasetValue.findOrCreateSequenceItem(DCM_ContentSequence, child, 0).good());
     REQUIRE(child->putAndInsertString(DCM_ValueType, "TEXT").good());
     REQUIRE(child->putAndInsertString(DCM_RelationshipType, "CONTAINS").good());
     REQUIRE(child->putAndInsertString(DCM_TextValue, "Before\nSecond line").good());
@@ -210,14 +222,14 @@ TEST_CASE("SR projects content hierarchy and preserves unrelated data when editi
 
     StructuredReport::edit(document, nodes[1].path, reportValues(nodes[1], "Text", "After\nSecond line"));
     REQUIRE(document.dirty());
-    REQUIRE(document.attributeValue(DCM_PatientName) == "Before^Patient");
-    REQUIRE(stringValue(document, DicomPath::element(nodes[1].path.parents(), DCM_TextValue)) == "After\nSecond line");
+    REQUIRE(attributeValue(document, DCM_PatientName) == "Before^Patient");
+    REQUIRE(stringValue(document, DicomPath::element(nodes[1].path.parents(), publicTag(DCM_TextValue))) == "After\nSecond line");
     REQUIRE(StructuredReport::nodes(document)[2].fields.front().value == "12.5");
 
     StructuredReport::edit(document, nodes[0].path, reportValues(nodes[0], "Name meaning", "Updated report"));
     REQUIRE(StructuredReport::nodes(document)[0].label == "Updated report");
     REQUIRE(StructuredReport::nodes(document).size() == 3);
-    REQUIRE(document.attributeValue(DCM_SOPClassUID) == UID_ComprehensiveSRStorage);
+    REQUIRE(attributeValue(document, DCM_SOPClassUID) == UID_ComprehensiveSRStorage);
 }
 
 TEST_CASE("SR invalid edits leave all node fields and dirty state unchanged", "[core][sr]") {
@@ -305,7 +317,7 @@ TEST_CASE("SR creates supported value types and rejects invalid new content with
         input.valueType = type;
         input.value = value;
         const auto path = StructuredReport::insert(document, DicomPath::dataset(), ReportInsertion::Child, input);
-        REQUIRE(document.itemAt(path).tagExists(DCM_ValueType));
+        REQUIRE(itemAt(document, path).tagExists(DCM_ValueType));
     }
     document.clearDirty();
     const auto count = StructuredReport::nodes(document).size();
@@ -346,8 +358,8 @@ TEST_CASE("SR copies and deletes subtrees while preserving sibling values", "[co
     REQUIRE(nodes[1].path.parents().back().itemIndex == 0);
     static_cast<void>(StructuredReport::changeStructure(document, nodes[1].path, true));
     REQUIRE(StructuredReport::nodes(document).size() == 1);
-    REQUIRE_FALSE(document.dataset().tagExists(DCM_ContentSequence));
-    REQUIRE(document.attributeValue(DCM_PatientName) == "Before^Patient");
+    REQUIRE_FALSE(dataset(document).tagExists(DCM_ContentSequence));
+    REQUIRE(attributeValue(document, DCM_PatientName) == "Before^Patient");
 }
 
 TEST_CASE("SR tree changes protect roots verified reports and content references", "[core][sr]") {
@@ -358,12 +370,12 @@ TEST_CASE("SR tree changes protect roots verified reports and content references
     for (const bool remove : {false, true}) {
         REQUIRE_THROWS_AS(StructuredReport::changeStructure(document, nodes[0].path, remove), dicom_editor::DicomError);
     }
-    REQUIRE(document.dataset().putAndInsertString(DCM_VerificationFlag, "VERIFIED").good());
+    REQUIRE(dataset(document).putAndInsertString(DCM_VerificationFlag, "VERIFIED").good());
     for (const bool remove : {false, true}) {
         REQUIRE_THROWS_AS(StructuredReport::changeStructure(document, nodes[1].path, remove), dicom_editor::DicomError);
     }
-    REQUIRE(document.dataset().findAndDeleteElement(DCM_VerificationFlag).good());
-    REQUIRE(document.itemAt(nodes[2].path).putAndInsertUint32(DCM_ReferencedContentItemIdentifier, 1).good());
+    REQUIRE(dataset(document).findAndDeleteElement(DCM_VerificationFlag).good());
+    REQUIRE(itemAt(document, nodes[2].path).putAndInsertUint32(DCM_ReferencedContentItemIdentifier, 1).good());
     for (const bool remove : {false, true}) {
         REQUIRE_THROWS_AS(StructuredReport::changeStructure(document, nodes[1].path, remove), dicom_editor::DicomError);
     }
@@ -387,7 +399,7 @@ TEST_CASE("SR measurements and codes survive save and reload", "[core][sr]") {
     REQUIRE(saved.size() == 3);
     REQUIRE(saved[2].fields.front().value == "24.75");
     REQUIRE(saved[2].fields.back().value == "Millimeters");
-    REQUIRE(loaded.attributeValue(DCM_PatientName) == "Before^Patient");
+    REQUIRE(attributeValue(loaded, DCM_PatientName) == "Before^Patient");
     REQUIRE_FALSE(loaded.dirty());
     std::filesystem::remove(output);
 }
@@ -399,10 +411,10 @@ TEST_CASE("SR verified reports reject content changes and no-op edits stay clean
     const auto nodes = StructuredReport::nodes(document);
     StructuredReport::edit(document, nodes[1].path, reportValues(nodes[1], "Text", "Before\nSecond line"));
     REQUIRE_FALSE(document.dirty());
-    REQUIRE(document.dataset().putAndInsertString(DCM_VerificationFlag, "VERIFIED").good());
+    REQUIRE(dataset(document).putAndInsertString(DCM_VerificationFlag, "VERIFIED").good());
     REQUIRE_THROWS_AS(StructuredReport::edit(document, nodes[1].path, reportValues(nodes[1], "Text", "After")), dicom_editor::DicomError);
     REQUIRE_FALSE(document.dirty());
-    REQUIRE(stringValue(document, DicomPath::element(nodes[1].path.parents(), DCM_TextValue)) == "Before\nSecond line");
+    REQUIRE(stringValue(document, DicomPath::element(nodes[1].path.parents(), publicTag(DCM_TextValue))) == "Before\nSecond line");
 }
 
 TEST_CASE("SR numeric edits replace alternate encodings only after validation", "[core][sr]") {
@@ -411,9 +423,9 @@ TEST_CASE("SR numeric edits replace alternate encodings only after validation", 
     seedReport(document);
     const auto nodes = StructuredReport::nodes(document);
     auto parents = nodes[2].path.parents();
-    parents.push_back({.sequenceTag = DCM_MeasuredValueSequence, .itemIndex = 0});
-    REQUIRE(document.itemAt(DicomPath::item(parents)).putAndInsertFloat64(DCM_FloatingPointValue, 12.5).good());
-    auto &measurement = document.itemAt(DicomPath::item(parents));
+    parents.push_back({.sequenceTag = publicTag(DCM_MeasuredValueSequence), .itemIndex = 0});
+    REQUIRE(itemAt(document, DicomPath::item(parents)).putAndInsertFloat64(DCM_FloatingPointValue, 12.5).good());
+    auto &measurement = itemAt(document, DicomPath::item(parents));
     REQUIRE(measurement.putAndInsertSint32(DCM_RationalNumeratorValue, 25).good());
     REQUIRE(measurement.putAndInsertUint32(DCM_RationalDenominatorValue, 2).good());
     const auto numeric = StructuredReport::nodes(document)[2];
@@ -426,7 +438,7 @@ TEST_CASE("SR numeric edits replace alternate encodings only after validation", 
     REQUIRE(measurement.tagExists(DCM_RationalNumeratorValue));
     REQUIRE_FALSE(document.dirty());
     StructuredReport::edit(document, numeric.path, reportValues(numeric, "Number", "26.75"));
-    auto &updated = document.itemAt(DicomPath::item(parents));
+    auto &updated = itemAt(document, DicomPath::item(parents));
     REQUIRE_FALSE(updated.tagExists(DCM_FloatingPointValue));
     REQUIRE_FALSE(updated.tagExists(DCM_RationalNumeratorValue));
     REQUIRE_FALSE(updated.tagExists(DCM_RationalDenominatorValue));
@@ -438,7 +450,7 @@ TEST_CASE("SR permits entering missing text values", "[core][sr]") {
     DicomDocument document;
     seedReport(document);
     const auto path = StructuredReport::nodes(document)[1].path;
-    REQUIRE(document.itemAt(path).findAndDeleteElement(DCM_TextValue).good());
+    REQUIRE(itemAt(document, path).findAndDeleteElement(DCM_TextValue).good());
     const auto node = StructuredReport::nodes(document)[1];
     REQUIRE(node.fields.back().label == "Text");
     REQUIRE(node.fields.back().value.empty());
@@ -470,7 +482,7 @@ TEST_CASE("controller SR edits refresh the raw dataset and use normal saving", "
     REQUIRE_FALSE(view.openFiles.front().dirty);
     DicomDocument loaded;
     REQUIRE(loaded.load(output).has_value());
-    REQUIRE(stringValue(loaded, DicomPath::element(nodes[1].path.parents(), DCM_TextValue)) == "Controller edit");
+    REQUIRE(stringValue(loaded, DicomPath::element(nodes[1].path.parents(), publicTag(DCM_TextValue))) == "Controller edit");
     std::filesystem::remove(output);
 }
 
@@ -482,7 +494,7 @@ TEST_CASE("scalar attributes can be edited", "[core][editing]") {
     DicomDocument document;
     seedDataset(document);
 
-    const DicomPath patientName = DicomPath::element({}, DCM_PatientName);
+    const DicomPath patientName = DicomPath::element({}, publicTag(DCM_PatientName));
     DicomEditorService::editValue(document, {.path = patientName, .value = "After^Patient"});
 
     REQUIRE(document.dirty());
@@ -494,21 +506,22 @@ TEST_CASE("attributes can be added and deleted", "[core][editing]") {
     seedDataset(document);
 
     const auto tag = DCM_PatientID;
-    const DicomPath patientId = DicomPath::element({}, tag);
-    DicomEditorService::addAttribute(document, AddAttributeRequest{.parentItemPath = DicomPath::dataset(), .tag = tag, .value = "PID-123"});
+    const DicomPath patientId = DicomPath::element({}, publicTag(tag));
+    DicomEditorService::addAttribute(
+        document, AddAttributeRequest{.parentItemPath = DicomPath::dataset(), .tag = publicTag(tag), .value = "PID-123"});
     REQUIRE(stringValue(document, patientId) == "PID-123");
 
     DicomEditorService::deleteAttribute(document, patientId);
     DcmElement *deleted = nullptr;
-    REQUIRE(document.dataset().findAndGetElement(tag, deleted).bad());
+    REQUIRE(dataset(document).findAndGetElement(tag, deleted).bad());
 }
 
 TEST_CASE("nested sequence attributes can be edited", "[core][editing]") {
     DicomDocument document;
     seedDataset(document);
 
-    std::vector<SequenceItemRef> parents{{DCM_ReferencedStudySequence, 0}};
-    const DicomPath referencedSop = DicomPath::element(parents, DCM_ReferencedSOPInstanceUID);
+    std::vector<SequenceItemRef> parents{{publicTag(DCM_ReferencedStudySequence), 0}};
+    const DicomPath referencedSop = DicomPath::element(parents, publicTag(DCM_ReferencedSOPInstanceUID));
     DicomEditorService::editValue(document, {.path = referencedSop, .value = "1.2.826.0.1.3680043.10.543.99"});
 
     REQUIRE(stringValue(document, referencedSop) == "1.2.826.0.1.3680043.10.543.99");
@@ -518,15 +531,15 @@ TEST_CASE("invalid standard values do not mutate the document", "[core][validati
     DicomDocument document;
     seedDataset(document);
 
-    const DicomPath sopInstanceUid = DicomPath::element({}, DCM_SOPInstanceUID);
+    const DicomPath sopInstanceUid = DicomPath::element({}, publicTag(DCM_SOPInstanceUID));
     REQUIRE_THROWS(DicomEditorService::editValue(document, {.path = sopInstanceUid, .value = "not a uid"}));
     REQUIRE(stringValue(document, sopInstanceUid) == "1.2.826.0.1.3680043.10.543.1");
     REQUIRE(!document.dirty());
 
     REQUIRE_THROWS(DicomEditorService::addAttribute(
-        document, {.parentItemPath = DicomPath::dataset(), .tag = DCM_PatientBirthDate, .value = "2026-99-99"}));
+        document, {.parentItemPath = DicomPath::dataset(), .tag = publicTag(DCM_PatientBirthDate), .value = "2026-99-99"}));
     DcmElement *birthDate = nullptr;
-    REQUIRE(document.dataset().findAndGetElement(DCM_PatientBirthDate, birthDate).bad());
+    REQUIRE(dataset(document).findAndGetElement(DCM_PatientBirthDate, birthDate).bad());
     REQUIRE(!document.dirty());
 }
 
@@ -534,7 +547,7 @@ TEST_CASE("validation can be disabled", "[core][validation]") {
     DicomDocument document;
     seedDataset(document);
 
-    const DicomPath sopInstanceUid = DicomPath::element({}, DCM_SOPInstanceUID);
+    const DicomPath sopInstanceUid = DicomPath::element({}, publicTag(DCM_SOPInstanceUID));
     DicomEditorService::editValue(document, {.path = sopInstanceUid, .value = "not-a-uid", .validate = false});
     REQUIRE(stringValue(document, sopInstanceUid) == "not-a-uid");
 
@@ -551,7 +564,7 @@ TEST_CASE("edits persist after save and reload", "[core][persistence]") {
     DicomDocument document;
     seedDataset(document);
 
-    const DicomPath patientName = DicomPath::element({}, DCM_PatientName);
+    const DicomPath patientName = DicomPath::element({}, publicTag(DCM_PatientName));
     DicomEditorService::editValue(document, EditRequest{.path = patientName, .value = "Persisted^Patient"});
 
     const auto output = std::filesystem::temp_directory_path() / "dicom_editor_persistence_test.dcm";
@@ -580,7 +593,7 @@ TEST_CASE("dataset nodes include nested sequence attributes", "[core][nodes]") {
 TEST_CASE("dataset nodes preserve full values", "[core][nodes]") {
     DicomDocument document;
     const std::string longValue(200, 'x');
-    document.dataset().putAndInsertString(DCM_PatientComments, longValue.c_str());
+    dataset(document).putAndInsertString(DCM_PatientComments, longValue.c_str());
 
     const auto nodes = document.nodes();
     const auto node = std::ranges::find_if(nodes, [](const auto &entry) { return entry.keyword == "PatientComments"; });
@@ -592,7 +605,7 @@ TEST_CASE("dataset nodes preserve full values", "[core][nodes]") {
 TEST_CASE("pixel data is not exposed as editable text", "[core][pixel-data]") {
     DicomDocument document;
     const Uint8 pixelData[]{0x00, 0x7f, 0xff};
-    document.dataset().putAndInsertUint8Array(DCM_PixelData, pixelData, 3);
+    dataset(document).putAndInsertUint8Array(DCM_PixelData, pixelData, 3);
 
     const auto nodes = document.nodes();
     const auto node = std::ranges::find_if(nodes, [](const auto &entry) { return entry.keyword == "PixelData"; });
@@ -604,18 +617,18 @@ TEST_CASE("pixel data is not exposed as editable text", "[core][pixel-data]") {
 
 TEST_CASE("pixel data renders as a preview", "[core][pixel-data]") {
     DicomDocument document;
-    auto &dataset = document.dataset();
-    dataset.putAndInsertUint16(DCM_Rows, 2);
-    dataset.putAndInsertUint16(DCM_Columns, 2);
-    dataset.putAndInsertUint16(DCM_SamplesPerPixel, 1);
-    dataset.putAndInsertString(DCM_PhotometricInterpretation, "MONOCHROME2");
-    dataset.putAndInsertUint16(DCM_BitsAllocated, 8);
-    dataset.putAndInsertUint16(DCM_BitsStored, 8);
-    dataset.putAndInsertUint16(DCM_HighBit, 7);
-    dataset.putAndInsertUint16(DCM_PixelRepresentation, 0);
+    auto &datasetValue = ::dataset(document);
+    datasetValue.putAndInsertUint16(DCM_Rows, 2);
+    datasetValue.putAndInsertUint16(DCM_Columns, 2);
+    datasetValue.putAndInsertUint16(DCM_SamplesPerPixel, 1);
+    datasetValue.putAndInsertString(DCM_PhotometricInterpretation, "MONOCHROME2");
+    datasetValue.putAndInsertUint16(DCM_BitsAllocated, 8);
+    datasetValue.putAndInsertUint16(DCM_BitsStored, 8);
+    datasetValue.putAndInsertUint16(DCM_HighBit, 7);
+    datasetValue.putAndInsertUint16(DCM_PixelRepresentation, 0);
     const Uint8 pixels[]{0, 64, 128, 255};
-    dataset.putAndInsertUint8Array(DCM_PixelData, pixels, 4);
-    dataset.initializeXfer(EXS_JPEGProcess1);
+    datasetValue.putAndInsertUint8Array(DCM_PixelData, pixels, 4);
+    datasetValue.initializeXfer(EXS_JPEGProcess1);
 
     const auto preview = document.renderPixelData(0);
     REQUIRE(preview.message.empty());
@@ -694,7 +707,7 @@ TEST_CASE("dataset branches collapse items and root without changing document da
 TEST_CASE("tag parser accepts only 16-bit hexadecimal components", "[core][validation]") {
     const auto tag = dicom_editor::parseTagKey("0010", "0010");
     REQUIRE(tag.has_value());
-    REQUIRE(tag == DCM_PatientName);
+    REQUIRE(tag == publicTag(DCM_PatientName));
     REQUIRE(!dicom_editor::parseTagKey("nope", "0010"));
     REQUIRE(!dicom_editor::parseTagKey("10000", "0010"));
 }
@@ -706,18 +719,18 @@ TEST_CASE("controller opens and navigates multiple files", "[application][worksp
 
     DicomDocument first;
     seedDataset(first);
-    first.dataset().putAndInsertString(DCM_PatientID, "PATIENT-1");
-    first.dataset().putAndInsertString(DCM_StudyDescription, "Workspace study");
-    first.dataset().putAndInsertString(DCM_SeriesDescription, "Series A");
-    first.dataset().putAndInsertString(DCM_InstanceNumber, "10");
+    dataset(first).putAndInsertString(DCM_PatientID, "PATIENT-1");
+    dataset(first).putAndInsertString(DCM_StudyDescription, "Workspace study");
+    dataset(first).putAndInsertString(DCM_SeriesDescription, "Series A");
+    dataset(first).putAndInsertString(DCM_InstanceNumber, "10");
     REQUIRE(first.saveAs(firstPath).has_value());
 
     DicomDocument second;
     seedDataset(second);
-    second.dataset().putAndInsertString(DCM_PatientID, "PATIENT-1");
-    second.dataset().putAndInsertString(DCM_StudyDescription, "Workspace study");
-    second.dataset().putAndInsertString(DCM_SeriesDescription, "Series A");
-    second.dataset().putAndInsertString(DCM_InstanceNumber, "2");
+    dataset(second).putAndInsertString(DCM_PatientID, "PATIENT-1");
+    dataset(second).putAndInsertString(DCM_StudyDescription, "Workspace study");
+    dataset(second).putAndInsertString(DCM_SeriesDescription, "Series A");
+    dataset(second).putAndInsertString(DCM_InstanceNumber, "2");
     REQUIRE(second.saveAs(secondPath).has_value());
 
     ControllerView view;
@@ -779,7 +792,7 @@ TEST_CASE("DICOMDIR documents are recognized and skipped", "[core][workspace][di
     const auto path = std::filesystem::temp_directory_path() / "DICOMDIR";
     DicomDocument directory;
     seedDataset(directory);
-    directory.dataset().putAndInsertString(DCM_SOPClassUID, UID_MediaStorageDirectoryStorage);
+    dataset(directory).putAndInsertString(DCM_SOPClassUID, UID_MediaStorageDirectoryStorage);
     REQUIRE(directory.isDicomDirectory());
     REQUIRE(directory.saveAs(path).has_value());
 
@@ -804,11 +817,11 @@ TEST_CASE("workspace sorts by instance number or filename", "[core][workspace]")
     const auto secondPath = directory / "a-first-name.dcm";
     DicomDocument first;
     seedDataset(first);
-    first.dataset().putAndInsertString(DCM_InstanceNumber, "2");
+    dataset(first).putAndInsertString(DCM_InstanceNumber, "2");
     REQUIRE(first.saveAs(firstPath).has_value());
     DicomDocument second;
     seedDataset(second);
-    second.dataset().putAndInsertString(DCM_InstanceNumber, "10");
+    dataset(second).putAndInsertString(DCM_InstanceNumber, "10");
     REQUIRE(second.saveAs(secondPath).has_value());
 
     DicomWorkspace workspace;
@@ -850,12 +863,12 @@ TEST_CASE("batch editing reports differences and updates its scope", "[core][wor
     const auto secondPath = directory / "dicom_editor_batch_second.dcm";
     DicomDocument first;
     seedDataset(first);
-    first.dataset().putAndInsertString(DCM_PatientID, "BATCH-PATIENT");
+    dataset(first).putAndInsertString(DCM_PatientID, "BATCH-PATIENT");
     REQUIRE(first.saveAs(firstPath).has_value());
     DicomDocument second;
     seedDataset(second);
-    second.dataset().putAndInsertString(DCM_PatientID, "BATCH-PATIENT");
-    second.dataset().putAndInsertString(DCM_PatientName, "Different^Patient");
+    dataset(second).putAndInsertString(DCM_PatientID, "BATCH-PATIENT");
+    dataset(second).putAndInsertString(DCM_PatientName, "Different^Patient");
     REQUIRE(second.saveAs(secondPath).has_value());
 
     DicomWorkspace workspace;
@@ -865,9 +878,9 @@ TEST_CASE("batch editing reports differences and updates its scope", "[core][wor
     const auto report = workspace.batchEditReport(target);
     REQUIRE(report.documentCount == 2);
     REQUIRE(report.attributes.front().values.size() == 2);
-    REQUIRE(workspace.batchEdit(target, DCM_PatientName, "Unified^Patient") == 2);
-    REQUIRE(workspace.at(0).attributeValue(DCM_PatientName) == "Unified^Patient");
-    REQUIRE(workspace.at(1).attributeValue(DCM_PatientName) == "Unified^Patient");
+    REQUIRE(workspace.batchEdit(target, publicTag(DCM_PatientName), "Unified^Patient") == 2);
+    REQUIRE(attributeValue(workspace.at(0), DCM_PatientName) == "Unified^Patient");
+    REQUIRE(attributeValue(workspace.at(1), DCM_PatientName) == "Unified^Patient");
     REQUIRE(workspace.at(0).dirty());
     REQUIRE(workspace.at(1).dirty());
 
@@ -880,10 +893,10 @@ TEST_CASE("hierarchy cache reflects mutations", "[core][document]") {
     seedDataset(document);
     REQUIRE(document.hierarchy().patientLabel == "Before^Patient");
 
-    document.dataset().putAndInsertString(DCM_PatientName, "Direct^Mutation");
+    dataset(document).putAndInsertString(DCM_PatientName, "Direct^Mutation");
     REQUIRE(document.hierarchy().patientLabel == "Direct^Mutation");
 
-    DicomEditorService::setAttribute(document, DCM_PatientName, "Service^Mutation", true);
+    DicomEditorService::setAttribute(document, publicTag(DCM_PatientName), "Service^Mutation", true);
     REQUIRE(document.hierarchy().patientLabel == "Service^Mutation");
 }
 
@@ -893,16 +906,16 @@ TEST_CASE("controller saves all documents and clears workspace", "[application][
     const auto secondPath = directory / "dicom_editor_save_all_second.dcm";
     DicomDocument first;
     seedDataset(first);
-    first.dataset().putAndInsertString(DCM_PatientID, "SAVE-ALL");
+    dataset(first).putAndInsertString(DCM_PatientID, "SAVE-ALL");
     REQUIRE(first.saveAs(firstPath).has_value());
     DicomDocument second;
     seedDataset(second);
-    second.dataset().putAndInsertString(DCM_PatientID, "SAVE-ALL");
+    dataset(second).putAndInsertString(DCM_PatientID, "SAVE-ALL");
     REQUIRE(second.saveAs(secondPath).has_value());
 
     ControllerView view;
     view.chosenFiles = {firstPath, secondPath};
-    view.batchInput = dicom_editor::AttributeInput{.tag = DCM_PatientName, .value = "Saved^Together"};
+    view.batchInput = dicom_editor::AttributeInput{.tag = publicTag(DCM_PatientName), .value = "Saved^Together"};
     EditorController controller(view);
     controller.openDocument();
     const auto activePath = std::ranges::find_if(view.openFiles, [](const auto &file) { return file.active; })->path;
@@ -930,8 +943,8 @@ TEST_CASE("controller saves all documents and clears workspace", "[application][
     DicomDocument reloadedSecond;
     REQUIRE(reloadedFirst.load(firstPath).has_value());
     REQUIRE(reloadedSecond.load(secondPath).has_value());
-    REQUIRE(reloadedFirst.attributeValue(DCM_PatientName) == "Saved^Together");
-    REQUIRE(reloadedSecond.attributeValue(DCM_PatientName) == "Saved^Together");
+    REQUIRE(attributeValue(reloadedFirst, DCM_PatientName) == "Saved^Together");
+    REQUIRE(attributeValue(reloadedSecond, DCM_PatientName) == "Saved^Together");
 
     controller.clearWorkspace();
     REQUIRE(!view.hasLoadedFiles);

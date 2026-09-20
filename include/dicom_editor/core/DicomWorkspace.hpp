@@ -4,8 +4,6 @@
 #include "dicom_editor/core/DicomError.hpp"
 #include "dicom_viewer/export.hpp"
 
-#include <dcmtk/dcmdata/dctagkey.h>
-
 #include <cstddef>
 #include <expected>
 #include <filesystem>
@@ -56,7 +54,7 @@ struct FileGroupTarget {
 };
 
 struct BatchAttributeState {
-    DcmTagKey tag;
+    DicomTag tag;
     std::string name;
     std::vector<std::string> values;
 };
@@ -115,8 +113,7 @@ class DICOM_VIEWER_OPERATIONS_EXPORT DicomWorkspace {
     /// Builds consistency information for one patient or study group.
     [[nodiscard]] BatchEditReport batchEditReport(const BatchEditTarget &target) const;
     /// Applies one root attribute to every document in a patient or study group.
-    [[nodiscard]] std::size_t batchEdit(const BatchEditTarget &target, const DcmTagKey &tag, const std::string &value,
-                                        bool validate = true);
+    [[nodiscard]] std::size_t batchEdit(const BatchEditTarget &target, const DicomTag &tag, const std::string &value, bool validate = true);
 
   private:
     std::vector<DicomDocument> documents_;

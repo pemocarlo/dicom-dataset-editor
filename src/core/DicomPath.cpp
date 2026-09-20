@@ -1,6 +1,6 @@
 #include "dicom_editor/core/DicomPath.hpp"
 
-#include <dcmtk/dcmdata/dctagkey.h>
+#include "dicom_editor/core/DicomTag.hpp"
 
 #include <format>
 #include <iterator>
@@ -13,13 +13,13 @@ namespace dicom_editor {
 
 namespace {
 
-std::string tagToString(const DcmTagKey &tag) { return std::format("({:04x},{:04x})", tag.getGroup(), tag.getElement()); }
+std::string tagToString(const DicomTag &tag) { return std::format("({:04x},{:04x})", tag.group, tag.element); }
 
 } // namespace
 
 DicomPath DicomPath::dataset() { return {}; }
 
-DicomPath DicomPath::element(std::vector<SequenceItemRef> parents, const DcmTagKey &tag) {
+DicomPath DicomPath::element(std::vector<SequenceItemRef> parents, const DicomTag &tag) {
     DicomPath path;
     path.parents_ = std::move(parents);
     path.elementTag_ = tag;
@@ -34,7 +34,7 @@ DicomPath DicomPath::item(std::vector<SequenceItemRef> parents) {
 
 const std::vector<SequenceItemRef> &DicomPath::parents() const { return parents_; }
 
-const std::optional<DcmTagKey> &DicomPath::elementTag() const { return elementTag_; }
+const std::optional<DicomTag> &DicomPath::elementTag() const { return elementTag_; }
 
 bool DicomPath::pointsToDatasetItem() const { return !elementTag_.has_value(); }
 

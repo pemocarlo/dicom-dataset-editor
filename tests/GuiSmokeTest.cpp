@@ -6,12 +6,14 @@
 #include "dicom_editor/core/DicomDocument.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomPath.hpp"
+#include "dicom_editor/core/DicomTag.hpp"
 #include "dicom_editor/core/DicomWorkspace.hpp"
 #include "dicom_editor/core/StructuredReport.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <dcmtk/dcmdata/dcdeftag.h>
+#include <dcmtk/dcmdata/dctagkey.h>
 
 #include <FL/Enumerations.H>
 #include <FL/Fl.H>
@@ -34,6 +36,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+static dicom_editor::DicomTag publicTag(const DcmTagKey &tag) { return {.group = tag.getGroup(), .element = tag.getElement()}; }
 
 TEST_CASE("file tree accepts empty and populated models", "[gui][smoke]") {
     FileTreePanel panel(0, 0, 320, 480);
@@ -85,13 +89,14 @@ TEST_CASE("SR form keeps duplicate labels distinct and applies selected node val
     nodes.push_back(
         {.path = DicomPath::dataset(), .depth = 0, .label = "Report", .valueType = "CONTAINER", .relationship = {}, .fields = {}});
     for (unsigned long index = 0; index < 2; ++index) {
-        const auto path = DicomPath::item({{.sequenceTag = DCM_ContentSequence, .itemIndex = index}});
-        nodes.push_back({.path = path,
-                         .depth = 1,
-                         .label = "Finding / same name",
-                         .valueType = "TEXT",
-                         .relationship = "CONTAINS",
-                         .fields = {{.path = DicomPath::element(path.parents(), DCM_TextValue), .label = "Text", .value = "Before"}}});
+        const auto path = DicomPath::item({{.sequenceTag = publicTag(DCM_ContentSequence), .itemIndex = index}});
+        nodes.push_back(
+            {.path = path,
+             .depth = 1,
+             .label = "Finding / same name",
+             .valueType = "TEXT",
+             .relationship = "CONTAINS",
+             .fields = {{.path = DicomPath::element(path.parents(), publicTag(DCM_TextValue)), .label = "Text", .value = "Before"}}});
     }
     bool accept = false;
     std::vector<std::string> submitted;
@@ -156,7 +161,7 @@ TEST_CASE("SR hides concept metadata by default and selects newly copied nodes",
     using dicom_editor::DicomPath;
     std::vector<dicom_editor::ReportNode> nodes{
         {.path = DicomPath::dataset(), .depth = 0, .label = "Report", .valueType = "CONTAINER", .relationship = {}, .fields = {}},
-        {.path = DicomPath::item({{.sequenceTag = DCM_ContentSequence, .itemIndex = 0}}),
+        {.path = DicomPath::item({{.sequenceTag = publicTag(DCM_ContentSequence), .itemIndex = 0}}),
          .depth = 1,
          .label = "Finding",
          .valueType = "TEXT",
@@ -169,7 +174,7 @@ TEST_CASE("SR hides concept metadata by default and selects newly copied nodes",
             REQUIRE_FALSE(remove);
             REQUIRE(path.parents() == nodes[1].path.parents());
             auto copy = nodes[1];
-            copy.path = DicomPath::item({{.sequenceTag = DCM_ContentSequence, .itemIndex = 1}});
+            copy.path = DicomPath::item({{.sequenceTag = publicTag(DCM_ContentSequence), .itemIndex = 1}});
             selection = copy.path;
             nodes.push_back(std::move(copy));
             return true;
@@ -283,10 +288,10 @@ TEST_CASE("dataset collapse controls retain a visible selection", "[gui][smoke]"
     root.kind = dicom_editor::DicomNodeKind::Dataset;
     dicom_editor::DicomNode item;
     item.kind = dicom_editor::DicomNodeKind::Item;
-    item.path = dicom_editor::DicomPath::item({{.sequenceTag = DCM_ContentSequence, .itemIndex = 0}});
+    item.path = dicom_editor::DicomPath::item({{.sequenceTag = publicTag(DCM_ContentSequence), .itemIndex = 0}});
     item.depth = 1;
     dicom_editor::DicomNode value;
-    value.path = dicom_editor::DicomPath::element(item.path.parents(), DCM_TextValue);
+    value.path = dicom_editor::DicomPath::element(item.path.parents(), publicTag(DCM_TextValue));
     value.depth = 2;
     DatasetPanel panel(0, 0, 900, 600);
     panel.setNodes({root, item, value});

@@ -13,11 +13,18 @@ target_link_libraries(my_viewer PRIVATE DicomViewer::operations)
 ```
 
 The public umbrella header is `dicom_viewer/operations.hpp`. DCMTK is loaded
-automatically by the installed package configuration.
+automatically by the installed package configuration for the implementation
+link; consumers do not include DCMTK headers to use the operations API.
+
+The optional `DicomViewer::operations_c` target provides an opaque-handle C ABI
+and is enabled with the Conan `with_c_api=True` option. The optional FLTK
+application is exposed in the build as `DicomViewer::fltk_demo` and is enabled
+with `with_gui=True`.
 
 Conan consumers can require `dicom_viewer/0.1.0`. The default package contains
-the static operations library only; set `shared=True` for a shared library and
-`with_gui=True` to additionally package the `dicom-dataset-editor` demo app.
+the static operations library only; set `shared=True` for a shared library,
+`with_c_api=True` for the C wrapper, and `with_gui=True` to additionally
+package the `dicom-dataset-editor` demo app.
 
 For a source-tree build that produces only the reusable library and
 toolkit-neutral tests, configure with `-DDICOM_EDITOR_BUILD_FLTK=OFF`.

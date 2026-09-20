@@ -1,9 +1,11 @@
 add_executable(dicom_editor_tests)
 target_sources(dicom_editor_tests PRIVATE DicomEditorTests.cpp)
+target_include_directories(dicom_editor_tests PRIVATE "${PROJECT_SOURCE_DIR}/src/core")
 target_link_libraries(dicom_editor_tests
     PRIVATE
         Catch2::Catch2WithMain
         DicomDatasetEditor::application
+        dcmtk::dcmtk
 )
 
 if(DICOM_EDITOR_BUILD_FLTK)
@@ -14,6 +16,7 @@ if(DICOM_EDITOR_BUILD_FLTK)
         PRIVATE
             Catch2::Catch2WithMain
             DicomDatasetEditor::fltk
+            dcmtk::dcmtk
     )
 endif()
 
@@ -23,6 +26,21 @@ catch_discover_tests(dicom_editor_tests
     TEST_PREFIX "unit."
     PROPERTIES LABELS unit
 )
+
+if(DICOM_EDITOR_BUILD_C_API)
+    add_executable(dicom_viewer_operations_c_smoke_test)
+    target_sources(dicom_viewer_operations_c_smoke_test PRIVATE DicomViewerOperationsCSmoke.cpp)
+    target_link_libraries(dicom_viewer_operations_c_smoke_test
+        PRIVATE
+            Catch2::Catch2WithMain
+            DicomViewer::operations_c
+    )
+    catch_discover_tests(dicom_viewer_operations_c_smoke_test
+        DISCOVERY_MODE PRE_TEST
+        TEST_PREFIX "unit.operations.c."
+        PROPERTIES LABELS unit
+    )
+endif()
 
 add_executable(dicom_viewer_operations_smoke_test)
 target_sources(dicom_viewer_operations_smoke_test PRIVATE DicomViewerOperationsSmoke.cpp)

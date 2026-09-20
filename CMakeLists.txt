@@ -25,6 +25,7 @@ option(DICOM_EDITOR_DEVELOPER_MODE "Enable developer tooling targets" OFF)
 option(DICOM_EDITOR_BUILD_BENCHMARKS "Build synthetic performance benchmarks" OFF)
 option(DICOM_EDITOR_ENABLE_VALGRIND "Provide a Valgrind CTest MemCheck target" OFF)
 option(DICOM_EDITOR_BUILD_FLTK "Build the FLTK UI and executable" ON)
+option(DICOM_EDITOR_BUILD_C_API "Build the optional pure C operations wrapper" OFF)
 
 find_package(DCMTK CONFIG REQUIRED)
 if(DICOM_EDITOR_BUILD_FLTK)
@@ -60,6 +61,7 @@ set(DICOM_VIEWER_OPERATIONS_PUBLIC_HEADERS
     include/dicom_editor/core/DicomError.hpp
     include/dicom_editor/core/DicomNode.hpp
     include/dicom_editor/core/DicomPath.hpp
+    include/dicom_editor/core/DicomTag.hpp
     include/dicom_editor/core/DicomWorkspace.hpp
     include/dicom_editor/core/StructuredReport.hpp
 )
@@ -144,7 +146,47 @@ target_include_directories(dicom_viewer_operations
     PRIVATE
         src/core
 )
-target_link_libraries(dicom_viewer_operations PUBLIC dcmtk::dcmtk)
+target_link_libraries(dicom_viewer_operations PRIVATE dcmtk::dcmtk)
+
+if(DICOM_EDITOR_BUILD_C_API)
+    add_library(dicom_viewer_operations_c)
+    add_library(DicomViewer::operations_c ALIAS dicom_viewer_operations_c)
+    set_target_properties(dicom_viewer_operations_c PROPERTIES
+        CXX_VISIBILITY_PRESET hidden
+        EXPORT_NAME operations_c
+        VISIBILITY_INLINES_HIDDEN YES
+    )
+    generate_export_header(dicom_viewer_operations_c
+        EXPORT_FILE_NAME ${PROJECT_BINARY_DIR}/generated/include/dicom_viewer/operations_c_export.h
+        EXPORT_MACRO_NAME DICOM_VIEWER_OPERATIONS_C_EXPORT
+        STATIC_DEFINE DICOM_VIEWER_OPERATIONS_C_STATIC_DEFINE
+    )
+    get_target_property(DICOM_VIEWER_OPERATIONS_C_TYPE dicom_viewer_operations_c TYPE)
+    if(DICOM_VIEWER_OPERATIONS_C_TYPE STREQUAL "STATIC_LIBRARY")
+        target_compile_definitions(dicom_viewer_operations_c
+            PUBLIC DICOM_VIEWER_OPERATIONS_C_STATIC_DEFINE
+        )
+    endif()
+    target_sources(dicom_viewer_operations_c
+        PRIVATE
+            src/c/operations_c.cpp
+        PUBLIC
+            FILE_SET HEADERS
+            BASE_DIRS
+                include
+                ${PROJECT_BINARY_DIR}/generated/include
+            FILES
+                include/dicom_viewer/operations_c.h
+                ${PROJECT_BINARY_DIR}/generated/include/dicom_viewer/operations_c_export.h
+    )
+    target_include_directories(dicom_viewer_operations_c
+        PUBLIC
+            $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+            $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/generated/include>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    )
+    target_link_libraries(dicom_viewer_operations_c PRIVATE DicomViewer::operations)
+endif()
 
 set(DICOM_EDITOR_APPLICATION_HEADERS
     include/dicom_editor/application/EditorController.hpp
@@ -204,6 +246,7 @@ if(DICOM_EDITOR_BUILD_FLTK)
         src/gui/fltk/App.cpp
     )
     add_executable(dicom-dataset-editor WIN32)
+    add_executable(DicomViewer::fltk_demo ALIAS dicom-dataset-editor)
     target_sources(dicom-dataset-editor
         PRIVATE
             ${DICOM_EDITOR_APP_SOURCES}
@@ -227,6 +270,16 @@ install(TARGETS dicom_viewer_operations
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
+
+if(DICOM_EDITOR_BUILD_C_API)
+    install(TARGETS dicom_viewer_operations_c
+        EXPORT DicomViewerOperationsTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+endif()
 
 if(DICOM_EDITOR_BUILD_FLTK)
     install(TARGETS dicom-dataset-editor)
@@ -276,7 +329,8 @@ endif()
 if(DICOM_EDITOR_BUILD_BENCHMARKS)
     add_executable(dicom_editor_benchmarks)
     target_sources(dicom_editor_benchmarks PRIVATE benchmarks/DicomEditorBenchmarks.cpp)
-    target_link_libraries(dicom_editor_benchmarks PRIVATE DicomViewer::operations)
+    target_include_directories(dicom_editor_benchmarks PRIVATE src/core)
+    target_link_libraries(dicom_editor_benchmarks PRIVATE DicomViewer::operations dcmtk::dcmtk)
 endif()
 
 if(DICOM_EDITOR_DEVELOPER_MODE)

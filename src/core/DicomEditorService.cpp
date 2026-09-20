@@ -1,7 +1,9 @@
 #include "dicom_editor/core/DicomEditorService.hpp"
 
+#include "DicomDocumentDetail.hpp"
 #include "dicom_editor/core/DicomDocument.hpp"
 #include "dicom_editor/core/DicomError.hpp"
+#include "dicom_editor/core/DicomTag.hpp"
 
 #include <dcmtk/dcmdata/dcdatset.h>
 #include <dcmtk/dcmdata/dcelem.h>
@@ -19,6 +21,8 @@
 namespace dicom_editor {
 
 namespace {
+
+DcmTagKey dcmtkTag(const DicomTag &tag) { return {tag.group, tag.element}; }
 
 void requireGood(const OFCondition &condition, const std::string &action) {
     if (condition.bad()) {
@@ -44,7 +48,7 @@ void validateValue(const DcmTag &tag, const std::string &value) {
 } // namespace
 
 void DicomEditorService::editValue(DicomDocument &document, const EditRequest &request) {
-    DcmElement &element = document.elementAt(request.path);
+    DcmElement &element = detail::DocumentAccess::element(document, request.path);
     requireEditable(element);
     if (request.validate) {
         validateValue(element.getTag(), request.value);
@@ -53,21 +57,22 @@ void DicomEditorService::editValue(DicomDocument &document, const EditRequest &r
     document.markDirty();
 }
 
-void DicomEditorService::setAttribute(DicomDocument &document, const DcmTagKey &tag, const std::string &value, bool validate) {
-    const DcmTag dictionaryTag(tag);
+void DicomEditorService::setAttribute(DicomDocument &document, const DicomTag &tag, const std::string &value, bool validate) {
+    const DcmTagKey nativeTag = dcmtkTag(tag);
+    const DcmTag dictionaryTag(nativeTag);
     if (validate) {
         validateValue(dictionaryTag, value);
     }
-    requireGood(document.dataset().putAndInsertString(tag, value.c_str(), true), "Set root attribute");
+    requireGood(detail::DocumentAccess::dataset(document).putAndInsertString(nativeTag, value.c_str(), true), "Set root attribute");
     document.markDirty();
 }
 
 void DicomEditorService::addAttribute(DicomDocument &document, const AddAttributeRequest &request) {
-    DcmItem &parent = document.itemAt(request.parentItemPath);
+    DcmItem &parent = detail::DocumentAccess::item(document, request.parentItemPath);
     if (request.validate) {
-        validateValue(DcmTag(request.tag), request.value);
+        validateValue(DcmTag(dcmtkTag(request.tag)), request.value);
     }
-    requireGood(parent.putAndInsertString(request.tag, request.value.c_str(), true), "Add attribute");
+    requireGood(parent.putAndInsertString(dcmtkTag(request.tag), request.value.c_str(), true), "Add attribute");
     document.markDirty();
 }
 
@@ -76,13 +81,13 @@ void DicomEditorService::deleteAttribute(DicomDocument &document, const DicomPat
     if (!tag) {
         throw DicomError("Only attributes can be deleted");
     }
-    if (document.elementAt(path).ident() == EVR_SQ) {
+    if (detail::DocumentAccess::element(document, path).ident() == EVR_SQ) {
         throw DicomError("Deleting sequence attributes is intentionally not exposed yet");
     }
 
     DicomPath parentPath = DicomPath::item(path.parents());
-    DcmItem &parent = document.itemAt(parentPath);
-    requireGood(parent.findAndDeleteElement(*tag, true, true), std::format("Delete attribute {}", path.toString()));
+    DcmItem &parent = detail::DocumentAccess::item(document, parentPath);
+    requireGood(parent.findAndDeleteElement(dcmtkTag(*tag), true, true), std::format("Delete attribute {}", path.toString()));
     document.markDirty();
 }
 

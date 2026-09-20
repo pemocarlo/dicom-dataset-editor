@@ -1,8 +1,10 @@
 #include "dicom_editor/core/StructuredReport.hpp"
 
+#include "DicomDocumentDetail.hpp"
 #include "dicom_editor/core/DicomDocument.hpp"
 #include "dicom_editor/core/DicomError.hpp"
 #include "dicom_editor/core/DicomPath.hpp"
+#include "dicom_editor/core/DicomTag.hpp"
 
 #include <cstddef>
 #include <dcmtk/dcmdata/dcdatset.h>
@@ -27,6 +29,10 @@
 
 namespace dicom_editor {
 namespace {
+DicomTag publicTag(const DcmTagKey &tag) { return {.group = tag.getGroup(), .element = tag.getElement()}; }
+
+DcmTagKey nativeTag(const DicomTag &tag) { return {tag.group, tag.element}; }
+
 std::string text(DcmItem &item, const DcmTagKey &tag) {
     OFString value;
     item.findAndGetOFStringArray(tag, value);
@@ -41,7 +47,7 @@ void check(const OFCondition &result) {
 
 void field(ReportNode &node, DcmItem &item, const std::vector<SequenceItemRef> &parents, const DcmTagKey &tag, const std::string &label) {
     if (item.tagExists(tag)) {
-        node.fields.push_back({.path = DicomPath::element(parents, tag), .label = label, .value = text(item, tag)});
+        node.fields.push_back({.path = DicomPath::element(parents, publicTag(tag)), .label = label, .value = text(item, tag)});
     }
 }
 
@@ -51,7 +57,7 @@ void codeFields(ReportNode &node, DcmItem &item, std::vector<SequenceItemRef> pa
         return;
     }
     auto &code = *sequence->getItem(0);
-    parents.push_back({.sequenceTag = tag, .itemIndex = 0});
+    parents.push_back({.sequenceTag = publicTag(tag), .itemIndex = 0});
     field(node, code, parents, DCM_CodeValue, label + " code");
     field(node, code, parents, DCM_LongCodeValue, label + " code");
     field(node, code, parents, DCM_URNCodeValue, label + " URI");
@@ -77,17 +83,18 @@ ReportNode project(DcmItem &item, const DicomPath &path, std::size_t depth) {
     const auto &parents = path.parents();
     codeFields(node, item, parents, DCM_ConceptNameCodeSequence, "Name");
     if (node.valueType == "TEXT") {
-        node.fields.push_back({.path = DicomPath::element(parents, DCM_TextValue), .label = "Text", .value = text(item, DCM_TextValue)});
+        node.fields.push_back(
+            {.path = DicomPath::element(parents, publicTag(DCM_TextValue)), .label = "Text", .value = text(item, DCM_TextValue)});
     } else if (node.valueType == "CODE") {
         codeFields(node, item, parents, DCM_ConceptCodeSequence, "Value");
     } else if (node.valueType == "NUM") {
         DcmSequenceOfItems *measured = nullptr;
         if (item.findAndGetSequence(DCM_MeasuredValueSequence, measured).good() && measured->card() == 1) {
             auto nested = parents;
-            nested.push_back({.sequenceTag = DCM_MeasuredValueSequence, .itemIndex = 0});
+            nested.push_back({.sequenceTag = publicTag(DCM_MeasuredValueSequence), .itemIndex = 0});
             auto &measurement = *measured->getItem(0);
             node.fields.push_back(
-                {.path = DicomPath::element(nested, DCM_NumericValue),
+                {.path = DicomPath::element(nested, publicTag(DCM_NumericValue)),
                  .label = "Number",
                  .value = text(measurement, measurement.tagExists(DCM_NumericValue) ? DCM_NumericValue : DCM_FloatingPointValue)});
             codeFields(node, measurement, nested, DCM_MeasurementUnitsCodeSequence, "Units");
@@ -117,7 +124,7 @@ void visit(DcmItem &item, const DicomPath &path, std::size_t depth, std::vector<
     }
     for (unsigned long index = 0; index < children->card(); ++index) {
         auto parents = path.parents();
-        parents.push_back({.sequenceTag = DCM_ContentSequence, .itemIndex = index});
+        parents.push_back({.sequenceTag = publicTag(DCM_ContentSequence), .itemIndex = index});
         visit(*children->getItem(index), DicomPath::item(std::move(parents)), depth + 1, result);
     }
 }
@@ -127,7 +134,7 @@ DcmItem &relativeItem(DcmItem &candidate, const ReportField &entry, std::size_t 
     for (std::size_t index = prefix; index < entry.path.parents().size(); ++index) {
         const auto &parent = entry.path.parents()[index];
         DcmItem *nested = nullptr;
-        check(item->findAndGetSequenceItem(parent.sequenceTag, nested, static_cast<signed long>(parent.itemIndex)));
+        check(item->findAndGetSequenceItem(nativeTag(parent.sequenceTag), nested, static_cast<signed long>(parent.itemIndex)));
         item = nested;
     }
     return *item;
@@ -135,7 +142,7 @@ DcmItem &relativeItem(DcmItem &candidate, const ReportField &entry, std::size_t 
 } // namespace
 
 bool StructuredReport::supports(const DicomDocument &document) {
-    return DSRTypes::sopClassUIDToDocumentType(document.attributeValue(DCM_SOPClassUID).value_or("")) != DSRTypes::DT_invalid;
+    return DSRTypes::sopClassUIDToDocumentType(document.attributeValue(publicTag(DCM_SOPClassUID)).value_or("")) != DSRTypes::DT_invalid;
 }
 
 DicomPath StructuredReport::insert(DicomDocument &document, const DicomPath &anchor, ReportInsertion placement,
@@ -145,10 +152,11 @@ DicomPath StructuredReport::insert(DicomDocument &document, const DicomPath &anc
         std::ranges::none_of(report, [&anchor](const ReportNode &node) { return node.path.parents() == anchor.parents(); })) {
         throw DicomError("Select an SR content item as the insertion point.");
     }
-    if (document.attributeValue(DCM_VerificationFlag) == "VERIFIED" || document.dataset().tagExists(DCM_DigitalSignaturesSequence, true)) {
+    if (document.attributeValue(publicTag(DCM_VerificationFlag)) == "VERIFIED" ||
+        detail::DocumentAccess::dataset(document).tagExists(DCM_DigitalSignaturesSequence, true)) {
         throw DicomError("Verified or digitally signed reports are read-only in the SR editor.");
     }
-    if (document.dataset().tagExists(DCM_ReferencedContentItemIdentifier, true)) {
+    if (detail::DocumentAccess::dataset(document).tagExists(DCM_ReferencedContentItemIdentifier, true)) {
         throw DicomError("Tree changes are unavailable for reports with content references.");
     }
     auto parents = anchor.parents();
@@ -163,9 +171,9 @@ DicomPath StructuredReport::insert(DicomDocument &document, const DicomPath &anc
     if (parents.size() >= 128) {
         throw DicomError("SR content exceeds the supported nesting depth (128).");
     }
-    auto &parent = document.itemAt(DicomPath::item(parents));
-    const std::unique_ptr<DSRIODConstraintChecker> constraints(
-        DSRTypes::createIODConstraintChecker(DSRTypes::sopClassUIDToDocumentType(document.attributeValue(DCM_SOPClassUID).value_or(""))));
+    auto &parent = detail::DocumentAccess::item(document, DicomPath::item(parents));
+    const std::unique_ptr<DSRIODConstraintChecker> constraints(DSRTypes::createIODConstraintChecker(
+        DSRTypes::sopClassUIDToDocumentType(document.attributeValue(publicTag(DCM_SOPClassUID)).value_or(""))));
     if (!constraints || !constraints->checkContentRelationship(DSRTypes::definedTermToValueType(text(parent, DCM_ValueType)),
                                                                DSRTypes::definedTermToRelationshipType(input.relationship),
                                                                DSRTypes::definedTermToValueType(input.valueType))) {
@@ -226,7 +234,7 @@ DicomPath StructuredReport::insert(DicomDocument &document, const DicomPath &anc
     check(parent.insert(sequence.get(), true));
     sequence.release(); // NOLINT(bugprone-unused-return-value): ownership transferred to parent
     document.markDirty();
-    parents.push_back({.sequenceTag = DCM_ContentSequence, .itemIndex = index});
+    parents.push_back({.sequenceTag = publicTag(DCM_ContentSequence), .itemIndex = index});
     return DicomPath::item(std::move(parents));
 }
 
@@ -236,16 +244,17 @@ DicomPath StructuredReport::changeStructure(DicomDocument &document, const Dicom
         std::ranges::none_of(report, [&path](const ReportNode &node) { return node.path.parents() == path.parents(); })) {
         throw DicomError("Select a non-root SR content item.");
     }
-    if (document.attributeValue(DCM_VerificationFlag) == "VERIFIED" || document.dataset().tagExists(DCM_DigitalSignaturesSequence, true)) {
+    if (document.attributeValue(publicTag(DCM_VerificationFlag)) == "VERIFIED" ||
+        detail::DocumentAccess::dataset(document).tagExists(DCM_DigitalSignaturesSequence, true)) {
         throw DicomError("Verified or digitally signed reports are read-only in the SR editor.");
     }
-    if (document.dataset().tagExists(DCM_ReferencedContentItemIdentifier, true)) {
+    if (detail::DocumentAccess::dataset(document).tagExists(DCM_ReferencedContentItemIdentifier, true)) {
         throw DicomError("Tree changes are unavailable for reports with content references.");
     }
     auto parents = path.parents();
     const auto index = parents.back().itemIndex;
     parents.pop_back();
-    auto &parent = document.itemAt(DicomPath::item(parents));
+    auto &parent = detail::DocumentAccess::item(document, DicomPath::item(parents));
     DcmSequenceOfItems *sequence = nullptr;
     check(parent.findAndGetSequence(DCM_ContentSequence, sequence));
     DicomPath selection = DicomPath::item(parents);
@@ -256,7 +265,7 @@ DicomPath StructuredReport::changeStructure(DicomDocument &document, const Dicom
         }
     } else {
         auto copy = std::unique_ptr<DcmItem>(static_cast<DcmItem *>(sequence->getItem(index)->clone()));
-        parents.push_back({.sequenceTag = DCM_ContentSequence, .itemIndex = sequence->card()});
+        parents.push_back({.sequenceTag = publicTag(DCM_ContentSequence), .itemIndex = sequence->card()});
         selection = DicomPath::item(std::move(parents));
         check(sequence->append(copy.get()));
         // append succeeded; the sequence now owns the copied item.
@@ -271,7 +280,7 @@ std::vector<ReportNode> StructuredReport::nodes(DicomDocument &document) {
         return {};
     }
     std::vector<ReportNode> result;
-    visit(document.dataset(), DicomPath::dataset(), 0, result);
+    visit(detail::DocumentAccess::dataset(document), DicomPath::dataset(), 0, result);
     return result;
 }
 
@@ -282,7 +291,7 @@ void StructuredReport::edit(DicomDocument &document, const DicomPath &path, cons
     if (found == report.end() || values.size() != found->fields.size()) {
         throw DicomError("The SR node or its fields have changed. Reopen the report editor.");
     }
-    auto &target = document.itemAt(path);
+    auto &target = detail::DocumentAccess::item(document, path);
     const std::unique_ptr<DcmItem> storage(static_cast<DcmItem *>(target.clone()));
     auto &candidate = *storage;
     bool changed = false;
@@ -300,10 +309,10 @@ void StructuredReport::edit(DicomDocument &document, const DicomPath &path, cons
         if (!tag) {
             throw DicomError("SR field has no attribute tag.");
         }
-        check(item.putAndInsertString(*tag, values[index].c_str()));
-        check(item.findAndGetElement(*tag, element));
+        check(item.putAndInsertString(nativeTag(*tag), values[index].c_str()));
+        check(item.findAndGetElement(nativeTag(*tag), element));
         check(element->checkValue("1"));
-        if (*tag == DCM_NumericValue) {
+        if (nativeTag(*tag) == DCM_NumericValue) {
             // Numeric Value becomes authoritative; optional alternate encodings must not retain the old number.
             for (const auto &alternate : {DCM_FloatingPointValue, DCM_RationalNumeratorValue, DCM_RationalDenominatorValue}) {
                 if (item.tagExists(alternate)) {
@@ -318,13 +327,15 @@ void StructuredReport::edit(DicomDocument &document, const DicomPath &path, cons
     }
     // Validate the complete edited coded entries with dcmsr, including code/scheme pairing.
     for (const auto &entry : found->fields) {
-        if (entry.path.elementTag() == DCM_CodeMeaning) {
+        if (entry.path.elementTag() && nativeTag(*entry.path.elementTag()) == DCM_CodeMeaning) {
             DSRCodedEntryValue code;
-            check(code.readSequenceItem(relativeItem(candidate, entry, path.parents().size()), entry.path.parents().back().sequenceTag));
+            check(code.readSequenceItem(relativeItem(candidate, entry, path.parents().size()),
+                                        nativeTag(entry.path.parents().back().sequenceTag)));
             check(code.checkCurrentValue());
         }
     }
-    if (document.attributeValue(DCM_VerificationFlag) == "VERIFIED" || document.dataset().tagExists(DCM_DigitalSignaturesSequence, true)) {
+    if (document.attributeValue(publicTag(DCM_VerificationFlag)) == "VERIFIED" ||
+        detail::DocumentAccess::dataset(document).tagExists(DCM_DigitalSignaturesSequence, true)) {
         throw DicomError("Verified or digitally signed reports are read-only in the SR editor.");
     }
     check(target.copyFrom(candidate));

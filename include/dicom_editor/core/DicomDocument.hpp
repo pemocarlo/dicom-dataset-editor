@@ -2,9 +2,8 @@
 
 #include "dicom_editor/core/DicomError.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
+#include "dicom_editor/core/DicomTag.hpp"
 #include "dicom_viewer/export.hpp"
-
-#include <dcmtk/dcmdata/dcfilefo.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -15,12 +14,11 @@
 #include <string>
 #include <vector>
 
-class DcmDataset;
-class DcmElement;
-class DcmItem;
-class DcmTagKey;
-
 namespace dicom_editor {
+
+namespace detail {
+struct DocumentAccess;
+}
 
 class DicomPath;
 
@@ -64,6 +62,12 @@ class DICOM_VIEWER_OPERATIONS_EXPORT DicomDocument {
   public:
     /// Creates an empty in-memory dataset.
     DicomDocument();
+    ~DicomDocument();
+
+    DicomDocument(const DicomDocument &) = delete;
+    DicomDocument &operator=(const DicomDocument &) = delete;
+    DicomDocument(DicomDocument &&) noexcept;
+    DicomDocument &operator=(DicomDocument &&) noexcept;
 
     /// Replaces the current content with a new empty dataset.
     void createEmpty();
@@ -74,18 +78,6 @@ class DICOM_VIEWER_OPERATIONS_EXPORT DicomDocument {
     /// Saves to a new file path and adopts it as the active path.
     [[nodiscard]] std::expected<void, DicomError> saveAs(const std::filesystem::path &path);
 
-    /// Returns the root dataset.
-    [[nodiscard]] DcmDataset &dataset();
-    /// Returns the root dataset.
-    [[nodiscard]] const DcmDataset &dataset() const;
-    /// Resolves a path to the owning item.
-    [[nodiscard]] DcmItem &itemAt(const DicomPath &path);
-    /// Resolves a path to the owning item.
-    [[nodiscard]] const DcmItem &itemAt(const DicomPath &path) const;
-    /// Resolves a path to the target element.
-    [[nodiscard]] DcmElement &elementAt(const DicomPath &path);
-    /// Resolves a path to the target element.
-    [[nodiscard]] const DcmElement &elementAt(const DicomPath &path) const;
     /// Flattens the dataset into UI rows.
     [[nodiscard]] std::vector<DicomNode> nodes(bool validateValues = false) const;
     /// Renders the requested pixel frame, if available.
@@ -93,7 +85,7 @@ class DICOM_VIEWER_OPERATIONS_EXPORT DicomDocument {
     /// Reads the patient/study/series grouping fields for the workspace tree.
     [[nodiscard]] DicomHierarchy hierarchy() const;
     /// Reads a root-dataset string attribute.
-    [[nodiscard]] std::optional<std::string> attributeValue(const DcmTagKey &tag) const;
+    [[nodiscard]] std::optional<std::string> attributeValue(const DicomTag &tag) const;
     /// Returns true when loaded object is a DICOM media directory.
     [[nodiscard]] bool isDicomDirectory() const;
     /// Returns the active file path.
@@ -108,7 +100,10 @@ class DICOM_VIEWER_OPERATIONS_EXPORT DicomDocument {
     void clearDirty();
 
   private:
-    std::unique_ptr<DcmFileFormat> file_;
+    friend struct detail::DocumentAccess;
+
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
     std::filesystem::path filePath_;
     mutable std::optional<DicomHierarchy> hierarchyCache_;
     bool dirty_{};

@@ -1,9 +1,11 @@
 #include "dicom_editor/core/DicomDocument.hpp"
 
+#include "DicomDocumentDetail.hpp"
 #include "dicom_editor/core/DicomDictionary.hpp"
 #include "dicom_editor/core/DicomError.hpp"
 #include "dicom_editor/core/DicomNode.hpp"
 #include "dicom_editor/core/DicomPath.hpp"
+#include "dicom_editor/core/DicomTag.hpp"
 
 #include <dcmtk/dcmdata/dcdatset.h>
 #include <dcmtk/dcmdata/dcdeftag.h>
@@ -58,6 +60,12 @@
 namespace dicom_editor {
 
 namespace {
+
+DcmTagKey dcmtkTag(const DicomTag &tag) { return {tag.group, tag.element}; }
+
+DicomTag publicTag(const DcmTagKey &tag) { return {.group = tag.getGroup(), .element = tag.getElement()}; }
+
+std::string tagToString(const DicomTag &key) { return std::format("({:04x},{:04x})", key.group, key.element); }
 
 constexpr std::string_view PixelDataPlaceholder = "[Double-click to view Pixel Data]";
 
@@ -227,7 +235,7 @@ void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &par
         std::string valuePreview = pixelData ? std::string{} : valuePreviewFor(value);
         DicomNode node{
             .kind = sequence ? DicomNodeKind::Sequence : DicomNodeKind::Element,
-            .path = DicomPath::element(parents, key),
+            .path = DicomPath::element(parents, publicTag(key)),
             .tag = tagToString(key),
             .keyword = keywordFor(tag),
             .vr = vrFor(*element),
@@ -249,11 +257,9 @@ void collectNodesFromItem(DcmItem &item, const std::vector<SequenceItemRef> &par
         for (unsigned long itemIndex = 0; itemIndex < sequenceElement.card(); ++itemIndex) {
             std::vector<SequenceItemRef> itemParents;
             itemParents.reserve(parents.size() + 1);
-            std::transform(parents.begin(), parents.end(), std::back_inserter(itemParents), [](const SequenceItemRef &parent) {
-                return SequenceItemRef{.sequenceTag = DcmTagKey(parent.sequenceTag.getGroup(), parent.sequenceTag.getElement()),
-                                       .itemIndex = parent.itemIndex};
-            });
-            itemParents.push_back({.sequenceTag = DcmTagKey(key.getGroup(), key.getElement()), .itemIndex = itemIndex});
+            std::transform(parents.begin(), parents.end(), std::back_inserter(itemParents),
+                           [](const SequenceItemRef &parent) { return parent; });
+            itemParents.push_back({.sequenceTag = publicTag(key), .itemIndex = itemIndex});
 
             const auto itemValue = std::format("#{}", itemIndex);
             DicomNode itemNode{
@@ -284,7 +290,7 @@ DcmItem &resolveItem(DcmItem &root, const DicomPath &path) {
     DcmItem *current = &root;
     for (const auto &parent : path.parents()) {
         DcmElement *element = nullptr;
-        requireGood(current->findAndGetElement(parent.sequenceTag, element), "Find sequence " + tagToString(parent.sequenceTag));
+        requireGood(current->findAndGetElement(dcmtkTag(parent.sequenceTag), element), "Find sequence " + tagToString(parent.sequenceTag));
         if (element == nullptr || element->ident() != EVR_SQ) {
             throw DicomError("Path segment is not a sequence: " + tagToString(parent.sequenceTag));
         }
@@ -303,13 +309,24 @@ const DcmItem &resolveItem(const DcmItem &root, const DicomPath &path) { return 
 
 } // namespace
 
+struct DicomDocument::Impl {
+    std::unique_ptr<DcmFileFormat> file;
+};
+
 DicomDocument::DicomDocument() {
     ensureEmbeddedDicomDictionary();
     createEmpty();
 }
 
+DicomDocument::~DicomDocument() = default;
+
+DicomDocument::DicomDocument(DicomDocument &&) noexcept = default;
+
+DicomDocument &DicomDocument::operator=(DicomDocument &&) noexcept = default;
+
 void DicomDocument::createEmpty() {
-    file_ = std::make_unique<DcmFileFormat>();
+    impl_ = std::make_unique<Impl>();
+    impl_->file = std::make_unique<DcmFileFormat>();
     filePath_.clear();
     hierarchyCache_.reset();
     dirty_ = false;
@@ -321,7 +338,10 @@ std::expected<void, DicomError> DicomDocument::load(const std::filesystem::path 
     if (result.bad()) {
         return makeUnexpected("Load DICOM file", result);
     }
-    file_ = std::move(loaded);
+    if (!impl_) {
+        impl_ = std::make_unique<Impl>();
+    }
+    impl_->file = std::move(loaded);
     filePath_ = path;
     hierarchyCache_.reset();
     dirty_ = false;
@@ -339,9 +359,9 @@ std::expected<void, DicomError> DicomDocument::save() {
     auto backup = filePath_;
     backup += suffix + ".bak";
 
-    const auto originalSyntax = file_->getDataset()->getOriginalXfer();
+    const auto originalSyntax = detail::DocumentAccess::dataset(*this).getOriginalXfer();
     const auto syntax = originalSyntax == EXS_Unknown ? EXS_LittleEndianExplicit : originalSyntax;
-    const auto result = file_->saveFile(temporary.string().c_str(), syntax);
+    const auto result = const_cast<DcmFileFormat &>(detail::DocumentAccess::file(*this)).saveFile(temporary.string().c_str(), syntax);
     if (result.bad()) {
         std::error_code ignored;
         std::filesystem::remove(temporary, ignored);
@@ -388,7 +408,7 @@ std::expected<void, DicomError> DicomDocument::save() {
             return std::unexpected(DicomError("Remove DICOM backup file: " + error.message()));
         }
     }
-    file_ = std::move(loaded);
+    impl_->file = std::move(loaded);
     hierarchyCache_.reset();
     dirty_ = false;
     return {};
@@ -404,42 +424,50 @@ std::expected<void, DicomError> DicomDocument::saveAs(const std::filesystem::pat
     return result;
 }
 
-DcmDataset &DicomDocument::dataset() {
-    hierarchyCache_.reset();
-    return *file_->getDataset();
+namespace detail {
+
+const DcmFileFormat &DocumentAccess::file(const DicomDocument &document) { return *document.impl_->file; }
+
+DcmDataset &DocumentAccess::dataset(DicomDocument &document) {
+    document.hierarchyCache_.reset();
+    return *document.impl_->file->getDataset();
 }
 
-const DcmDataset &DicomDocument::dataset() const { return *file_->getDataset(); }
+const DcmDataset &DocumentAccess::dataset(const DicomDocument &document) { return *document.impl_->file->getDataset(); }
 
-DcmItem &DicomDocument::itemAt(const DicomPath &path) {
+DcmItem &DocumentAccess::item(DicomDocument &document, const DicomPath &path) {
     if (!path.pointsToDatasetItem()) {
         throw DicomError("Path does not point to a dataset item: " + path.toString());
     }
-    return resolveItem(dataset(), path);
+    return resolveItem(dataset(document), path);
 }
 
-const DcmItem &DicomDocument::itemAt(const DicomPath &path) const {
+const DcmItem &DocumentAccess::item(const DicomDocument &document, const DicomPath &path) {
     if (!path.pointsToDatasetItem()) {
         throw DicomError("Path does not point to a dataset item: " + path.toString());
     }
-    return resolveItem(dataset(), path);
+    return resolveItem(dataset(document), path);
 }
 
-DcmElement &DicomDocument::elementAt(const DicomPath &path) {
+DcmElement &DocumentAccess::element(DicomDocument &document, const DicomPath &path) {
     const auto &tag = path.elementTag();
     if (!tag) {
         throw DicomError("Path does not point to an element: " + path.toString());
     }
-    DcmItem &parent = resolveItem(dataset(), path);
+    DcmItem &parent = resolveItem(dataset(document), path);
     DcmElement *element = nullptr;
-    requireGood(parent.findAndGetElement(*tag, element), "Find element " + path.toString());
+    requireGood(parent.findAndGetElement(dcmtkTag(*tag), element), "Find element " + path.toString());
     if (element == nullptr) {
         throw DicomError("Element not found: " + path.toString());
     }
     return *element;
 }
 
-const DcmElement &DicomDocument::elementAt(const DicomPath &path) const { return const_cast<DicomDocument &>(*this).elementAt(path); }
+const DcmElement &DocumentAccess::element(const DicomDocument &document, const DicomPath &path) {
+    return element(const_cast<DicomDocument &>(document), path);
+}
+
+} // namespace detail
 
 std::vector<DicomNode> DicomDocument::nodes(bool validateValues) const {
     const auto rootValue = filePath_.empty() ? std::string{"<new>"} : filePath_.string();
@@ -457,13 +485,13 @@ std::vector<DicomNode> DicomDocument::nodes(bool validateValues) const {
         .invalidValue = false,
         .readOnlyValue = {},
     }};
-    collectNodesFromItem(const_cast<DcmDataset &>(dataset()), {}, 1, validateValues, result);
+    collectNodesFromItem(const_cast<DcmDataset &>(detail::DocumentAccess::dataset(*this)), {}, 1, validateValues, result);
     return result;
 }
 
 PixelDataPreview DicomDocument::renderPixelData(unsigned long frameIndex) const {
     PixelDataPreview preview;
-    auto &mutableDataset = const_cast<DcmDataset &>(dataset());
+    auto &mutableDataset = const_cast<DcmDataset &>(detail::DocumentAccess::dataset(*this));
     logPixelPreview(std::format("request file='{}' frame={} original={} current={}",
                                 filePath_.empty() ? "<new dataset>" : filePath_.string(), frameIndex + 1,
                                 transferSyntaxName(mutableDataset.getOriginalXfer()), transferSyntaxName(mutableDataset.getCurrentXfer())));
@@ -556,7 +584,7 @@ DicomHierarchy DicomDocument::hierarchy() const {
     if (hierarchyCache_) {
         return *hierarchyCache_;
     }
-    auto &mutableDataset = const_cast<DcmDataset &>(dataset());
+    auto &mutableDataset = const_cast<DcmDataset &>(detail::DocumentAccess::dataset(*this));
     DicomHierarchy result;
     result.patientId = datasetString(mutableDataset, DCM_PatientID);
     result.studyId = datasetString(mutableDataset, DCM_StudyInstanceUID);
@@ -564,7 +592,7 @@ DicomHierarchy DicomDocument::hierarchy() const {
     result.patientLabel = labelOr(datasetString(mutableDataset, DCM_PatientName), result.patientId, "Unknown patient");
     result.studyLabel = labelOr(datasetString(mutableDataset, DCM_StudyDescription), result.studyId, "Unknown study");
     result.seriesLabel = labelOr(datasetString(mutableDataset, DCM_SeriesDescription), result.seriesId, "Unknown series");
-    const auto instance = attributeValue(DCM_InstanceNumber);
+    const auto instance = attributeValue(publicTag(DCM_InstanceNumber));
     if (instance) {
         long number{};
         const auto [end, error] = std::from_chars(instance->data(), instance->data() + instance->size(), number);
@@ -576,9 +604,9 @@ DicomHierarchy DicomDocument::hierarchy() const {
     return result;
 }
 
-std::optional<std::string> DicomDocument::attributeValue(const DcmTagKey &tag) const {
+std::optional<std::string> DicomDocument::attributeValue(const DicomTag &tag) const {
     OFString value;
-    if (const_cast<DcmDataset &>(dataset()).findAndGetOFStringArray(tag, value).bad()) {
+    if (const_cast<DcmDataset &>(detail::DocumentAccess::dataset(*this)).findAndGetOFStringArray(dcmtkTag(tag), value).bad()) {
         return std::nullopt;
     }
     return std::string{value};
@@ -586,11 +614,15 @@ std::optional<std::string> DicomDocument::attributeValue(const DcmTagKey &tag) c
 
 bool DicomDocument::isDicomDirectory() const {
     OFString sopClassUid;
-    if (file_->getMetaInfo()->findAndGetOFString(DCM_MediaStorageSOPClassUID, sopClassUid).good() &&
+    if (const_cast<DcmFileFormat &>(detail::DocumentAccess::file(*this))
+            .getMetaInfo()
+            ->findAndGetOFString(DCM_MediaStorageSOPClassUID, sopClassUid)
+            .good() &&
         sopClassUid == UID_MediaStorageDirectoryStorage) {
         return true;
     }
-    return datasetString(const_cast<DcmDataset &>(dataset()), DCM_SOPClassUID) == UID_MediaStorageDirectoryStorage;
+    return datasetString(const_cast<DcmDataset &>(detail::DocumentAccess::dataset(*this)), DCM_SOPClassUID) ==
+           UID_MediaStorageDirectoryStorage;
 }
 
 const std::filesystem::path &DicomDocument::filePath() const { return filePath_; }

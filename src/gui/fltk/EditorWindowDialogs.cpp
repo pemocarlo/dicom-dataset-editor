@@ -5,8 +5,6 @@
 #include "dicom_editor/core/AttributeInput.hpp"
 #include "dicom_editor/core/DicomWorkspace.hpp"
 
-#include <dcmtk/dcmdata/dctagkey.h>
-
 #include <FL/Enumerations.H>
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
@@ -160,7 +158,7 @@ std::optional<dicom_editor::AttributeInput> EditorWindow::batchEditAttribute(con
         std::format("{} dataset(s) in {} '{}'.\n\n", report.documentCount,
                     report.target.level == dicom_editor::BatchEditLevel::Patient ? "patient" : "study", report.target.label);
     for (const auto &attribute : report.attributes) {
-        summary += std::format("{} ({:04x},{:04x}): ", attribute.name, attribute.tag.getGroup(), attribute.tag.getElement());
+        summary += std::format("{} ({:04x},{:04x}): ", attribute.name, attribute.tag.group, attribute.tag.element);
         for (std::size_t index = 0; index < attribute.values.size(); ++index) {
             summary += (index == 0 ? "" : " | ") + attribute.values[index];
         }
