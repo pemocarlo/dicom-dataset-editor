@@ -26,6 +26,14 @@ option(DICOM_EDITOR_BUILD_BENCHMARKS "Build synthetic performance benchmarks" OF
 option(DICOM_EDITOR_ENABLE_VALGRIND "Provide a Valgrind CTest MemCheck target" OFF)
 option(DICOM_EDITOR_BUILD_FLTK "Build the FLTK UI and executable" ON)
 option(DICOM_EDITOR_BUILD_C_API "Build the optional pure C operations wrapper" OFF)
+option(DICOM_EDITOR_BUILD_C_DEMO "Build the minimal pure C API demo" OFF)
+
+if(DICOM_EDITOR_BUILD_C_DEMO)
+    if(NOT DICOM_EDITOR_BUILD_C_API)
+        message(FATAL_ERROR "DICOM_EDITOR_BUILD_C_DEMO requires DICOM_EDITOR_BUILD_C_API=ON")
+    endif()
+    enable_language(C)
+endif()
 
 find_package(DCMTK CONFIG REQUIRED)
 if(DICOM_EDITOR_BUILD_FLTK)
@@ -186,7 +194,14 @@ if(DICOM_EDITOR_BUILD_C_API)
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     )
     target_link_libraries(dicom_viewer_operations_c PRIVATE DicomViewer::operations)
+
+    if(DICOM_EDITOR_BUILD_C_DEMO)
+        add_executable(dicom_viewer_c_demo examples/c_demo/main.c)
+        add_executable(DicomViewer::c_demo ALIAS dicom_viewer_c_demo)
+        target_link_libraries(dicom_viewer_c_demo PRIVATE DicomViewer::operations_c)
+    endif()
 endif()
+
 
 set(DICOM_EDITOR_APPLICATION_HEADERS
     include/dicom_editor/application/EditorController.hpp
@@ -281,9 +296,14 @@ if(DICOM_EDITOR_BUILD_C_API)
     )
 endif()
 
+if(DICOM_EDITOR_BUILD_C_DEMO)
+    install(TARGETS dicom_viewer_c_demo)
+endif()
+
 if(DICOM_EDITOR_BUILD_FLTK)
     install(TARGETS dicom-dataset-editor)
 endif()
+
 
 install(EXPORT DicomViewerOperationsTargets
     FILE DicomViewerOperationsTargets.cmake

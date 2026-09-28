@@ -11,6 +11,12 @@ The operations headers use project-owned value types and do not expose DCMTK
 classes. An optional opaque-handle C ABI is available as
 `dicom_viewer/operations_c.h`.
 
+A minimal C example is available at `examples/c_demo/main.c`. It creates an
+opaque document handle, loads a DICOM file, reports errors through the C API,
+and can optionally exercise `save_as` followed by `save` to write an output
+copy. See [BUILDING.md](BUILDING.md#reusing-the-dicom-operations-library) for
+the build and run commands.
+
 ## Start Here
 
 - Build and install: [BUILDING.md](BUILDING.md)

@@ -30,6 +30,7 @@ class DicomViewerRecipe(ConanFile):
         "CMakeLists.txt",
         "CMakePresets.json",
         "cmake/*",
+        "examples/*",
         "include/*",
         "src/*",
         "tests/*",

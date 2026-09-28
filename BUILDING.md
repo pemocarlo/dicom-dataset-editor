@@ -21,6 +21,38 @@ and is enabled with the Conan `with_c_api=True` option. The optional FLTK
 application is exposed in the build as `DicomViewer::fltk_demo` and is enabled
 with `with_gui=True`.
 
+The repository also contains a minimal C demo in `examples/c_demo/main.c`.
+Build it directly with CMake by enabling both C API options:
+
+```text
+cmake --preset dev -DDICOM_EDITOR_BUILD_C_API=ON -DDICOM_EDITOR_BUILD_C_DEMO=ON
+cmake --build --preset dev --target dicom_viewer_c_demo
+```
+
+The executable accepts an input DICOM path and an optional output path:
+
+```text
+dicom_viewer_c_demo <input-dicom-file> [output-dicom-file]
+```
+
+For example, from the repository root on Windows:
+
+```text
+.\build\Debug\Debug\dicom_viewer_c_demo.exe .\ct_rdsr\ct_rdsr_2.25.72161259926463007376704393658014718422.dcm .\build\Debug\demo-output.dcm
+```
+
+The demo uses only `dicom_viewer/operations_c.h` and demonstrates the full
+basic handle lifecycle:
+
+1. Create an opaque document handle.
+2. Load the input file and report failures through `last_error`.
+3. If an output path is supplied, call `save_as` to write a copy and adopt the
+   new path, then call `save` to write that file again.
+4. Destroy the handle.
+
+Use a different output path when you want to preserve the input file. With no
+output path, the demo only loads and validates the input without saving it.
+
 Conan consumers can require `dicom_viewer/0.1.0`. The default package contains
 the static operations library only; set `shared=True` for a shared library,
 `with_c_api=True` for the C wrapper, and `with_gui=True` to additionally
